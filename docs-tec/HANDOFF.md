@@ -36,7 +36,9 @@ validar com os enums do schema Prisma em vez de listas próprias; testes de unid
   18 pessoas do seed (Pai, Mãe, Avô, Avó, Irmã, Irmão, Tio, Primo, Filha, Filho, Você) e
   busca/paginação/ordenação funcionando através do proxy do Vite.
 - `docker compose up -d --build`: imagem do backend, `migrate` aplicando as migrations e a API
-  respondendo em container.
+  respondendo em container (healthcheck verde).
+- O repositório foi publicado em [github.com/jpmvale/kindred](https://github.com/jpmvale/kindred) e o
+  CI passou no primeiro push.
 
 ## Pontos de atenção
 
