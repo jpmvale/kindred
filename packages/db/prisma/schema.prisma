@@ -1,0 +1,62 @@
+// Fonte da verdade do modelo de dados do kindred (doc: docs-tec/02-modelo-de-dados.md).
+// Só o @kindred/db conhece o Prisma; os apps importam os tipos e o client deste pacote.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Person {
+  id               String           @id @default(uuid())
+  name             String
+  sex              Sex?
+  birthDate        DateTime?
+  deathDate        DateTime?
+  deceased         Boolean          @default(false)
+  profilePhoto     String?
+  relationshipType RelationshipType
+  isCentralUser    Boolean          @default(false)
+
+  fatherId         String?
+  father           Person?          @relation("Father", fields: [fatherId], references: [id])
+  childrenAsFather Person[]         @relation("Father")
+
+  motherId         String?
+  mother           Person?          @relation("Mother", fields: [motherId], references: [id])
+  childrenAsMother Person[]         @relation("Mother")
+
+  locationId       String?
+  location         Location?        @relation(fields: [locationId], references: [id])
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("people")
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  people    Person[]
+
+  @@map("locations")
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum RelationshipType {
+  FAMILY
+  WIFE
+  FRIEND
+  ACQUAINTANCE
+  OTHER
+}

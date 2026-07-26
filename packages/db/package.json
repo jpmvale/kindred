@@ -1,0 +1,37 @@
+{
+  "name": "@kindred/db",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "pnpm db:generate && tsc -b",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "tsx src/cli.ts generate",
+    "db:migrate": "tsx src/cli.ts migrate deploy",
+    "db:migrate:dev": "tsx src/cli.ts migrate dev",
+    "db:reset": "tsx src/cli.ts migrate reset",
+    "db:studio": "tsx src/cli.ts studio",
+    "db:seed": "tsx src/seed.ts",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo"
+  },
+  "prisma": {
+    "seed": "tsx src/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

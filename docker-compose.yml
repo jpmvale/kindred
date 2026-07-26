@@ -1,0 +1,71 @@
+# Ambiente de dev do kindred (ADR-004): Postgres, migrations e API.
+#
+#   docker compose up -d postgres    # só o banco (fluxo de dev recomendado, API/web no host)
+#   docker compose up -d             # banco + migrations + API em container
+#
+# O web não está aqui de propósito: num monorepo pnpm o dev server com HMR roda
+# no host (`pnpm --filter @kindred/web dev`) — bind-mount de node_modules com os
+# symlinks do pnpm é fonte de problema, não de produtividade.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kindred-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kindred
+      POSTGRES_PASSWORD: kindred123
+      POSTGRES_DB: kindred
+    ports:
+      - "5432:5432"
+    volumes:
+      - kindred_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kindred"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Aplica as migrations e sai. A API depende da conclusão bem-sucedida deste serviço.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["pnpm", "--filter", "@kindred/db", "db:migrate"]
+    environment:
+      DATABASE_URL: postgresql://kindred:kindred123@postgres:5432/kindred?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kindred-api
+    restart: unless-stopped
+    command: ["node", "apps/api/dist/main.js"]
+    environment:
+      DATABASE_URL: postgresql://kindred:kindred123@postgres:5432/kindred?schema=public
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  kindred_pgdata:

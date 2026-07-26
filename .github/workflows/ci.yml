@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Um PR que recebe vários pushes cancela as execuções antigas.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: build + typecheck + lint + testes
+    runs-on: ubuntu-latest
+    env:
+      # O `prisma generate` (build do @kindred/db) exige a variável resolvível,
+      # mesmo sem conectar. Os testes de unidade não tocam o banco.
+      DATABASE_URL: postgresql://kindred:kindred123@localhost:5432/kindred?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build
+      - run: pnpm turbo run typecheck
+      - run: pnpm turbo run lint
+      - run: pnpm turbo run test
