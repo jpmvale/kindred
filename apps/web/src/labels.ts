@@ -1,4 +1,4 @@
-import type { RelationshipType, Sex } from '@kindred/types';
+import type { RelationshipType, Sex, UnionStatus } from '@kindred/types';
 
 /**
  * Rótulos em pt-BR dos enums do domínio. Ficam no web porque são apresentação —
@@ -11,8 +11,12 @@ export const SEX_LABELS: Record<Sex, string> = {
 
 export const RELATIONSHIP_LABELS: Record<RelationshipType, string> = {
   FAMILY: 'Família',
-  WIFE: 'Esposa',
   FRIEND: 'Amigo(a)',
   ACQUAINTANCE: 'Conhecido(a)',
   OTHER: 'Outro',
+};
+
+export const UNION_STATUS_LABELS: Record<UnionStatus, string> = {
+  CURRENT: 'União atual',
+  ENDED: 'União desfeita',
 };

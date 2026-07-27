@@ -3,16 +3,23 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import type { Person, UnionStatus } from '@kindred/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { computeKinship } from './kinship.util';
 import { FindPeopleQueryDto } from './dto/find-people-query.dto';
 
-const INCLUDE = { father: true, mother: true, location: true } as const;
+const INCLUDE = {
+  father: true,
+  mother: true,
+  location: true,
+  unionsAsA: { include: { partnerB: true } },
+  unionsAsB: { include: { partnerA: true } },
+} as const;
+
 const RELATIONSHIP_LABELS: Record<string, string> = {
   FAMILY: 'Família',
-  WIFE: 'Esposa',
   FRIEND: 'Amigo',
   ACQUAINTANCE: 'Conhecido',
   OTHER: 'Outro',
@@ -22,6 +29,45 @@ function normalizeNullableUuid(value?: string | null): string | null {
   if (value === undefined || value === null) return null;
   const normalized = value.trim();
   return normalized.length ? normalized : null;
+}
+
+type UnionFields = {
+  id: string;
+  status: UnionStatus;
+  startDate: Date | null;
+  endDate: Date | null;
+};
+
+type PersonWithUnionSides = {
+  unionsAsA: (UnionFields & { partnerBId: string; partnerB: Person })[];
+  unionsAsB: (UnionFields & { partnerAId: string; partnerA: Person })[];
+};
+
+/**
+ * A tabela guarda a união com dois lados (`partnerA`/`partnerB`) porque é assim que
+ * o Postgres a representa, mas quem consome quer uma lista só: "as uniões desta
+ * pessoa, e quem é o par em cada uma". A conversão acontece aqui, na borda.
+ */
+function withUnions<T extends PersonWithUnionSides>({
+  unionsAsA,
+  unionsAsB,
+  ...person
+}: T) {
+  return {
+    ...person,
+    unions: [
+      ...unionsAsA.map(({ partnerBId, partnerB, ...union }) => ({
+        ...union,
+        partnerId: partnerBId,
+        partner: partnerB,
+      })),
+      ...unionsAsB.map(({ partnerAId, partnerA, ...union }) => ({
+        ...union,
+        partnerId: partnerAId,
+        partner: partnerA,
+      })),
+    ],
+  };
 }
 
 @Injectable()
@@ -39,7 +85,7 @@ export class PeopleService {
         );
     }
 
-    return this.prisma.person.create({
+    const created = await this.prisma.person.create({
       data: {
         name: dto.name,
         sex: dto.sex ?? null,
@@ -55,22 +101,29 @@ export class PeopleService {
       },
       include: INCLUDE,
     });
+
+    return withUnions(created);
   }
 
   async findAll(query?: FindPeopleQueryDto) {
-    const people = await this.prisma.person.findMany({
-      orderBy: { name: 'asc' },
-      include: INCLUDE,
-    });
+    const [people, unions] = await Promise.all([
+      this.prisma.person.findMany({
+        orderBy: { name: 'asc' },
+        include: INCLUDE,
+      }),
+      this.prisma.union.findMany({
+        select: { partnerAId: true, partnerBId: true, status: true },
+      }),
+    ]);
 
     const central = people.find((p) => p.isCentralUser);
 
     const enriched = people.map((p) => ({
-      ...p,
+      ...withUnions(p),
       kinshipDegree: p.isCentralUser
         ? 'Você'
         : central
-          ? computeKinship(p.id, central.id, people)
+          ? computeKinship(p.id, central.id, people, unions)
           : null,
     }));
 
@@ -164,18 +217,24 @@ export class PeopleService {
     });
     if (!person) throw new NotFoundException(`Pessoa "${id}" não encontrada`);
 
-    if (person.isCentralUser) return { ...person, kinshipDegree: 'Você' };
+    if (person.isCentralUser)
+      return { ...withUnions(person), kinshipDegree: 'Você' };
 
-    const [central, all] = await Promise.all([
+    const [central, all, unions] = await Promise.all([
       this.prisma.person.findFirst({ where: { isCentralUser: true } }),
       this.prisma.person.findMany({
-        select: { id: true, fatherId: true, motherId: true },
+        select: { id: true, fatherId: true, motherId: true, sex: true },
+      }),
+      this.prisma.union.findMany({
+        select: { partnerAId: true, partnerBId: true, status: true },
       }),
     ]);
 
     return {
-      ...person,
-      kinshipDegree: central ? computeKinship(id, central.id, all) : null,
+      ...withUnions(person),
+      kinshipDegree: central
+        ? computeKinship(id, central.id, all, unions)
+        : null,
     };
   }
 
@@ -184,7 +243,7 @@ export class PeopleService {
     const resolvedDeceased =
       dto.deathDate !== undefined ? Boolean(dto.deathDate) : dto.deceased;
 
-    return this.prisma.person.update({
+    const updated = await this.prisma.person.update({
       where: { id },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
@@ -214,6 +273,8 @@ export class PeopleService {
       },
       include: INCLUDE,
     });
+
+    return withUnions(updated);
   }
 
   async remove(id: string) {

@@ -32,10 +32,36 @@ model Person {
   locationId       String?
   location         Location?        @relation(fields: [locationId], references: [id])
 
+  // Uniões conjugais. Uma união é simétrica, mas o Postgres precisa de dois lados;
+  // o serviço normaliza a ordem do par (ver RN-011), então basta somar as duas listas
+  // para ter todas as uniões de uma pessoa.
+  unionsAsA        Union[]          @relation("PartnerA")
+  unionsAsB        Union[]          @relation("PartnerB")
+
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
   @@map("people")
+}
+
+/// União conjugal entre duas pessoas. É entidade, e não um campo `spouseId`, porque
+/// tem dados próprios (início, fim, situação) e porque uma pessoa pode ter tido mais
+/// de uma ao longo da vida — é o que distingue cônjuge de ex (ADR-008).
+model Union {
+  id         String      @id @default(uuid())
+  partnerAId String
+  partnerA   Person      @relation("PartnerA", fields: [partnerAId], references: [id], onDelete: Cascade)
+  partnerBId String
+  partnerB   Person      @relation("PartnerB", fields: [partnerBId], references: [id], onDelete: Cascade)
+  status     UnionStatus @default(CURRENT)
+  startDate  DateTime?
+  endDate    DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([partnerAId, partnerBId])
+  @@index([partnerBId])
+  @@map("unions")
 }
 
 model Location {
@@ -55,8 +81,14 @@ enum Sex {
 
 enum RelationshipType {
   FAMILY
-  WIFE
   FRIEND
   ACQUAINTANCE
   OTHER
+}
+
+enum UnionStatus {
+  /// União vigente — é por ela que o parentesco por afinidade se propaga (RN-013).
+  CURRENT
+  /// União desfeita: a pessoa é "ex". Não propaga afinidade.
+  ENDED
 }

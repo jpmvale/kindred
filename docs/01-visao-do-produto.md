@@ -14,7 +14,9 @@ todo o resto é descrito em relação a ela:
 
 - **Vínculo de sangue** modelado do jeito mais simples possível: cada pessoa aponta para **pai** e
   **mãe**. Todo parentesco (irmão, tio, primo, bisneta) é *derivado* disso, não digitado à mão.
-- **Vínculo social** como um rótulo na pessoa: família, esposa, amigo, conhecido, outro.
+- **União conjugal** como vínculo entre duas pessoas, com situação (vigente ou desfeita) e datas — é
+  daí que saem sogro, cunhado e genro, e é o que permite dizer "esposa" ou "ex-esposa".
+- **Vínculo social** como um rótulo na pessoa: família, amigo, conhecido, outro.
 - **Local** (cidade) e datas de **nascimento** e **falecimento**.
 
 Com isso, três leituras da mesma base:

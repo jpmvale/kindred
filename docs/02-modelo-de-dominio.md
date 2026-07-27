@@ -1,6 +1,6 @@
 # 02 — Modelo de domínio
 
-Duas entidades: **Pessoa** e **Local**. O schema que as implementa está em
+Três entidades: **Pessoa**, **União** e **Local**. O schema que as implementa está em
 [`docs-tec/02-modelo-de-dados.md`](../docs-tec/02-modelo-de-dados.md).
 
 ## Pessoa
@@ -11,8 +11,8 @@ Duas entidades: **Pessoa** e **Local**. O schema que as implementa está em
 | **Sexo** | `MASCULINO` / `FEMININO`, opcional. Serve para flexionar o grau de parentesco ("Tia", "Neto"). |
 | **Nascimento / falecimento** | Datas opcionais. Preencher o falecimento marca a pessoa como falecida (RN-006). |
 | **Foto** | URL de imagem. Sem foto, a interface mostra a inicial do nome (RN-007). |
-| **Tipo de relacionamento** | Como essa pessoa entra na sua vida: `FAMILY`, `WIFE`, `FRIEND`, `ACQUAINTANCE`, `OTHER`. É um rótulo social, não um vínculo de sangue. |
-| **Pai / mãe** | Referências a outras pessoas. São o **único** vínculo estrutural do modelo. |
+| **Tipo de relacionamento** | Como essa pessoa entra na sua vida: `FAMILY`, `FRIEND`, `ACQUAINTANCE`, `OTHER`. É um rótulo social, não um vínculo de sangue. Cônjuge **não** está aqui: é vínculo, ver União. |
+| **Pai / mãe** | Referências a outras pessoas. Junto da União, são os vínculos estruturais do modelo. |
 | **Local** | Referência opcional a um Local. |
 | **Pessoa central** | Marca única: a pessoa a partir de quem o parentesco é calculado (RN-001). |
 
@@ -38,8 +38,23 @@ e a outra pessoa é medido em **subidas** (para pai/mãe) e **descidas** (para f
 | 3 | 1 | Tio-avô / Tia-avó |
 | … | … | ver RN-004 |
 
-Sem caminho conhecido dentro do limite, a pessoa é "Parente distante". Quem não é da família (amigo,
-conhecido) simplesmente não tem parentesco — o rótulo social já a descreve.
+Não havendo caminho de sangue, o parentesco pode vir por **afinidade**: um salto pela união (sogro,
+cunhado, genro, madrasta), e só se a união estiver vigente — ver União e RN-013. Sem nenhum dos dois
+caminhos dentro do limite, a pessoa é "Parente distante"; quem não é da família (amigo, conhecido)
+simplesmente não tem parentesco — o rótulo social já a descreve.
+
+## União
+
+O casamento — ou qualquer relação conjugal — liga **duas pessoas** e existe por si só, não é um campo
+da pessoa. Tem uma **situação**: vigente (são cônjuges hoje) ou desfeita (são ex). Tem datas
+opcionais de início e fim.
+
+É entidade por causa da separação. Um campo "cônjuge" na pessoa não teria onde guardar que a união
+acabou, nem como registrar um segundo casamento sem apagar o primeiro. Como entidade, a história fica
+inteira: uma pessoa pode ter várias uniões desfeitas e no máximo uma vigente (RN-014).
+
+A união não tem lado — dizer "A e B" ou "B e A" é a mesma união (RN-011). E ela é o que carrega a
+afinidade: os parentes do cônjuge só são parentes enquanto a união vale.
 
 ## Local
 

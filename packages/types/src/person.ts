@@ -1,10 +1,15 @@
 import type { Location } from "./location";
+import type { PersonUnion } from "./union";
 
 export type Sex = "MALE" | "FEMALE";
 
+/**
+ * Rótulo social de como a pessoa entra na sua vida. Cônjuge **não** está aqui:
+ * virou vínculo de verdade (`PersonUnion`), porque precisa distinguir atual de ex
+ * e guardar início e fim (ADR-008).
+ */
 export type RelationshipType =
   | "FAMILY"
-  | "WIFE"
   | "FRIEND"
   | "ACQUAINTANCE"
   | "OTHER";
@@ -25,7 +30,12 @@ export interface Person {
   father?: Person | null;
   mother?: Person | null;
   location?: Location | null;
-  /** Grau de parentesco em relação à pessoa central, calculado pela API (RN-004). */
+  /** Uniões conjugais desta pessoa, vigentes e desfeitas (RN-012). */
+  unions?: PersonUnion[];
+  /**
+   * Grau de parentesco em relação à pessoa central, calculado pela API. Cobre
+   * sangue (RN-004), cônjuge/ex (RN-012) e afinidade (RN-013).
+   */
   kinshipDegree?: string | null;
   createdAt: string;
   updatedAt: string;

@@ -56,8 +56,8 @@ instanciar o `PrismaClient` (que lê `DATABASE_URL` na construção).
 ## ADR-003 — Prisma isolado no `@kindred/db`
 
 **Decisão.** Só o `@kindred/db` declara `prisma`/`@prisma/client`. Ele reexporta `PrismaClient`,
-`Prisma`, os enums (`Sex`, `RelationshipType`) e os tipos de modelo. `apps/api` importa **de
-`@kindred/db`** — nunca de `@prisma/client`.
+`Prisma`, os enums (`Sex`, `RelationshipType`, `UnionStatus`) e os tipos de modelo. `apps/api` importa
+**de `@kindred/db`** — nunca de `@prisma/client`.
 
 **Consequências.** O `prisma generate` roda num lugar só (é o `build` do pacote, então o Turborepo o
 executa antes de compilar a API, inclusive no Docker e no CI). Os DTOs validam com os enums do
@@ -125,3 +125,30 @@ pessoa central contando **subidas** e **descidas**, com limite de 8 passos, e tr
 **Consequências.** Simples de ler, testar (`kinship.util.spec.ts`) e evoluir em pt-BR — e nada fica
 desatualizado, porque nada é persistido. Em troca, `GET /api/people` carrega todas as pessoas para
 calcular. Para uma base pessoal (centenas de pessoas) é irrelevante; ver BL-09.
+
+---
+
+## ADR-008 — União conjugal é entidade, não um campo
+
+**Contexto.** Cônjuge era um valor do enum `RelationshipType` (`WIFE`): um rótulo social, sem vínculo
+nenhum no banco. A esposa aparecia como "Parente distante", a árvore não tinha como desenhar casais e
+não havia caminho até sogro ou cunhado. O desenho óbvio — um `spouseId` apontando para outra pessoa —
+**não resolve o caso que motivou a mudança**: separação. Um campo só comporta um valor e não tem onde
+guardar que a união acabou, então não sabe dizer se alguém é cônjuge ou ex.
+
+**Decisão.** Uma tabela `unions` ligando duas pessoas, com `status` (`CURRENT`/`ENDED`), `startDate` e
+`endDate` — a mesma forma que o GEDCOM usa para família. O valor `WIFE` saiu do `RelationshipType`
+(a migration converte quem estava assim para `FAMILY` e cria a união com a pessoa central), para não
+haver duas fontes dizendo a mesma coisa e podendo divergir.
+
+A união é simétrica, mas a tabela precisa de dois lados. A invariante é gravar sempre o **menor id em
+`partnerAId`** (RN-011): assim (A,B) e (B,A) caem na mesma linha e o índice único do par funciona. A
+conversão para a visão "as uniões desta pessoa, e quem é o par" acontece na borda da API
+(`withUnions`, em `people.service.ts`), então quem consome nunca vê `partnerA`/`partnerB`.
+
+**Consequências.** O cálculo de parentesco passou a ter dois grafos sobrepostos: o de sangue, que é
+percorrido em largura como antes, e o de uniões, que entra depois só para nomear a afinidade — sogro,
+cunhado, genro, padrasto, enteado. Afinidade **só atravessa união vigente** (RN-013): terminada a
+união, a pessoa vira "Ex-esposa" e os parentes dela deixam de ser parentes, que é o comportamento que
+se espera de uma separação. Preço: uniões são recurso próprio (`/api/unions`), fora do formulário de
+pessoa, e a árvore ainda não desenha casais — ficou como item de backlog.

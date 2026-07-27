@@ -19,3 +19,4 @@ export type {
   Sex,
   SortDirection,
 } from "./person";
+export type { PersonUnion, UnionFormData, UnionStatus } from "./union";

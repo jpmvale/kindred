@@ -33,10 +33,11 @@ campo não declarado no DTO é descartado, não rejeitado.
 | `GET` | `/api/health` | Status da API + `select 1` no banco. |
 | `GET` | `/api/people` | Lista com parentesco calculado; paginada se vier `page`/`limit`/`search`/`sortBy`/`sortDirection` (RN-005). |
 | `GET` | `/api/people/central` | A pessoa central, ou `null`. |
-| `GET` | `/api/people/:id` | Uma pessoa, com pai, mãe, local e parentesco. |
+| `GET` | `/api/people/:id` | Uma pessoa, com pai, mãe, local, uniões e parentesco. |
 | `POST` | `/api/people` | Cria (RN-001, RN-003). |
 | `PATCH` | `/api/people/:id` | Atualiza campo a campo (só o que vem no corpo). |
 | `DELETE` | `/api/people/:id` | Remove (RN-010). |
+| `GET`/`POST`/`PATCH`/`DELETE` | `/api/unions[/:id]` | CRUD de uniões conjugais (RN-011, RN-014; ADR-008). |
 | `GET`/`POST`/`PATCH`/`DELETE` | `/api/locations[/:id]` | CRUD de locais. |
 
 A ordem das rotas importa: `/people/central` é declarada **antes** de `/people/:id`, senão "central"

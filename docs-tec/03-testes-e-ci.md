@@ -16,7 +16,9 @@ pnpm lint
 
 O teste que carrega peso é o de `computeKinship` (ADR-007): monta uma árvore de quatro gerações e
 confere pai, mãe, avós, irmã, tio, primo, filha e o caso sem caminho. É a lógica que mais se mexe e a
-que mais quebra sem avisar.
+que mais quebra sem avisar. Com a união conjugal (ADR-008) ele ganhou a metade da afinidade: cônjuge
+e ex, sogro, cunhado, genro, padrasto — e, principalmente, o corte da afinidade quando a união é
+desfeita (RN-013), que é o comportamento fácil de quebrar sem perceber.
 
 O e2e é de fumaça: sobe a app inteira e bate em `/api/health`. Fica fora do `pnpm test` de propósito —
 CI e desenvolvedor rodam a unidade sem infra.

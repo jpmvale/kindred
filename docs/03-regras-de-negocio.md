@@ -12,7 +12,8 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
 ## Cadastro
 
 - **RN-003** — `name` e `relationshipType` são obrigatórios; todo o resto é opcional. O
-  `relationshipType` é normalizado (trim + maiúsculas) antes de validar.
+  `relationshipType` é normalizado (trim + maiúsculas) antes de validar. Os valores são `FAMILY`,
+  `FRIEND`, `ACQUAINTANCE` e `OTHER` — **cônjuge não é um deles**: virou vínculo próprio (RN-011).
 - **RN-006** — Data de falecimento preenchida ⇒ `deceased = true`; limpar a data ⇒ `deceased = false`.
   A flag existe para o caso "sabe-se que faleceu, não se sabe quando".
 - **RN-007** — Pessoa sem foto é exibida com a inicial do nome.
@@ -20,6 +21,17 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   texto.
 - **RN-009** — Campos de referência vazios (`""`) chegando do formulário são tratados como ausência
   (`null`), não como erro de validação.
+
+## União conjugal
+
+- **RN-011** — Uma união liga **duas pessoas distintas** e o par é **único**: não existem duas uniões
+  para o mesmo casal, e tanto faz a ordem em que as duas pessoas são informadas. A união tem uma
+  situação — **vigente** (cônjuge) ou **desfeita** (ex) — e datas opcionais de início e fim.
+- **RN-014** — Uma pessoa tem **no máximo uma união vigente** por vez. Para registrar outra, a
+  anterior precisa ser marcada como desfeita primeiro. Uniões desfeitas não têm limite: é assim que
+  se guarda mais de um casamento ao longo da vida.
+- Apagar uma pessoa apaga as uniões dela — ao contrário de pai/mãe (RN-010), uma união sem um dos
+  lados não significa nada.
 
 ## Parentesco
 
@@ -30,6 +42,18 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   - pares sem nome na tabela viram "Parente de Nº grau"; sem caminho, "Parente distante";
   - a subida só acontece antes de qualquer descida — o caminho é sempre "sobe até o ancestral comum,
     depois desce", o que evita rotular sogros e cunhados como consanguíneos.
+- **RN-012** — Quem tem união com a pessoa central é "Esposa"/"Marido" se ela é vigente, e
+  "Ex-esposa"/"Ex-marido" se foi desfeita (neutro: "Cônjuge"/"Ex-cônjuge"). Esse rótulo vem **antes**
+  do sangue: quem se casou com um primo distante aparece como cônjuge, não como primo.
+- **RN-013** — Não havendo laço de sangue, o parentesco pode vir por **afinidade** — um único salto
+  conjugal, em qualquer das duas direções:
+  - parentes do cônjuge: **Sogro/Sogra**, **Cunhado/Cunhada**, **Enteado/Enteada**;
+  - cônjuges dos parentes: **Cunhado/Cunhada**, **Genro/Nora**, **Padrasto/Madrasta**;
+  - sem nome próprio em pt-BR, o rótulo é descritivo: "Avó do cônjuge", "Cônjuge de Primo".
+
+  **A afinidade só atravessa união vigente.** Terminada a união, o ex continua sendo "Ex-esposa", mas
+  os parentes dele deixam de ser parentes — o sogro volta a ser "Parente distante". É o que se espera
+  de uma separação, e é o motivo de a união ser entidade e não um campo.
 
 ## Listagem
 

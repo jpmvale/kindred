@@ -7,9 +7,16 @@
  * O objetivo é ter conteúdo suficiente para as telas fazerem sentido de primeira:
  * três gerações (para a árvore e o cálculo de parentesco), datas de nascimento
  * espalhadas pelo ano (para o calendário de aniversários), pessoas falecidas,
- * locais e relacionamentos de todos os tipos. São pessoas fictícias.
+ * locais, relacionamentos de todos os tipos e uniões conjugais — inclusive uma
+ * desfeita, para exercitar o "ex" e o corte da afinidade (RN-013). São pessoas
+ * fictícias.
  */
-import { PrismaClient, type RelationshipType, type Sex } from "@prisma/client";
+import {
+  PrismaClient,
+  type RelationshipType,
+  type Sex,
+  type UnionStatus,
+} from "@prisma/client";
 import { loadRootEnv } from "./env";
 
 loadRootEnv();
@@ -26,6 +33,14 @@ type PersonSeed = {
   father?: string;
   mother?: string;
   location?: string;
+};
+
+/** Os nomes são resolvidos para ids; a ordem do par é normalizada na gravação (RN-011). */
+type UnionSeed = {
+  partners: [string, string];
+  status?: UnionStatus;
+  startDate?: string;
+  endDate?: string;
 };
 
 const LOCATIONS = [
@@ -129,12 +144,35 @@ const PEOPLE: PersonSeed[] = [
     father: "Paulo Souza",
     location: "Belo Horizonte, MG",
   },
+
+  // --- Família da esposa (sogros e cunhado, para exercitar a afinidade) ---
+  {
+    name: "Heitor Alves",
+    sex: "MALE",
+    birthDate: "1959-08-14",
+    location: "Curitiba, PR",
+  },
+  {
+    name: "Sônia Alves",
+    sex: "FEMALE",
+    birthDate: "1963-03-02",
+    location: "Curitiba, PR",
+  },
   {
     name: "Fernanda Alves",
     sex: "FEMALE",
     birthDate: "1990-11-11",
-    relationshipType: "WIFE",
+    father: "Heitor Alves",
+    mother: "Sônia Alves",
     location: "São Paulo, SP",
+  },
+  {
+    name: "Marcos Alves",
+    sex: "MALE",
+    birthDate: "1993-06-26",
+    father: "Heitor Alves",
+    mother: "Sônia Alves",
+    location: "Curitiba, PR",
   },
 
   // --- Filhos ---
@@ -152,6 +190,21 @@ const PEOPLE: PersonSeed[] = [
     birthDate: "2021-09-14",
     father: "Miguel Souza",
     mother: "Fernanda Alves",
+    location: "São Paulo, SP",
+  },
+
+  // --- Cônjuges dos parentes e a união desfeita ---
+  {
+    name: "Rodrigo Pinto",
+    sex: "MALE",
+    birthDate: "1990-01-23",
+    location: "Curitiba, PR",
+  },
+  {
+    name: "Tereza Nunes",
+    sex: "FEMALE",
+    birthDate: "1987-05-09",
+    relationshipType: "OTHER",
     location: "São Paulo, SP",
   },
 
@@ -185,6 +238,24 @@ const PEOPLE: PersonSeed[] = [
   },
 ];
 
+const UNIONS: UnionSeed[] = [
+  { partners: ["Antônio Souza", "Maria Souza"], startDate: "1957-11-09" },
+  { partners: ["José Lima", "Aparecida Lima"], startDate: "1961-02-18" },
+  { partners: ["Carlos Souza", "Regina Lima Souza"], startDate: "1986-10-25" },
+  { partners: ["Heitor Alves", "Sônia Alves"], startDate: "1988-04-16" },
+  // A pessoa central: uma união vigente e uma desfeita — é o par que distingue
+  // "Esposa" de "Ex-esposa" e corta a afinidade pelo lado da Tereza.
+  { partners: ["Miguel Souza", "Fernanda Alves"], startDate: "2015-12-05" },
+  {
+    partners: ["Miguel Souza", "Tereza Nunes"],
+    status: "ENDED",
+    startDate: "2010-06-19",
+    endDate: "2014-03-30",
+  },
+  // Marido da irmã: cunhado pelo outro caminho da afinidade.
+  { partners: ["Beatriz Souza", "Rodrigo Pinto"], startDate: "2019-09-07" },
+];
+
 async function main() {
   const force = process.argv.includes("--force");
   const existing = await prisma.person.count();
@@ -197,8 +268,10 @@ async function main() {
   }
 
   if (existing > 0 && force) {
-    console.log(`▶ --force: apagando ${existing} pessoa(s) e os locais`);
+    console.log(`▶ --force: apagando ${existing} pessoa(s), uniões e locais`);
     // `people` referencia `people` (pai/mãe) e `locations`: limpa filho antes de pai.
+    // As uniões cairiam junto por cascata, mas apagá-las antes deixa a ordem explícita.
+    await prisma.union.deleteMany();
     await prisma.person.deleteMany();
     await prisma.location.deleteMany();
   }
@@ -228,8 +301,30 @@ async function main() {
     personIds.set(seed.name, person.id);
   }
 
+  for (const union of UNIONS) {
+    const [first, second] = union.partners.map((name) => {
+      const id = personIds.get(name);
+      if (!id) throw new Error(`união com pessoa desconhecida: "${name}"`);
+      return id;
+    });
+    // Ordem normalizada (RN-011): o menor id em partnerAId, para que (A,B) e
+    // (B,A) sejam sempre a mesma união.
+    const [partnerAId, partnerBId] =
+      first < second ? [first, second] : [second, first];
+
+    await prisma.union.create({
+      data: {
+        partnerAId,
+        partnerBId,
+        status: union.status ?? "CURRENT",
+        startDate: union.startDate ? new Date(union.startDate) : null,
+        endDate: union.endDate ? new Date(union.endDate) : null,
+      },
+    });
+  }
+
   console.log(
-    `✓ seed aplicado: ${locationIds.size} locais e ${personIds.size} pessoas (central: Miguel Souza).`,
+    `✓ seed aplicado: ${locationIds.size} locais, ${personIds.size} pessoas e ${UNIONS.length} uniões (central: Miguel Souza).`,
   );
 }
 
