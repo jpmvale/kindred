@@ -14,9 +14,11 @@ completa em [`docs/01-visao-do-produto.md`](docs/01-visao-do-produto.md).
 
 ## Como trabalhar aqui
 
-1. **Gerenciador de pacotes: sempre `pnpm`** (via `corepack pnpm`) — é um monorepo pnpm workspaces.
+1. **Gerenciador de pacotes: sempre `pnpm`**, chamado direto — é um monorepo pnpm workspaces.
    **Nunca `npm` nem `yarn`:** um `npm install` gera `package-lock.json`, quebra os symlinks do
-   workspace e os scripts `pnpm --filter …`.
+   workspace e os scripts `pnpm --filter …`. **Nem `corepack pnpm`:** sob o corepack o pnpm não
+   troca de versão sozinho, e com um pnpm mais novo que o `packageManager` do `package.json` todo
+   script do turbo morre com "This project is configured to use …". Chamado direto ele se ajusta.
 2. **Idioma:** documentação, comentários e conversa em **português (pt-BR)**. A UI também.
 3. **Commits:** `tipo: frase` curta em português — `feat`, `fix`, `docs`, `chore`, `refactor`.
 4. **Schema:** o Prisma vive só no `@kindred/db`. Mudou o schema → `pnpm db:migrate:dev` (gera a
