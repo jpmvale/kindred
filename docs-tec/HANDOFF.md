@@ -37,9 +37,21 @@ Vitest). O porquê das duas escolhas de layout está no **ADR-009**:
 - o passe de espaçamento de cada geração trata o casal como **um bloco**, senão enfia um irmão entre
   marido e mulher.
 
-Quem só está na árvore por causa da união é folha (sem botão de expandir) — abrir a família do
-cônjuge virou BL-13. Há um filtro **Com cônjuges** ao lado do "Com irmãos", e a legenda ganhou união
-vigente (linha cheia) e desfeita (tracejada).
+Há um filtro **Com cônjuges** ao lado do "Com irmãos", e a legenda ganhou união vigente (linha cheia)
+e desfeita (tracejada).
+
+## Sessão de 27/07 — a linha do cônjuge (BL-13)
+
+O cônjuge deixou de ser folha: ganhou os mesmos botões de todo mundo, e o "+" abre sogro e sogra, o
+"↔" traz os cunhados. A família dele **só entra quando é pedida** — a árvore continua de sangue por
+padrão.
+
+O problema real era o rank. O dagre não sabe que uma união liga duas pessoas, então o cônjuge sem
+filhos na árvore fica solto e vai para o topo, levando o sogro junto — ele apareceria acima dos
+próprios avós da pessoa central. Resolver dentro do dagre não dá: `minlen: 0` (aresta de mesmo rank)
+**quebra o layout**, verificado à parte antes de escolher o caminho. A saída foi deixar o dagre
+arrumar a família do cônjuge entre si e deslocar esse **grupo inteiro**, em x e em y, junto com o
+cônjuge (ADR-009).
 
 ## Sessão de 26/07 — monorepo
 
@@ -78,16 +90,20 @@ não há resposta.
 
 Na sessão de 27/07:
 
+- BL-13 na tela, contra o seed: o "+" da Fernanda traz Heitor e Sônia **exatamente uma linha acima**
+  (148px, a distância entre gerações) e do lado dela, não sobre o Miguel; o "↔" traz o Marcos
+  (Cunhado) na mesma linha. Com tudo aberto: 19 nós em 4 gerações, **nenhuma colisão** e as 7 linhas
+  de união medindo 14px — o vão de um casal encostado.
 - RN-015 contra o seed, com a API no ar: os três amigos/conhecidos e a `OTHER` sem união vêm com
   `kinshipDegree` nulo, todo o resto mantém o grau, e a lista na tela mostra "Amigo(a) · Masculino ·
   19/07/1987" sem parentesco nenhum. A busca continua achando por rótulo social ("amigo" → 2) e por
   grau ("primo" → 1).
 
-- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**32 testes**: 21 de parentesco, 10 do layout da
+- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**40 testes**: 23 de parentesco, 16 do layout da
   árvore, 1 de health) — verdes.
-- Árvore no navegador contra o seed, colapsada e com tudo aberto: 19 nós, **nenhum par mais perto que
-  o espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e
-  as 7 linhas de união medindo o vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as
+- Árvore no navegador contra o seed, colapsada e com tudo aberto: **nenhum par mais perto que o
+  espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e as
+  linhas de união todas no vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as
   linhas; o hover realça as duas uniões do Miguel, a vigente e a desfeita.
 - A migration foi testada num **banco descartável** antes de tocar o de dev: `0_init` + linhas com
   `WIFE` + a migration nova, conferindo que a pessoa virou `FAMILY`, que a união nasceu vigente com o
@@ -114,18 +130,18 @@ Na sessão de 26/07 (monorepo):
 
 - **Portas.** O projeto irmão *coda* também usa 3000 e 5432. Rodar os dois ao mesmo tempo exige
   mudar as portas de um deles (`docker compose stop` no coda foi o que se fez aqui).
-- **A árvore para no cônjuge.** Ele aparece ao lado do par, mas é folha: a família dele (sogros,
-  cunhados) não tem como ser aberta na tela, embora o parentesco já saiba nomeá-la (BL-13).
+- **O grupo de afinidade se desloca como bloco, mas o espaçamento é linha a linha.** Num caso
+  extremo (muitos cônjuges com família aberta na mesma geração) o grupo pode sair torto — nunca
+  sobreposto, mas desalinhado do cônjuge. Não apareceu com o seed.
 - **Duas regras do `react-hooks` estão como aviso** no ESLint do web (BL-11), por causa do fetch em
   `useEffect` nas páginas. O CI passa, mas a dívida existe.
 - **`isCentralUser` não tem unicidade no banco** — a garantia é só na aplicação (doc 02).
 
 ## Próximo passo sugerido
 
-Nada travado. Em ordem de incômodo:
+Nada travado, e as três frentes do cônjuge estão fechadas. Em ordem de incômodo:
 
-1. **BL-13 — abrir a linha do cônjuge** na árvore (sogros, cunhados). O layout já está isolado e
-   testado (ADR-009), então dá para mexer com rede de proteção; a decisão de produto é até onde
-   deixar a árvore crescer para fora do sangue.
+1. **BL-03** — busca sem acento ("jose" achar "José"). Pequeno e aparece toda hora.
 2. **BL-11** — tirar o fetch do `useEffect`, que é a dívida que o ESLint ainda aponta.
-3. **BL-03** — busca sem acento ("jose" achar "José"), que é pequeno e aparece toda hora.
+3. **BL-08** — os testes que faltam no front (lista, formulário, calendário). A árvore já tem os
+   seus, e o caminho está aberto: `pnpm --filter @kindred/web test` roda no Vitest.

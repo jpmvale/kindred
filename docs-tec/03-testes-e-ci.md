@@ -26,8 +26,10 @@ CI e desenvolvedor rodam a unidade sem infra.
 
 **No front, só a árvore tem teste.** O layout saiu do componente para um módulo puro (ADR-009), e é
 ele que `apps/web/src/pages/tree-layout.test.ts` exercita no Vitest, sem DOM: quem aparece, o cônjuge
-encostado no par, a ex do outro lado, a união desfeita tracejada. O resto das páginas continua sem
-teste nenhum (BL-08).
+encostado no par, a ex do outro lado, a união desfeita tracejada, o sogro uma geração acima e nenhum
+par de nós mais perto que o espaçamento mínimo. Os dois defeitos que apareceram durante o BL-12/BL-13
+— a linha da ex atravessando o card da atual e dois cards sobrepostos — viraram teste. O resto das
+páginas continua sem teste nenhum (BL-08).
 
 ## CI
 

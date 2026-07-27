@@ -177,7 +177,18 @@ Sobre o casal em si, duas escolhas:
   mínima entre nós do mesmo rank passou a mover o casal junto, senão ele enfia um irmão ou um primo
   entre marido e mulher.
 
-**Consequências.** Quem só está na árvore por causa da união é **folha**: aparece ao lado do par, mas
-sem os botões de expandir — abrir a linha dele traria a família inteira do sogro para uma árvore que
-é de sangue (BL-13). Quem tem união *e* laço de sangue (o cônjuge que também é pai de alguém visível,
-ou o primo com quem se casou) mantém o rank próprio e mesmo assim é aproximado do par.
+Depois veio a família do cônjuge (sogro, cunhado, avó do cônjuge), e ela obrigou a uma terceira
+escolha: **o grupo de afinidade anda junto**. O dagre não sabe que uma união liga duas pessoas, então
+o cônjuge sem filhos na árvore fica solto e o dagre o joga para o topo, levando o sogro junto — o
+sogro apareceria acima dos próprios avós da pessoa central. Tentar resolver dentro do dagre não dá:
+uma aresta de mesmo rank (`minlen: 0`) **quebra o layout** (o algoritmo pressupõe que toda aresta
+desce pelo menos um nível). Então o dagre arruma a família do cônjuge entre si — sogro em cima,
+cunhado ao lado —, e o `placeCouples` desloca esse conjunto inteiro, em x e em y, pelo mesmo tanto
+que deslocou o cônjuge. O desenho interno chega intacto na altura certa.
+
+**Consequências.** O cônjuge deixou de ser folha: tem os mesmos botões de todo mundo, e a linha dele
+só entra quando é pedida — a árvore continua sendo de sangue por padrão. Quem tem união *e* laço de
+sangue (o cônjuge que também é pai de alguém visível, ou o primo com quem se casou) mantém o rank
+próprio e mesmo assim é aproximado do par. O limite conhecido: o grupo de afinidade se desloca como
+bloco, mas o passe de espaçamento continua trabalhando linha a linha — num caso extremo o grupo pode
+sair torto, embora nunca sobreposto.

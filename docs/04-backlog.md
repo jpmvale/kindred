@@ -4,7 +4,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-13 | **Abrir a linha do cônjuge** na árvore (sogros, cunhados) | Hoje o cônjuge é folha: aparece ao lado do par, mas sem os botões de expandir — a árvore é de sangue, e a família dele fica de fora. |
 | BL-02 | **Upload de foto** (hoje é URL) | O caminho atual depende de a imagem estar hospedada em algum lugar. |
 | BL-03 | **Busca com acento-insensibilidade** ("jose" achar "José") | Hoje a busca normaliza caixa, não acento. |
 | BL-04 | **Trocar a pessoa central** sem mexer no banco | RN-001 impede a segunda; falta a operação de transferência. |
@@ -21,5 +20,8 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 - **BL-01** — cônjuge como vínculo: virou a entidade `Union` (ADR-008), com o parentesco por
   afinidade (RN-011 a RN-014).
 - **BL-12** — casais na árvore: o cônjuge aparece encostado no par, com a união vigente em linha
-  cheia e a desfeita tracejada (ADR-009). O que ficou de fora — abrir a família do cônjuge — seguiu
-  como BL-13.
+  cheia e a desfeita tracejada (ADR-009).
+- **BL-13** — a linha do cônjuge: o "+" e o "↔" do cônjuge abrem sogros, cunhados e a família deles,
+  que entram na geração certa e andam junto com ele (ADR-009).
+- **Parentesco só para quem é parente** — amigo e conhecido não aparecem mais como "Parente
+  distante" (RN-015).

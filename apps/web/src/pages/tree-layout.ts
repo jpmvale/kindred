@@ -113,10 +113,11 @@ function partnerIdsByPerson(unions: UnionLink[]): Map<string, string[]> {
 export interface VisiblePeople {
   people: Person[];
   /**
-   * Quem só está na árvore por causa de uma união. Não tem rank próprio: é
-   * encostado no par depois do dagre, e não ganha os botões de expandir.
+   * Quem está na árvore atravessando uma união: o cônjuge e, se ele for
+   * expandido, a família dele (sogro, cunhado, avó do cônjuge). Esse pessoal
+   * anda junto no layout — ver `inLawGroups`.
    */
-  spouseOnlyIds: Set<string>;
+  inLawIds: Set<string>;
 }
 
 export function buildVisiblePeople(
@@ -210,21 +211,41 @@ export function buildVisiblePeople(
   }
 
   // Cônjuges por último, sobre quem o sangue já trouxe: assim o cônjuge de alguém
-  // que só apareceu numa expansão também aparece — e a união do cônjuge com uma
-  // terceira pessoa não puxa mais ninguém (a lista é uma cópia, não cresce aqui).
-  const spouseOnlyIds = new Set<string>();
+  // que só apareceu numa expansão também aparece.
+  const inLawIds = new Set<string>();
   if (includeSpouses) {
     const partnersOf = partnerIdsByPerson(collectUnions(people));
-    for (const id of [...visible]) {
-      for (const partnerId of partnersOf.get(id) ?? []) {
-        if (!pmap.has(partnerId) || visible.has(partnerId)) continue;
-        visible.add(partnerId);
-        spouseOnlyIds.add(partnerId);
+    const addPartners = (ids: string[]) => {
+      for (const id of ids) {
+        for (const partnerId of partnersOf.get(id) ?? []) {
+          if (!pmap.has(partnerId) || visible.has(partnerId)) continue;
+          visible.add(partnerId);
+          inLawIds.add(partnerId);
+        }
+      }
+    };
+
+    addPartners([...visible]);
+
+    // A família do cônjuge só entra quando ele é expandido: a árvore é de sangue,
+    // e trazer a linha do sogro sem pedir dobraria o tamanho dela (RN-013 dá o
+    // nome — sogro, cunhado —, mas quem decide se aparece é quem está olhando).
+    const before = new Set(visible);
+    for (const id of [...inLawIds]) {
+      addAncestors(id);
+      if (includeSiblings && expandedSideDown.has(id)) {
+        addSiblingsAndCousinBranches(id);
       }
     }
+    const inLawFamily = [...visible].filter((id) => !before.has(id));
+    for (const id of inLawFamily) inLawIds.add(id);
+
+    // Mais uma volta, para o cunhado não aparecer sozinho enquanto todo o resto
+    // da árvore aparece em casal. Só uma: a lista percorrida não cresce de novo.
+    addPartners(inLawFamily);
   }
 
-  return { people: people.filter((p) => visible.has(p.id)), spouseOnlyIds };
+  return { people: people.filter((p) => visible.has(p.id)), inLawIds };
 }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
@@ -248,16 +269,13 @@ export function computeLayout({
   onToggleParents,
   onToggleSideDown,
 }: LayoutOptions): { nodes: Node[]; edges: Edge[] } {
-  const { people, spouseOnlyIds } = buildVisiblePeople(
+  const { people, inLawIds } = buildVisiblePeople(
     allPeople,
     expandedParents,
     expandedSideDown,
     includeSiblings,
     includeSpouses,
   );
-  // Quem tem rank próprio no dagre. O cônjuge fica de fora: a posição dele é
-  // relativa ao par, não à geração.
-  const ranked = people.filter((p) => !spouseOnlyIds.has(p.id));
   const allPeopleById = new Map(allPeople.map((p) => [p.id, p]));
   const allChildrenOf = new Map<string, Set<string>>();
   for (const p of allPeople) {
@@ -281,7 +299,7 @@ export function computeLayout({
     ranker: 'tight-tree',
   });
 
-  for (const p of ranked) {
+  for (const p of people) {
     dagreGraph.setNode(p.id, { width: NODE_W, height: NODE_H });
   }
 
@@ -292,11 +310,10 @@ export function computeLayout({
       [p.motherId, EDGE_PREFIX.mother],
     ] as const) {
       if (!parentId || !visibleIds.has(parentId)) continue;
-      // O cônjuge não entra no grafo do dagre, mas a linha até o filho é
-      // desenhada do mesmo jeito — é o que faz o casal descer junto.
-      if (!spouseOnlyIds.has(parentId) && !spouseOnlyIds.has(p.id)) {
-        dagreGraph.setEdge(parentId, p.id);
-      }
+      // Filiação vale para todo mundo, inclusive o cônjuge: é dela que sai o
+      // rank do sogro, uma geração acima. Quem não tem filiação visível fica
+      // solto no topo e é o `placeCouples` que o traz para a altura do par.
+      dagreGraph.setEdge(parentId, p.id);
       edges.push({
         id: `${prefix}${parentId}-${p.id}`,
         source: parentId,
@@ -311,14 +328,14 @@ export function computeLayout({
 
   // Pos-processamento leve: aproxima irmaos sem quebrar o layout global do dagre.
   const layoutPos = new Map<string, { x: number; y: number }>();
-  for (const p of ranked) {
+  for (const p of people) {
     const n = dagreGraph.node(p.id) as { x: number; y: number } | undefined;
     layoutPos.set(p.id, n ? { x: n.x, y: n.y } : { x: 0, y: 0 });
   }
 
   const central = people.find((p) => p.isCentralUser);
   const siblingGroups = new Map<string, string[]>();
-  for (const p of ranked) {
+  for (const p of people) {
     const parentKey = `${p.fatherId ?? ''}|${p.motherId ?? ''}`;
     if (parentKey === '|') continue;
     if (!siblingGroups.has(parentKey)) siblingGroups.set(parentKey, []);
@@ -377,7 +394,7 @@ export function computeLayout({
       adjacency.get(a)!.add(b);
       adjacency.get(b)!.add(a);
     }
-    for (const p of ranked) {
+    for (const p of people) {
       if (p.fatherId && layoutPos.has(p.fatherId)) link(p.id, p.fatherId);
       if (p.motherId && layoutPos.has(p.motherId)) link(p.id, p.motherId);
     }
@@ -424,7 +441,13 @@ export function computeLayout({
 
   // Casais primeiro, espaçamento depois: o passe seguinte trata o casal como um
   // bloco só, senão ele enfiaria alguém entre os dois.
-  const coupleBlocks = placeCouples(unions, spouseOnlyIds, layoutPos, centralX);
+  const coupleBlocks = placeCouples(
+    unions,
+    inLawIds,
+    inLawGroups(people, inLawIds),
+    layoutPos,
+    centralX,
+  );
   spreadRanks(layoutPos, coupleBlocks, centralX);
 
   // As arestas de união saem depois do layout porque quem é fonte e quem é alvo
@@ -467,13 +490,10 @@ export function computeLayout({
 
   const nodes: Node[] = people.map((p) => {
     const n = layoutPos.get(p.id);
-    // O cônjuge é folha: expandir a linha dele seria trazer a família inteira do
-    // sogro para uma árvore que é de sangue.
-    const spouseOnly = spouseOnlyIds.has(p.id);
-    const hasParents = !spouseOnly && Boolean(p.fatherId || p.motherId);
+    const hasParents = Boolean(p.fatherId || p.motherId);
 
     let hasSideDown = false;
-    if (includeSiblings && !spouseOnly) {
+    if (includeSiblings) {
       for (const pid of [p.fatherId, p.motherId]) {
         if (!pid) continue;
         const siblings = allChildrenOf.get(pid);
@@ -552,32 +572,38 @@ type Positions = Map<string, { x: number; y: number }>;
  */
 function placeCouples(
   unions: UnionLink[],
-  spouseOnlyIds: Set<string>,
+  inLawIds: Set<string>,
+  groupOf: Map<string, string[]>,
   layoutPos: Positions,
   centralX: number,
 ): Map<string, string> {
   const blockOf = new Map<string, string>();
 
-  // Quem fica parado e quem é encostado nele. O cônjuge sem rank próprio ainda
-  // não tem posição — herda a do par.
+  // Quem fica parado e quem é encostado nele. Quem veio pela união é sempre o
+  // que se move: arrastar o lado de sangue levaria junto a árvore inteira.
   const pairs: { anchorId: string; guestId: string; ended: boolean }[] = [];
   for (const union of unions) {
-    const aOnly = spouseOnlyIds.has(union.aId);
-    const bOnly = spouseOnlyIds.has(union.bId);
+    const aInLaw = inLawIds.has(union.aId);
+    const bInLaw = inLawIds.has(union.bId);
     const ended = union.status === 'ENDED';
 
-    if (aOnly !== bOnly) {
-      const [anchorId, guestId] = aOnly ? [union.bId, union.aId] : [union.aId, union.bId];
-      if (layoutPos.has(anchorId)) pairs.push({ anchorId, guestId, ended });
+    if (aInLaw !== bInLaw) {
+      const [anchorId, guestId] = aInLaw ? [union.bId, union.aId] : [union.aId, union.bId];
+      if (layoutPos.has(anchorId) && layoutPos.has(guestId)) {
+        pairs.push({ anchorId, guestId, ended });
+      }
       continue;
     }
-    if (aOnly && bOnly) continue;
 
     const a = layoutPos.get(union.aId);
     const b = layoutPos.get(union.bId);
+    if (!a || !b) continue;
+    // Dois de afinidade (sogro e sogra, por exemplo): já vieram juntos do dagre
+    // e andam no mesmo grupo — encostar um no outro só desalinharia o grupo.
+    if (aInLaw && bInLaw) continue;
     // Gerações diferentes: encostar um no outro quebraria a leitura da árvore.
-    if (!a || !b || Math.abs(a.y - b.y) > 1) continue;
-    // Os dois com rank próprio: fica quem está mais perto do centro.
+    if (Math.abs(a.y - b.y) > 1) continue;
+    // Os dois de sangue: fica quem está mais perto do centro.
     const [anchorId, guestId] =
       Math.abs(a.x - centralX) <= Math.abs(b.x - centralX)
         ? [union.aId, union.bId]
@@ -605,13 +631,27 @@ function placeCouples(
     const slot = slots.get(anchorId) ?? 0;
     slots.set(anchorId, slot + 1);
 
+    const guest = layoutPos.get(guestId)!;
     const outward = anchor.x >= centralX ? 1 : -1;
     const side = slot % 2 === 0 ? outward : -outward;
-    layoutPos.set(guestId, {
+    const target = {
       x: anchor.x + side * MIN_GAP * (Math.floor(slot / 2) + 1),
       y: anchor.y,
-    });
-    moved.add(guestId);
+    };
+
+    // A família do cônjuge anda junto com ele: o dagre já a arrumou em volta
+    // (sogro acima, cunhado ao lado), e mover só o cônjuge esticaria tudo. O
+    // deslocamento é o mesmo para o grupo inteiro, então o desenho interno fica
+    // de pé — inclusive na vertical, quando o cônjuge não tinha rank próprio e
+    // o grupo dele ficou pendurado no topo.
+    const delta = { x: target.x - guest.x, y: target.y - guest.y };
+    for (const memberId of groupOf.get(guestId) ?? [guestId]) {
+      const pos = layoutPos.get(memberId);
+      if (!pos) continue;
+      pos.x += delta.x;
+      pos.y += delta.y;
+      moved.add(memberId);
+    }
 
     const block = blockOf.get(anchorId) ?? anchorId;
     blockOf.set(anchorId, block);
@@ -619,6 +659,44 @@ function placeCouples(
   }
 
   return blockOf;
+}
+
+/**
+ * Os blocos de afinidade: cada cônjuge com a família que veio atrás dele
+ * (sogro, cunhado, avó do cônjuge). São as pessoas ligadas entre si por
+ * filiação **sem passar pelo sangue** da pessoa central — é esse conjunto que
+ * se desloca junto quando o cônjuge é encostado no par.
+ */
+function inLawGroups(people: Person[], inLawIds: Set<string>): Map<string, string[]> {
+  const links = new Map<string, Set<string>>();
+  const link = (a: string, b: string) => {
+    if (!inLawIds.has(a) || !inLawIds.has(b)) return;
+    if (!links.has(a)) links.set(a, new Set());
+    if (!links.has(b)) links.set(b, new Set());
+    links.get(a)!.add(b);
+    links.get(b)!.add(a);
+  };
+  for (const p of people) {
+    if (p.fatherId) link(p.id, p.fatherId);
+    if (p.motherId) link(p.id, p.motherId);
+  }
+
+  const groups = new Map<string, string[]>();
+  const seen = new Set<string>();
+  for (const id of inLawIds) {
+    if (seen.has(id)) continue;
+    const members: string[] = [];
+    const stack = [id];
+    while (stack.length) {
+      const current = stack.pop()!;
+      if (seen.has(current)) continue;
+      seen.add(current);
+      members.push(current);
+      for (const next of links.get(current) ?? []) stack.push(next);
+    }
+    for (const memberId of members) groups.set(memberId, members);
+  }
+  return groups;
 }
 
 /**
