@@ -4,7 +4,8 @@
 
 | Suíte | Onde | Precisa de banco? |
 | --- | --- | --- |
-| **Unidade** (Jest) | `apps/api/src/**/*.spec.ts` | não |
+| **Unidade da API** (Jest) | `apps/api/src/**/*.spec.ts` | não |
+| **Unidade do web** (Vitest) | `apps/web/src/**/*.test.ts` | não |
 | **E2E** (Jest + supertest) | `apps/api/test/*.e2e-spec.ts` | **sim** |
 
 ```bash
@@ -23,8 +24,10 @@ desfeita (RN-013), que é o comportamento fácil de quebrar sem perceber.
 O e2e é de fumaça: sobe a app inteira e bate em `/api/health`. Fica fora do `pnpm test` de propósito —
 CI e desenvolvedor rodam a unidade sem infra.
 
-**Não existem testes de front.** A parte que mais precisaria (o layout da árvore em `TreePage`) é
-também a mais difícil de testar sem um render de verdade; está no backlog (BL-08).
+**No front, só a árvore tem teste.** O layout saiu do componente para um módulo puro (ADR-009), e é
+ele que `apps/web/src/pages/tree-layout.test.ts` exercita no Vitest, sem DOM: quem aparece, o cônjuge
+encostado no par, a ex do outro lado, a união desfeita tracejada. O resto das páginas continua sem
+teste nenhum (BL-08).
 
 ## CI
 

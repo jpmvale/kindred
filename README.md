@@ -23,7 +23,7 @@ a última sessão parou, ver [`docs-tec/HANDOFF.md`](docs-tec/HANDOFF.md).
 | **Uniões** | Vínculo conjugal entre duas pessoas, com situação (vigente ou desfeita) e datas de início e fim — no formulário da pessoa (RN-011, ADR-008). |
 | **Listagem** | Busca por nome, parentesco ou tipo de relacionamento; ordenação por nome, nascimento ou idade; paginação; pessoas falecidas vão para o fim da lista. |
 | **Parentesco** | Grau calculado na API em relação à pessoa central, com gênero ("Avô"/"Avó") e até 8 passos de distância (RN-004); por afinidade, um salto pela união vigente — sogro, cunhado, genro (RN-013). |
-| **Árvore** | Árvore genealógica interativa (React Flow + dagre): ancestrais, descendentes, irmãos e ramos de primos, expandindo nó por nó. |
+| **Árvore** | Árvore genealógica interativa (React Flow + dagre): ancestrais, descendentes, irmãos e ramos de primos, expandindo nó por nó; casais lado a lado, com a união vigente em linha cheia e a desfeita tracejada (ADR-009). |
 | **Calendário** | Aniversários do mês e os próximos, em pt-BR. |
 | **Locais** | CRUD de locais (cidades) associáveis às pessoas. |
 

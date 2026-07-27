@@ -151,4 +151,33 @@ percorrido em largura como antes, e o de uniões, que entra depois só para nome
 cunhado, genro, padrasto, enteado. Afinidade **só atravessa união vigente** (RN-013): terminada a
 união, a pessoa vira "Ex-esposa" e os parentes dela deixam de ser parentes, que é o comportamento que
 se espera de uma separação. Preço: uniões são recurso próprio (`/api/unions`), fora do formulário de
-pessoa, e a árvore ainda não desenha casais — ficou como item de backlog.
+pessoa. Desenhar os casais na árvore veio depois, no ADR-009.
+
+---
+
+## ADR-009 — O layout da árvore fora do componente, e o casal como bloco
+
+**Contexto.** O `TreePage` tinha 928 linhas misturando o algoritmo de layout (quem aparece, onde cada
+nó fica) com o render do React Flow — e nenhum teste, porque testar exigia montar o componente. Era o
+arquivo mais delicado do projeto, e desenhar casais mexia justamente no algoritmo.
+
+**Decisão.** O layout saiu para [`apps/web/src/pages/tree-layout.ts`](../apps/web/src/pages/tree-layout.ts),
+um módulo puro: entra a lista de pessoas e o que está expandido, saem nós e arestas. Não importa nada
+de runtime do React nem do reactflow (só tipos), então roda no Vitest sem DOM — é o primeiro teste de
+front do projeto (`tree-layout.test.ts`, BL-08).
+
+Sobre o casal em si, duas escolhas:
+
+- **O cônjuge é encostado no par depois do dagre.** O dagre organiza gerações, e união não é geração:
+  colocar o cônjuge no grafo o empurraria para um rank próprio. Ele é posicionado à mão, na altura do
+  par. Havendo duas uniões, os lados **alternam** — a vigente para fora, a ex para o outro lado, com
+  o par no meio: empilhadas do mesmo lado, a linha da ex passaria por trás do card da atual e a
+  árvore diria que quem é casado são as duas.
+- **O espaçamento de cada geração trata o casal como um bloco só.** O passe que garante distância
+  mínima entre nós do mesmo rank passou a mover o casal junto, senão ele enfia um irmão ou um primo
+  entre marido e mulher.
+
+**Consequências.** Quem só está na árvore por causa da união é **folha**: aparece ao lado do par, mas
+sem os botões de expandir — abrir a linha dele traria a família inteira do sogro para uma árvore que
+é de sangue (BL-13). Quem tem união *e* laço de sangue (o cônjuge que também é pai de alguém visível,
+ou o primo com quem se casou) mantém o rank próprio e mesmo assim é aproximado do par.

@@ -24,8 +24,22 @@ tabela `unions` (`partnerA`/`partnerB`, `status`, `startDate`, `endDate`) — o 
 Afinidade **só atravessa união vigente**: ao marcar a união como desfeita, a esposa vira "Ex-esposa"
 e o sogro volta a ser "Parente distante". Foi verificado rodando, ponta a ponta.
 
-O que ficou de fora do BL-01: **a árvore não desenha casais** — virou BL-12, porque mexe no
-`TreePage` (928 linhas, sem testes) e valia fechar o vínculo antes.
+## Sessão de 27/07 — casais na árvore (BL-12)
+
+A outra metade: a árvore passou a desenhar as uniões. O layout saiu do `TreePage` para
+[`tree-layout.ts`](../apps/web/src/pages/tree-layout.ts) — módulo puro, sem React nem reactflow em
+runtime — e virou o **primeiro teste de front do projeto** (`tree-layout.test.ts`, 10 casos no
+Vitest). O porquê das duas escolhas de layout está no **ADR-009**:
+
+- o cônjuge é encostado no par **depois** do dagre (união não é geração);
+- havendo duas uniões, os lados alternam — a vigente para fora, a ex para o outro lado, com o par no
+  meio. Empilhadas, a linha da ex passava por trás do card da atual;
+- o passe de espaçamento de cada geração trata o casal como **um bloco**, senão enfia um irmão entre
+  marido e mulher.
+
+Quem só está na árvore por causa da união é folha (sem botão de expandir) — abrir a família do
+cônjuge virou BL-13. Há um filtro **Com cônjuges** ao lado do "Com irmãos", e a legenda ganhou união
+vigente (linha cheia) e desfeita (tracejada).
 
 ## Sessão de 26/07 — monorepo
 
@@ -51,9 +65,14 @@ validar com os enums do schema Prisma em vez de listas próprias; testes de unid
 
 ## O que foi verificado rodando
 
-Na sessão de 27/07 (união conjugal):
+Na sessão de 27/07:
 
-- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**22 testes**, 21 deles de parentesco) — verdes.
+- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**32 testes**: 21 de parentesco, 10 do layout da
+  árvore, 1 de health) — verdes.
+- Árvore no navegador contra o seed, colapsada e com tudo aberto: 19 nós, **nenhum par mais perto que
+  o espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e
+  as 7 linhas de união medindo o vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as
+  linhas; o hover realça as duas uniões do Miguel, a vigente e a desfeita.
 - A migration foi testada num **banco descartável** antes de tocar o de dev: `0_init` + linhas com
   `WIFE` + a migration nova, conferindo que a pessoa virou `FAMILY`, que a união nasceu vigente com o
   par normalizado e que o enum ficou com 4 valores. Também o caminho sem pessoa central.
@@ -83,18 +102,19 @@ Na sessão de 26/07 (monorepo):
   RN-013), mas quem entrou como `FRIEND`/`ACQUAINTANCE` continua caindo no fallback, porque não há
   caminho de sangue nem de união. A UI ficaria melhor não mostrando parentesco nesses casos — é
   conversa de produto, ainda em aberto.
-- **A árvore ignora as uniões.** O `TreePage` só percorre pai/mãe; casais não aparecem lado a lado
-  (BL-12).
+- **A árvore para no cônjuge.** Ele aparece ao lado do par, mas é folha: a família dele (sogros,
+  cunhados) não tem como ser aberta na tela, embora o parentesco já saiba nomeá-la (BL-13).
 - **Duas regras do `react-hooks` estão como aviso** no ESLint do web (BL-11), por causa do fetch em
   `useEffect` nas páginas. O CI passa, mas a dívida existe.
 - **`isCentralUser` não tem unicidade no banco** — a garantia é só na aplicação (doc 02).
 
 ## Próximo passo sugerido
 
-**BL-12 — desenhar casais na árvore.** É a metade que ficou de fora do BL-01: o dado já está lá
-(`GET /api/people` devolve `unions` em cada pessoa), falta o `TreePage` colocar o cônjuge ao lado em
-vez de só empilhar gerações. Vale escrever os primeiros testes do front junto (BL-08), porque o
-arquivo tem 928 linhas e nenhum hoje.
+Nada travado — as duas frentes do cônjuge estão fechadas. Em ordem de incômodo:
 
-Alternativa menor: esconder o parentesco de quem é `FRIEND`/`ACQUAINTANCE`, para tirar o "Parente
-distante" que ainda sobra na lista.
+1. **Esconder o parentesco de quem é `FRIEND`/`ACQUAINTANCE`**, para acabar com o "Parente distante"
+   que ainda sobra na lista. É pequeno e é o que mais aparece na tela.
+2. **BL-13 — abrir a linha do cônjuge** na árvore (sogros, cunhados). O layout já está isolado e
+   testado (ADR-009), então dá para mexer com rede de proteção; a decisão de produto é até onde
+   deixar a árvore crescer para fora do sangue.
+3. **BL-11** — tirar o fetch do `useEffect`, que é a dívida que o ESLint ainda aponta.
