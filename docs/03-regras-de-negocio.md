@@ -39,7 +39,7 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   percorrendo o grafo de pai/mãe em largura (subidas e descidas), com no máximo **8 passos**:
   - a própria pessoa central é "Você";
   - o rótulo é flexionado pelo sexo quando conhecido, e neutro quando não ("Filho(a)");
-  - pares sem nome na tabela viram "Parente de Nº grau"; sem caminho, "Parente distante";
+  - pares sem nome na tabela viram "Parente de Nº grau"; sem caminho, "Parente distante" (RN-015);
   - a subida só acontece antes de qualquer descida — o caminho é sempre "sobe até o ancestral comum,
     depois desce", o que evita rotular sogros e cunhados como consanguíneos.
 - **RN-012** — Quem tem união com a pessoa central é "Esposa"/"Marido" se ela é vigente, e
@@ -54,6 +54,13 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   **A afinidade só atravessa união vigente.** Terminada a união, o ex continua sendo "Ex-esposa", mas
   os parentes dele deixam de ser parentes — o sogro volta a ser "Parente distante". É o que se espera
   de uma separação, e é o motivo de a união ser entidade e não um campo.
+- **RN-015** — "Parente distante" é resposta só para quem é **família**. Não havendo caminho nenhum —
+  nem sangue, nem união, nem afinidade —, quem está cadastrado como amigo, conhecido ou outro fica
+  **sem grau de parentesco** (`null`), e a tela mostra só o rótulo social. Dizer que um amigo é
+  "parente distante" é ruído: ele não é parente, e não há o que descobrir.
+
+  Ter caminho **vale mais que o rótulo social**: o primo cadastrado como amigo continua sendo "Primo".
+  A regra só decide o que fazer quando não há resposta.
 
 ## Listagem
 

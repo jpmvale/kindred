@@ -12,6 +12,12 @@ export type PersonNode = {
   fatherId: string | null;
   motherId: string | null;
   sex?: string | null;
+  /**
+   * Rótulo social. Só interessa ao cálculo no fim da linha: "Parente distante"
+   * é resposta para quem é da família, não para amigo ou conhecido (RN-015).
+   * Ausente é lido como `FAMILY`.
+   */
+  relationshipType?: string | null;
 };
 
 export type UnionEdge = {
@@ -35,11 +41,12 @@ export function computeKinship(
   centralId: string,
   allPeople: PersonNode[],
   unions: UnionEdge[] = [],
-): string {
+): string | null {
   if (targetId === centralId) return 'Você';
 
   const graph = buildGraph(allPeople);
-  const targetSex = graph.people.get(targetId)?.sex ?? null;
+  const target = graph.people.get(targetId);
+  const targetSex = target?.sex ?? null;
 
   // O vínculo conjugal direto vem antes do sangue: quem é casado com a pessoa
   // central é "Esposa", mesmo no caso raro de também ser primo em 3º grau.
@@ -49,9 +56,13 @@ export function computeKinship(
   const blood = findBloodPath(centralId, targetId, graph);
   if (blood) return kinshipLabel(blood.ups, blood.downs, targetSex);
 
-  return (
-    affinityLabel(targetId, centralId, graph, unions) ?? 'Parente distante'
-  );
+  const affinity = affinityLabel(targetId, centralId, graph, unions);
+  if (affinity) return affinity;
+
+  // Sem caminho nenhum. Para quem é da família isso é "não se sabe como, mas é
+  // parente"; para amigo ou conhecido não é resposta — é ruído (RN-015).
+  const relationshipType = target?.relationshipType ?? 'FAMILY';
+  return relationshipType === 'FAMILY' ? 'Parente distante' : null;
 }
 
 function buildGraph(allPeople: PersonNode[]): Graph {

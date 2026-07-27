@@ -42,6 +42,29 @@ const PEOPLE = [
   // Ex-esposa do Miguel e a família dela.
   { id: 'gilberto', fatherId: null, motherId: null, sex: 'MALE' },
   { id: 'tereza', fatherId: 'gilberto', motherId: null, sex: 'FEMALE' },
+
+  // Quem não é da família. O `lucas` é primo *e* está cadastrado como amigo.
+  {
+    id: 'joana',
+    fatherId: null,
+    motherId: null,
+    sex: 'FEMALE',
+    relationshipType: 'FRIEND',
+  },
+  {
+    id: 'vizinho',
+    fatherId: null,
+    motherId: null,
+    sex: 'MALE',
+    relationshipType: 'ACQUAINTANCE',
+  },
+  {
+    id: 'lucas',
+    fatherId: 'paulo',
+    motherId: null,
+    sex: 'MALE',
+    relationshipType: 'FRIEND',
+  },
 ];
 
 const UNIONS: UnionEdge[] = [
@@ -82,6 +105,15 @@ describe('computeKinship', () => {
 
     it('devolve parente distante quando não há caminho', () => {
       expect(kinship('estranho')).toBe('Parente distante');
+    });
+
+    it('não força parentesco em quem não é da família (RN-015)', () => {
+      expect(kinship('joana')).toBeNull();
+      expect(kinship('vizinho')).toBeNull();
+    });
+
+    it('mantém o parentesco de quem é da família mesmo cadastrado como amigo', () => {
+      expect(kinship('lucas')).toBe('Primo');
     });
 
     it('continua funcionando sem nenhuma união informada', () => {

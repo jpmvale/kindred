@@ -63,9 +63,25 @@ validar com os enums do schema Prisma em vez de listas próprias; testes de unid
 (`computeKinship`, health) no lugar do teste de exemplo; e um erro de tipos que já existia no
 `TreePage` (mudanças não commitadas) foi corrigido.
 
+## Sessão de 27/07 — sem parentesco para quem não é família (RN-015)
+
+O "Parente distante" que sobrava na lista era o fallback do `computeKinship` para quem não tem
+caminho nenhum. Faz sentido para família (*é* parente, só não se sabe como); para amigo e conhecido
+era ruído. Agora o fallback é só para `FAMILY`; os outros vêm com `kinshipDegree: null` e a tela
+mostra só o rótulo social — a UI já tratava o nulo, a mudança é da API.
+
+**Ter caminho vale mais que o rótulo social:** o primo cadastrado como amigo continua "Primo", e a
+Tereza do seed, que é `OTHER`, continua "Ex-esposa" pela união. A regra só decide o que fazer quando
+não há resposta.
+
 ## O que foi verificado rodando
 
 Na sessão de 27/07:
+
+- RN-015 contra o seed, com a API no ar: os três amigos/conhecidos e a `OTHER` sem união vêm com
+  `kinshipDegree` nulo, todo o resto mantém o grau, e a lista na tela mostra "Amigo(a) · Masculino ·
+  19/07/1987" sem parentesco nenhum. A busca continua achando por rótulo social ("amigo" → 2) e por
+  grau ("primo" → 1).
 
 - `pnpm typecheck`, `pnpm lint` e `pnpm test` (**32 testes**: 21 de parentesco, 10 do layout da
   árvore, 1 de health) — verdes.
@@ -98,10 +114,6 @@ Na sessão de 26/07 (monorepo):
 
 - **Portas.** O projeto irmão *coda* também usa 3000 e 5432. Rodar os dois ao mesmo tempo exige
   mudar as portas de um deles (`docker compose stop` no coda foi o que se fez aqui).
-- **"Parente distante" para amigos e conhecidos.** O cônjuge e a família dele já têm rótulo (RN-012,
-  RN-013), mas quem entrou como `FRIEND`/`ACQUAINTANCE` continua caindo no fallback, porque não há
-  caminho de sangue nem de união. A UI ficaria melhor não mostrando parentesco nesses casos — é
-  conversa de produto, ainda em aberto.
 - **A árvore para no cônjuge.** Ele aparece ao lado do par, mas é folha: a família dele (sogros,
   cunhados) não tem como ser aberta na tela, embora o parentesco já saiba nomeá-la (BL-13).
 - **Duas regras do `react-hooks` estão como aviso** no ESLint do web (BL-11), por causa do fetch em
@@ -110,11 +122,10 @@ Na sessão de 26/07 (monorepo):
 
 ## Próximo passo sugerido
 
-Nada travado — as duas frentes do cônjuge estão fechadas. Em ordem de incômodo:
+Nada travado. Em ordem de incômodo:
 
-1. **Esconder o parentesco de quem é `FRIEND`/`ACQUAINTANCE`**, para acabar com o "Parente distante"
-   que ainda sobra na lista. É pequeno e é o que mais aparece na tela.
-2. **BL-13 — abrir a linha do cônjuge** na árvore (sogros, cunhados). O layout já está isolado e
+1. **BL-13 — abrir a linha do cônjuge** na árvore (sogros, cunhados). O layout já está isolado e
    testado (ADR-009), então dá para mexer com rede de proteção; a decisão de produto é até onde
    deixar a árvore crescer para fora do sangue.
-3. **BL-11** — tirar o fetch do `useEffect`, que é a dívida que o ESLint ainda aponta.
+2. **BL-11** — tirar o fetch do `useEffect`, que é a dívida que o ESLint ainda aponta.
+3. **BL-03** — busca sem acento ("jose" achar "José"), que é pequeno e aparece toda hora.
