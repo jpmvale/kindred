@@ -1,31 +1,27 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useLoaderData, useNavigate, useRevalidator } from 'react-router-dom';
 import { locationsApi } from '../api/locations';
 import type { Location } from '@kindred/types';
 
 export default function LocationsPage() {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
+  const locations = useLoaderData() as Location[];
+  const revalidator = useRevalidator();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    locationsApi.getAll()
-      .then(setLocations)
-      .finally(() => setLoading(false));
-  }, []);
+  const loading = revalidator.state === 'loading';
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
     setAdding(true);
     try {
-      const created = await locationsApi.create({ name: newName.trim() });
-      setLocations((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      await locationsApi.create({ name: newName.trim() });
       setNewName('');
+      revalidator.revalidate();
     } finally {
       setAdding(false);
     }
@@ -38,15 +34,15 @@ export default function LocationsPage() {
 
   async function handleSaveEdit(id: string) {
     if (!editName.trim()) return;
-    const updated = await locationsApi.update(id, { name: editName.trim() });
-    setLocations((prev) => prev.map((l) => (l.id === id ? updated : l)));
+    await locationsApi.update(id, { name: editName.trim() });
     setEditingId(null);
+    revalidator.revalidate();
   }
 
   async function handleRemove(id: string, name: string) {
     if (!confirm(`Remover "${name}"?`)) return;
     await locationsApi.remove(id);
-    setLocations((prev) => prev.filter((l) => l.id !== id));
+    revalidator.revalidate();
   }
 
   return (

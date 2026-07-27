@@ -9,10 +9,9 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 | BL-05 | **Notas por pessoa** (origem da amizade, histórias) | A spec original tinha `friendshipOrigin`; virou texto livre que ainda não existe. |
 | BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
 | BL-07 | **Aniversário de falecimento** no calendário | O calendário só olha nascimento. |
-| BL-08 | **Testes do front** — o resto das páginas | O layout da árvore já tem os seus (`tree-layout.test.ts`); lista, formulário e calendário continuam sem nenhum. |
+| BL-08 | **Testes do front** — o resto das páginas | Os módulos puros já têm os seus (`tree-layout.test.ts`, `people-list-query.test.ts`); as páginas em si continuam sem nenhum. Com os dados vindo de loaders (ADR-010), os loaders são o próximo alvo fácil. |
 | BL-09 | **Paginação de verdade no banco** | Hoje a API carrega todas as pessoas e filtra em memória — está ótimo para centenas, não para milhares. Levar a busca para o SQL cobra a RN-016 junto: o Postgres precisaria de `unaccent` (ou coluna normalizada), e o grau de parentesco, que é calculado e não existe como coluna, não tem como ser filtrado lá. |
 | BL-10 | **Multiusuário com login** | Mudaria o produto de "base pessoal" para serviço; fora do escopo atual. |
-| BL-11 | **Buscar dados fora do `useEffect`** nas páginas | As regras `react-hooks/set-state-in-effect` e `preserve-manual-memoization` estão como *aviso* no ESLint por causa disso (`apps/web/eslint.config.js`); o certo é reescrever o fetch. |
 
 **Concluídos.**
 
@@ -24,5 +23,7 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   que entram na geração certa e andam junto com ele (ADR-009).
 - **BL-03** — busca sem acento: "jose" acha "José" e "José" acha "Jose", nos três campos casados
   (RN-016).
+- **BL-11** — os dados vêm de loaders de rota, não de `useEffect`; a lista de pessoas passou a morar
+  na URL, e as regras de lint voltaram a ser erro (ADR-010).
 - **Parentesco só para quem é parente** — amigo e conhecido não aparecem mais como "Parente
   distante" (RN-015).

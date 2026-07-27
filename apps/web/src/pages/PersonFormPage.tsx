@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import {
+  useLoaderData,
+  useNavigate,
+  useParams,
+  useRevalidator,
+} from 'react-router-dom';
 import axios from 'axios';
 import { peopleApi } from '../api/people';
-import { locationsApi } from '../api/locations';
 import { unionsApi } from '../api/unions';
+import type { PersonFormPageData } from '../loaders';
 import { RELATIONSHIP_LABELS, UNION_STATUS_LABELS } from '../labels';
 import type {
-  Location,
   Person,
   PersonFormData,
   PersonUnion,
@@ -49,64 +53,48 @@ const EMPTY: PersonFormData = {
   locationId: null,
 };
 
+/** O que veio da API vira o que o formulário edita: datas sem hora, nulo vira "". */
+function toFormData(person: Person | null): PersonFormData {
+  if (!person) return EMPTY;
+  return {
+    name: person.name,
+    sex: person.sex ?? null,
+    birthDate: person.birthDate ? person.birthDate.slice(0, 10) : '',
+    deathDate: person.deathDate ? person.deathDate.slice(0, 10) : '',
+    deceased: person.deceased ?? Boolean(person.deathDate),
+    profilePhoto: person.profilePhoto ?? '',
+    relationshipType: person.relationshipType,
+    fatherId: person.fatherId ?? null,
+    motherId: person.motherId ?? null,
+    locationId: person.locationId ?? null,
+  };
+}
+
 export default function PersonFormPage() {
   const { id } = useParams<{ id: string }>();
+  const { people, locations, person } = useLoaderData() as PersonFormPageData;
+  const revalidator = useRevalidator();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
 
-  const [form, setForm] = useState<PersonFormData>(EMPTY);
-  const [people, setPeople] = useState<Person[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
+  // O formulário é o único estado local que sobra: ele se descola do servidor no
+  // instante em que a pessoa digita, então nasce do loader e segue por conta.
+  const [form, setForm] = useState<PersonFormData>(() => toFormData(person));
   const [submitting, setSubmitting] = useState(false);
 
   // As uniões são recurso próprio (`/api/unions`): mudam na hora, fora do submit
   // da pessoa — que é também o único jeito de editá-las sem inventar um formato
-  // de payload aninhado só para o formulário.
-  const [unions, setUnions] = useState<PersonUnion[]>([]);
+  // de payload aninhado só para o formulário. Como cada ação recarrega a rota,
+  // elas vêm direto do loader, sem cópia em estado.
+  const unions: PersonUnion[] = person?.unions ?? [];
   const [newPartnerId, setNewPartnerId] = useState('');
   const [newStatus, setNewStatus] = useState<UnionStatus>('CURRENT');
   const [newStartDate, setNewStartDate] = useState('');
   const [unionError, setUnionError] = useState<string | null>(null);
   const [unionBusy, setUnionBusy] = useState(false);
 
-  useEffect(() => {
-    const fetches: Promise<unknown>[] = [
-      peopleApi.getAll().then(setPeople),
-      locationsApi.getAll().then(setLocations),
-    ];
-
-    if (id) {
-      fetches.push(
-        peopleApi.getOne(id).then((person) => {
-          setUnions(person.unions ?? []);
-          setForm({
-            name: person.name,
-            sex: person.sex ?? null,
-            birthDate: person.birthDate ? person.birthDate.slice(0, 10) : '',
-            deathDate: person.deathDate ? person.deathDate.slice(0, 10) : '',
-            deceased: person.deceased ?? Boolean(person.deathDate),
-            profilePhoto: person.profilePhoto ?? '',
-            relationshipType: person.relationshipType,
-            fatherId: person.fatherId ?? null,
-            motherId: person.motherId ?? null,
-            locationId: person.locationId ?? null,
-          });
-        }),
-      );
-    }
-
-    Promise.all(fetches).finally(() => setLoading(false));
-  }, [id]);
-
   function set<K extends keyof PersonFormData>(field: K, value: PersonFormData[K]) {
     setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  async function refreshUnions() {
-    if (!id) return;
-    const person = await peopleApi.getOne(id);
-    setUnions(person.unions ?? []);
   }
 
   async function runUnionAction(action: () => Promise<unknown>, fallback: string) {
@@ -114,7 +102,7 @@ export default function PersonFormPage() {
     setUnionError(null);
     try {
       await action();
-      await refreshUnions();
+      revalidator.revalidate();
     } catch (error) {
       setUnionError(errorMessage(error, fallback));
     } finally {
@@ -180,8 +168,6 @@ export default function PersonFormPage() {
       setSubmitting(false);
     }
   }
-
-  if (loading) return <div className="page loading">Carregando...</div>;
 
   const selectablePeople = people.filter((p) => p.id !== id);
   // Quem já tem união com esta pessoa não volta na lista: o par é único (RN-011).

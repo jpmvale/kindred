@@ -192,3 +192,51 @@ sangue (o cônjuge que também é pai de alguém visível, ou o primo com quem s
 próprio e mesmo assim é aproximado do par. O limite conhecido: o grupo de afinidade se desloca como
 bloco, mas o passe de espaçamento continua trabalhando linha a linha — num caso extremo o grupo pode
 sair torto, embora nunca sobreposto.
+
+---
+
+## ADR-010 — Os dados vêm de loaders de rota, não de `useEffect`
+
+**Contexto.** Toda página buscava os próprios dados dentro de um `useEffect`: renderizava vazia,
+chamava a API, voltava com `setState`. Isso custava três coisas. A primeira é a cascata de renders
+que o próprio React desaconselha — e que o lint apontava, com duas regras rebaixadas a *aviso* para
+o CI não travar (BL-11). A segunda é que a lista de pessoas guardava busca, ordenação e página em
+estado do componente, então recarregar a tela perdia tudo e não havia link para uma busca. A
+terceira é que essa forma não tem como ser testada sem montar o componente inteiro.
+
+A alternativa comum é uma biblioteca de dados (TanStack Query e afins). O `react-router-dom` v7 já
+estava no projeto e resolve o mesmo problema sem dependência nova.
+
+**Decisão.** O router virou *data router* (`createBrowserRouter`), e cada rota tem um **loader** —
+todos juntos em [`src/loaders.ts`](../apps/web/src/loaders.ts). O loader roda **antes** de a página
+renderizar; a página só lê o resultado com `useLoaderData`. Depois de uma escrita, quem recarrega é
+`useRevalidator()`, não um `setState` local.
+
+Três consequências de desenho vieram junto:
+
+- **A lista de pessoas mora na URL.** Busca, ordenação e página são query params, lidos por um módulo
+  puro ([`people-list-query.ts`](../apps/web/src/pages/people-list-query.ts)) que valida o que vier
+  torto — a URL é editável e não dá para confiar nela. O que é padrão não vai para a query string,
+  então a lista em repouso continua sendo `/people`.
+- **O `/setup` virou porta de entrada de verdade.** O desvio de quem ainda não tem pessoa central era
+  um efeito no `App`; agora é o loader do layout. O `/setup` fica fora desse layout para não cair no
+  próprio desvio.
+- **A árvore calcula o desenho durante o render.** `computeLayout` é função pura (ADR-009), então o
+  resultado é um `useMemo`, e "a árvore saiu vazia" passou a ser coisa derivada. O efeito que sobrou
+  ali só empurra nós e arestas para dentro do reactflow — sincronizar sistema de fora é justamente
+  para o que serve um efeito.
+
+**Consequências.** As duas regras de lint voltaram a ser **erro** (na verdade saíram do arquivo: o
+padrão do plugin já é erro), sem nenhuma exceção no código. O formulário de pessoa é o único lugar
+que ainda copia dado do servidor para estado local, e por um motivo: ele se descola do servidor no
+instante em que alguém digita.
+
+O campo de busca tem uma sutileza que custou um defeito no caminho. Ele corre à frente da URL até o
+debounce alcançar, e precisa se realinhar quando a URL muda **por fora** (voltar do navegador, link
+colado). Comparar o campo com a URL não basta: a resposta do próprio debounce conta como mudança e
+apaga o que a pessoa digitou enquanto a busca anterior ia e voltava. Por isso a página guarda o
+último termo **enviado** e só se realinha quando a URL discorda dele.
+
+Preço: navegar agora espera o loader terminar antes de trocar de tela — nada pisca vazio, mas um
+clique numa API lenta parece travado até a página virar. Hoje a API é local e responde em
+milissegundos; se um dia não for, o caminho é `useNavigation()` para uma barra de progresso.

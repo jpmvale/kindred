@@ -64,6 +64,30 @@ Normalizar só o termo não bastaria: um "Jose" cadastrado sem acento ficaria in
 digita "José". Como o filtro é em memória (BL-09), a mudança não tocou o banco — quando a busca for
 para o SQL, ela cobra `unaccent` junto.
 
+## Sessão de 27/07 — dados por loader de rota (BL-11)
+
+O front deixou de buscar dados em `useEffect`. O router virou *data router*
+(`createBrowserRouter`), cada rota ganhou um loader em [`loaders.ts`](../apps/web/src/loaders.ts), e
+a página só lê o resultado com `useLoaderData`. Depois de uma escrita, quem recarrega é
+`useRevalidator()`. O porquê e os três desdobramentos estão no **ADR-010**.
+
+| Arquivo | O que mudou |
+| --- | --- |
+| `main.tsx`, `routes.tsx` | `RouterProvider` + `createBrowserRouter`; o `/setup` fora do layout |
+| `App.tsx` | virou só a moldura (`AppLayout` com `<Outlet/>`); o desvio para o `/setup` é o loader do layout |
+| `PeopleListPage` | busca, ordenação e página passaram a morar na **URL**; `people-list-query.ts` lê e valida |
+| `PersonFormPage` | só o formulário continua em estado local; as uniões vêm do loader |
+| `TreePage` | o desenho virou `useMemo` (o `computeLayout` é puro), e "árvore vazia" virou coisa derivada |
+| `CalendarPage` | o mês navegado deixou de ser um `Date` em estado e virou par de números |
+| `eslint.config.js` | as duas regras rebaixadas a aviso **saíram**: o padrão do plugin é erro, e não há exceção no código |
+
+Também saiu `@types/react-router-dom` (v5), que sobrava desde o começo — o v7 traz os próprios tipos.
+
+**O defeito que apareceu no caminho:** o campo de busca corre à frente da URL até o debounce
+alcançar, e precisa se realinhar quando a URL muda por fora. Comparar o campo com a URL não basta —
+a resposta do próprio debounce conta como mudança e apaga o que foi digitado enquanto a busca ia e
+voltava. A página guarda o último termo **enviado** e só se realinha quando a URL discorda dele.
+
 ## Sessão de 26/07 — monorepo
 
 O que estava em dois diretórios soltos (`kindred-api`, `kindred-web`), com um repositório git de um
@@ -101,6 +125,14 @@ não há resposta.
 
 Na sessão de 27/07:
 
+- BL-11 na tela, contra o seed: `/people?search=sonia&sortBy=age&sortDirection=desc` reconstrói
+  campo, os dois selects e o resultado; `?page=0&sortBy=altura&sortDirection=cima` cai no padrão em
+  vez de erro; o voltar do navegador realinha o campo de busca; digitar mais **durante** a ida da
+  busca anterior não perde o que foi digitado (era o defeito). Calendário navega os meses e lista os
+  5 próximos aniversários; a árvore abre em 5 nós e vai a 19 em 4 gerações a 148px, como antes;
+  criar/remover local e remover pessoa recarregam a lista pelo `useRevalidator`; a segunda união
+  vigente ainda barra na tela com a mensagem da RN-014, e o select volta ao que o servidor diz.
+  Nenhum erro no console; o seed ficou intacto (23 pessoas, 4 locais).
 - BL-03 com a API no ar, contra o seed: "antonio" e "Antônio" acham o mesmo Antônio Souza; "jose",
   "sonia", "lucia" e "sergio" acham José Lima, Sônia Alves, Lúcia Prado e Sérgio Menezes; "familia"
   traz as 10 pessoas com o rótulo "Família"; "avo" traz os 4 avós, "Avô" e "Avó" juntos.
@@ -113,8 +145,9 @@ Na sessão de 27/07:
   19/07/1987" sem parentesco nenhum. A busca continua achando por rótulo social ("amigo" → 2) e por
   grau ("primo" → 1).
 
-- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**46 testes**: 23 de parentesco, 16 do layout da
-  árvore, 6 da normalização da busca, 1 de health) — verdes.
+- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**54 testes**: 23 de parentesco, 16 do layout da
+  árvore, 8 da URL da lista, 6 da normalização da busca, 1 de health) — verdes. O lint agora passa
+  **sem aviso nenhum**.
 - Árvore no navegador contra o seed, colapsada e com tudo aberto: **nenhum par mais perto que o
   espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e as
   linhas de união todas no vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as

@@ -72,6 +72,9 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   - **ordenação** por `name`, `birthDate` ou `age`, `asc`/`desc`, com limite de 100 por página;
   - **falecidos vão para o fim**, independente da ordenação escolhida;
   - quem não tem data de nascimento vai depois de quem tem, ao ordenar por nascimento ou idade.
+
+  Na tela, esses quatro parâmetros ficam na **URL**: recarregar a página mantém a busca, o voltar do
+  navegador desfaz o último filtro e um link leva outra pessoa exatamente à mesma lista.
 - **RN-016** — A busca **ignora acento nos dois sentidos**: "jose" acha "José", e "José" acha um
   "Jose" cadastrado sem acento. Vale para todos os diacríticos do português — agudo, circunflexo,
   crase, til e cedilha ("conceicao" acha "Conceição") — e para os três campos casados, então

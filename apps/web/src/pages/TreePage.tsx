@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import ReactFlow, {
   Controls,
   Background,
@@ -13,7 +13,7 @@ import ReactFlow, {
   BackgroundVariant,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { peopleApi } from '../api/people';
+import { useLoaderData } from 'react-router-dom';
 import type { Person } from '@kindred/types';
 import {
   computeLayout,
@@ -250,21 +250,19 @@ const NODE_TYPES = { person: PersonNode };
 // ─── Inner component ──────────────────────────────────────────────────────────
 
 function TreeContent() {
+  const people = useLoaderData() as Person[];
   const { fitView } = useReactFlow();
   const nodeTypes = useMemo(() => NODE_TYPES, []);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [loading, setLoading] = useState(true);
-  const [empty, setEmpty] = useState(false);
   const [includeSiblings, setIncludeSiblings] = useState(true);
   const [includeSpouses, setIncludeSpouses] = useState(true);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [expandedSideDown, setExpandedSideDown] = useState<Set<string>>(new Set());
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null);
-  const allPeopleRef = useRef<Person[]>([]);
 
   const applyHoverStyling = useCallback((hoveredId: string | null) => {
-    const peopleById = new Map(allPeopleRef.current.map((p) => [p.id, p]));
+    const peopleById = new Map(people.map((p) => [p.id, p]));
     const hovered = hoveredId ? peopleById.get(hoveredId) : null;
     const parentIds = new Set<string>();
     const childIds = new Set<string>();
@@ -273,7 +271,7 @@ function TreeContent() {
     if (hovered) {
       if (hovered.fatherId) parentIds.add(hovered.fatherId);
       if (hovered.motherId) parentIds.add(hovered.motherId);
-      for (const p of allPeopleRef.current) {
+      for (const p of people) {
         if (p.fatherId === hovered.id || p.motherId === hovered.id) childIds.add(p.id);
       }
       for (const union of hovered.unions ?? []) partnerIds.add(union.partnerId);
@@ -298,76 +296,64 @@ function TreeContent() {
       const ended = Boolean(edge.style?.strokeDasharray);
       return { ...edge, style: unionEdgeStyle(ended, highlighted) };
     }));
-  }, [setEdges, setNodes]);
+  }, [people, setEdges, setNodes]);
 
-  const renderTree = useCallback((people: Person[], expanded: Set<string>, hoveredId: string | null) => {
-    const { nodes: n, edges: e } = computeLayout({
-      people,
-      expandedParents: expanded,
-      expandedSideDown,
-      includeSiblings,
-      includeSpouses,
-      onToggleParents: (personId) => {
-        setExpandedParents((prev) => {
-          const next = new Set(prev);
-          if (next.has(personId)) next.delete(personId);
-          else next.add(personId);
-          return next;
-        });
-      },
-      onToggleSideDown: (personId) => {
-        setExpandedSideDown((prev) => {
-          const next = new Set(prev);
-          if (next.has(personId)) next.delete(personId);
-          else next.add(personId);
-          return next;
-        });
-      },
-    });
-    setNodes(n);
-    setEdges(e);
-    setEmpty(!n.length);
-    if (n.length) setTimeout(() => applyHoverStyling(hoveredId), 0);
-    return n;
-  }, [applyHoverStyling, expandedSideDown, includeSiblings, includeSpouses, setEdges, setNodes]);
+  const toggleIn = useCallback(
+    (setter: typeof setExpandedParents) => (personId: string) => {
+      setter((prev) => {
+        const next = new Set(prev);
+        if (next.has(personId)) next.delete(personId);
+        else next.add(personId);
+        return next;
+      });
+    },
+    [],
+  );
 
-  const load = useCallback(() => {
-    peopleApi.getAll().then((people) => {
-      allPeopleRef.current = people;
-      if (!people.length) {
-        setEmpty(true);
-        setLoading(false);
-        return;
-      }
-      renderTree(people, new Set(), null);
-      setLoading(false);
-    });
-  }, [renderTree]);
+  // O desenho é função pura das pessoas mais os filtros (`computeLayout` não toca
+  // em React): dá para calcular durante o render, e aí "a árvore saiu vazia" é
+  // coisa derivada, não estado que precisa de efeito para existir.
+  const layout = useMemo(
+    () =>
+      computeLayout({
+        people,
+        expandedParents,
+        expandedSideDown,
+        includeSiblings,
+        includeSpouses,
+        onToggleParents: toggleIn(setExpandedParents),
+        onToggleSideDown: toggleIn(setExpandedSideDown),
+      }),
+    [people, expandedParents, expandedSideDown, includeSiblings, includeSpouses, toggleIn],
+  );
 
-  useEffect(() => { load(); }, [load]);
+  const empty = layout.nodes.length === 0;
+
+  // O reactflow guarda os nós por conta: este efeito só empurra para ele o
+  // desenho que o render já calculou. É sincronizar sistema de fora, que é para
+  // o que serve um efeito.
+  useEffect(() => {
+    setNodes(layout.nodes);
+    setEdges(layout.edges);
+    if (layout.nodes.length) setTimeout(() => applyHoverStyling(null), 0);
+  }, [layout, applyHoverStyling, setEdges, setNodes]);
 
   useEffect(() => {
-    if (!allPeopleRef.current.length) return;
-    renderTree(allPeopleRef.current, expandedParents, null);
-  }, [expandedParents, expandedSideDown, includeSiblings, includeSpouses, renderTree]);
-
-  useEffect(() => {
-    if (!allPeopleRef.current.length) return;
+    if (empty) return;
     setTimeout(() => fitView({ padding: 0.06, duration: 350 }), 20);
-  }, [expandedParents, expandedSideDown, includeSiblings, includeSpouses, fitView]);
+  }, [empty, expandedParents, expandedSideDown, includeSiblings, includeSpouses, fitView]);
 
   useEffect(() => {
-    if (!allPeopleRef.current.length) return;
+    if (empty) return;
     applyHoverStyling(hoveredPersonId);
-  }, [applyHoverStyling, hoveredPersonId]);
+  }, [empty, applyHoverStyling, hoveredPersonId]);
 
   const handleExpandAllRelationships = useCallback(() => {
-    const all = allPeopleRef.current;
     const idsToExpand = new Set<string>();
     const idsToExpandSideDown = new Set<string>();
-    const knownIds = new Set(all.map((p) => p.id));
+    const knownIds = new Set(people.map((p) => p.id));
 
-    for (const p of all) {
+    for (const p of people) {
       if ((p.fatherId && knownIds.has(p.fatherId)) || (p.motherId && knownIds.has(p.motherId))) {
         idsToExpand.add(p.id);
         if (includeSiblings) idsToExpandSideDown.add(p.id);
@@ -377,15 +363,7 @@ function TreeContent() {
     setExpandedParents(idsToExpand);
     setExpandedSideDown(includeSiblings ? idsToExpandSideDown : new Set());
     setTimeout(() => fitView({ padding: 0.06, duration: 600 }), 50);
-  }, [fitView, includeSiblings]);
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af' }}>
-        Carregando árvore...
-      </div>
-    );
-  }
+  }, [people, fitView, includeSiblings]);
 
   if (empty) {
     return (

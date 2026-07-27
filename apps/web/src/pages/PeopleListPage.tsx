@@ -1,67 +1,72 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import {
+  useLoaderData,
+  useNavigate,
+  useNavigation,
+  useRevalidator,
+  useSearchParams,
+} from 'react-router-dom';
 import { peopleApi } from '../api/people';
-import type { Person } from '@kindred/types';
+import type { PeopleSortField, SortDirection } from '@kindred/types';
+import type { PeopleListData } from '../loaders';
+import {
+  serializePeopleListQuery,
+  type PeopleListQuery,
+} from './people-list-query';
 import { RELATIONSHIP_LABELS, SEX_LABELS } from '../labels';
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 export default function PeopleListPage() {
-  const [people, setPeople] = useState<Person[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [hasCentralUser, setHasCentralUser] = useState(true);
-  const [sortBy, setSortBy] = useState<'name' | 'birthDate' | 'age'>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const limit = 10;
+  const { query, result } = useLoaderData() as PeopleListData;
+  const { data: people, total, page, totalPages } = result;
+
+  const [, setSearchParams] = useSearchParams();
+  const navigation = useNavigation();
+  const revalidator = useRevalidator();
   const navigate = useNavigate();
 
-  const loadPeople = useCallback(async (
-    targetPage: number,
-    targetSearch: string,
-    targetSortBy: 'name' | 'birthDate' | 'age',
-    targetSortDirection: 'asc' | 'desc',
-  ) => {
-    setLoading(true);
-    try {
-      const response = await peopleApi.getPage({
-        page: targetPage,
-        limit,
-        search: targetSearch || undefined,
-        sortBy: targetSortBy,
-        sortDirection: targetSortDirection,
-      });
-      setPeople(response.data);
-      setTotal(response.total);
-      setTotalPages(response.totalPages);
-      setPage(response.page);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loading =
+    navigation.state === 'loading' || revalidator.state === 'loading';
 
-  useEffect(() => {
-    peopleApi.getCentral().then((person) => setHasCentralUser(Boolean(person)));
-  }, []);
+  // O texto digitado é estado da UI, não da busca: ele corre à frente da URL até
+  // o debounce alcançar. Quando a URL muda **por fora** — voltar do navegador,
+  // link colado —, o campo se realinha com ela; ajustar estado durante o render
+  // é o jeito que o React recomenda para isso, e não custa um efeito.
+  //
+  // Daí guardar o último termo enviado: sem essa comparação, a resposta do
+  // próprio debounce contaria como mudança de fora e apagaria o que a pessoa
+  // digitou enquanto a busca anterior ia e voltava.
+  const [searchInput, setSearchInput] = useState(query.search);
+  const [sentSearch, setSentSearch] = useState(query.search);
+  if (sentSearch !== query.search) {
+    setSentSearch(query.search);
+    setSearchInput(query.search);
+  }
 
+  function go(changes: Partial<PeopleListQuery>) {
+    setSearchParams(serializePeopleListQuery({ ...query, ...changes }));
+  }
+
+  // Não é o fetch: é a URL alcançando o que já foi digitado. Quem busca é o
+  // loader da rota, assim que a URL muda (ADR-010).
   useEffect(() => {
+    const term = searchInput.trim();
+    if (term === query.search) return;
     const timeoutId = window.setTimeout(() => {
-      setPage(1);
-      setSearch(searchInput.trim());
-    }, 300);
+      setSentSearch(term);
+      setSearchParams(
+        serializePeopleListQuery({ ...query, search: term, page: 1 }),
+        { replace: true },
+      );
+    }, SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timeoutId);
-  }, [searchInput]);
-
-  useEffect(() => {
-    loadPeople(page, search, sortBy, sortDirection);
-  }, [loadPeople, page, search, sortBy, sortDirection]);
+  }, [searchInput, query, setSearchParams]);
 
   async function handleRemove(id: string, name: string) {
     if (!confirm(`Remover "${name}"?`)) return;
     await peopleApi.remove(id);
-    await loadPeople(page, search, sortBy, sortDirection);
+    revalidator.revalidate();
   }
 
   function parseDateOnly(dateStr?: string | null) {
@@ -103,11 +108,6 @@ export default function PeopleListPage() {
       <div className="page-header">
         <h1>Pessoas</h1>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {!loading && !hasCentralUser && (
-            <button className="btn-ghost" onClick={() => navigate('/setup')}>
-              Cadastrar Eu
-            </button>
-          )}
           <button className="btn-primary" onClick={() => navigate('/people/new')}>
             Adicionar pessoa
           </button>
@@ -128,11 +128,10 @@ export default function PeopleListPage() {
             <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
               <label>Ordenar por</label>
               <select
-                value={sortBy}
-                onChange={(e) => {
-                  setPage(1);
-                  setSortBy(e.target.value as 'name' | 'birthDate' | 'age');
-                }}
+                value={query.sortBy}
+                onChange={(e) =>
+                  go({ sortBy: e.target.value as PeopleSortField, page: 1 })
+                }
               >
                 <option value="name">Nome</option>
                 <option value="birthDate">Data de nascimento</option>
@@ -142,11 +141,13 @@ export default function PeopleListPage() {
             <div className="form-group" style={{ marginBottom: 0, minWidth: 140 }}>
               <label>Direção</label>
               <select
-                value={sortDirection}
-                onChange={(e) => {
-                  setPage(1);
-                  setSortDirection(e.target.value as 'asc' | 'desc');
-                }}
+                value={query.sortDirection}
+                onChange={(e) =>
+                  go({
+                    sortDirection: e.target.value as SortDirection,
+                    page: 1,
+                  })
+                }
               >
                 <option value="asc">Ascendente</option>
                 <option value="desc">Descendente</option>
@@ -160,7 +161,7 @@ export default function PeopleListPage() {
 
       {!loading && people.length === 0 && (
         <div className="empty-state">
-          <p>{search ? 'Nenhuma pessoa encontrada para esta busca.' : 'Nenhuma pessoa cadastrada ainda.'}</p>
+          <p>{query.search ? 'Nenhuma pessoa encontrada para esta busca.' : 'Nenhuma pessoa cadastrada ainda.'}</p>
         </div>
       )}
 
@@ -275,7 +276,7 @@ export default function PeopleListPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
               className="btn-ghost"
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              onClick={() => go({ page: Math.max(1, page - 1) })}
               disabled={page <= 1}
             >
               ← Anterior
@@ -285,7 +286,7 @@ export default function PeopleListPage() {
             </span>
             <button
               className="btn-ghost"
-              onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+              onClick={() => go({ page: Math.min(totalPages, page + 1) })}
               disabled={page >= totalPages}
             >
               Próxima →

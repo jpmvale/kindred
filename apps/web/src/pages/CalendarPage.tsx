@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { peopleApi } from '../api/people';
+import { useMemo, useState } from 'react';
+import { useLoaderData } from 'react-router-dom';
 import type { Person } from '@kindred/types';
 
 type BirthdayEntry = {
@@ -57,18 +57,17 @@ function getDaysUntilDate(targetDate: Date, fromDate: Date): number {
 }
 
 export default function CalendarPage() {
-  const [people, setPeople] = useState<Person[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentMonthDate, setCurrentMonthDate] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const people = useLoaderData() as Person[];
 
-  useEffect(() => {
-    peopleApi.getAll()
-      .then(setPeople)
-      .finally(() => setLoading(false));
-  }, []);
+  // O mês navegado é guardado como par de números, não como `Date`: um `Date` em
+  // estado é objeto mutável, e memoizar em cima dele faz o compilador do React
+  // desistir de otimizar a tela inteira.
+  const [cursor, setCursor] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), monthIndex: now.getMonth() };
+  });
+  const { year, monthIndex } = cursor;
+  const currentMonthDate = new Date(year, monthIndex, 1);
 
   const aliveBirthdayEntries = useMemo(() => {
     return people
@@ -86,8 +85,6 @@ export default function CalendarPage() {
       .filter((entry): entry is BirthdayEntry => entry !== null);
   }, [people]);
 
-  const year = currentMonthDate.getFullYear();
-  const monthIndex = currentMonthDate.getMonth();
   const daysInMonth = getDaysInMonth(year, monthIndex);
   const firstDayWeekIndex = new Date(year, monthIndex, 1).getDay();
 
@@ -120,12 +117,11 @@ export default function CalendarPage() {
   const todayMonth = today.getMonth();
   const todayDay = today.getDate();
 
-  function goToPreviousMonth() {
-    setCurrentMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  }
-
-  function goToNextMonth() {
-    setCurrentMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  function shiftMonth(step: number) {
+    setCursor((prev) => {
+      const shifted = new Date(prev.year, prev.monthIndex + step, 1);
+      return { year: shifted.getFullYear(), monthIndex: shifted.getMonth() };
+    });
   }
 
   return (
@@ -134,17 +130,13 @@ export default function CalendarPage() {
         <h1>Calendário</h1>
       </div>
 
-      {loading && <div className="loading">Carregando...</div>}
-
-      {!loading && (
-        <>
           <div className="calendar-card">
             <div className="calendar-month-nav">
-              <button type="button" className="btn-ghost" onClick={goToPreviousMonth} aria-label="Mês anterior">
+              <button type="button" className="btn-ghost" onClick={() => shiftMonth(-1)} aria-label="Mês anterior">
                 ←
               </button>
               <h2>{monthLabel}</h2>
-              <button type="button" className="btn-ghost" onClick={goToNextMonth} aria-label="Próximo mês">
+              <button type="button" className="btn-ghost" onClick={() => shiftMonth(1)} aria-label="Próximo mês">
                 →
               </button>
             </div>
@@ -202,8 +194,6 @@ export default function CalendarPage() {
               </table>
             )}
           </div>
-        </>
-      )}
     </div>
   );
 }
