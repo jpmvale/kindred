@@ -53,6 +53,17 @@ próprios avós da pessoa central. Resolver dentro do dagre não dá: `minlen: 0
 arrumar a família do cônjuge entre si e deslocar esse **grupo inteiro**, em x e em y, junto com o
 cônjuge (ADR-009).
 
+## Sessão de 27/07 — busca sem acento (BL-03)
+
+A busca já ignorava caixa; agora ignora acento também, nos dois sentidos (RN-016). A normalização
+virou [`search.util.ts`](../apps/api/src/people/search.util.ts) — `NFD` para separar a letra do
+acento e `\p{Diacritic}` para apagar só a marca — e o `people.service` passa **os dois lados** pela
+mesma função: o termo digitado e cada um dos três campos casados (nome, grau, rótulo social).
+
+Normalizar só o termo não bastaria: um "Jose" cadastrado sem acento ficaria invisível para quem
+digita "José". Como o filtro é em memória (BL-09), a mudança não tocou o banco — quando a busca for
+para o SQL, ela cobra `unaccent` junto.
+
 ## Sessão de 26/07 — monorepo
 
 O que estava em dois diretórios soltos (`kindred-api`, `kindred-web`), com um repositório git de um
@@ -90,6 +101,9 @@ não há resposta.
 
 Na sessão de 27/07:
 
+- BL-03 com a API no ar, contra o seed: "antonio" e "Antônio" acham o mesmo Antônio Souza; "jose",
+  "sonia", "lucia" e "sergio" acham José Lima, Sônia Alves, Lúcia Prado e Sérgio Menezes; "familia"
+  traz as 10 pessoas com o rótulo "Família"; "avo" traz os 4 avós, "Avô" e "Avó" juntos.
 - BL-13 na tela, contra o seed: o "+" da Fernanda traz Heitor e Sônia **exatamente uma linha acima**
   (148px, a distância entre gerações) e do lado dela, não sobre o Miguel; o "↔" traz o Marcos
   (Cunhado) na mesma linha. Com tudo aberto: 19 nós em 4 gerações, **nenhuma colisão** e as 7 linhas
@@ -99,8 +113,8 @@ Na sessão de 27/07:
   19/07/1987" sem parentesco nenhum. A busca continua achando por rótulo social ("amigo" → 2) e por
   grau ("primo" → 1).
 
-- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**40 testes**: 23 de parentesco, 16 do layout da
-  árvore, 1 de health) — verdes.
+- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**46 testes**: 23 de parentesco, 16 do layout da
+  árvore, 6 da normalização da busca, 1 de health) — verdes.
 - Árvore no navegador contra o seed, colapsada e com tudo aberto: **nenhum par mais perto que o
   espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e as
   linhas de união todas no vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as

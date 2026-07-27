@@ -67,11 +67,19 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
 - **RN-005** — `GET /api/people` devolve a lista inteira, já com o parentesco calculado. Se vier
   qualquer parâmetro de paginação/busca/ordenação, a resposta passa a ser paginada
   (`data`, `total`, `page`, `limit`, `totalPages`):
-  - **busca** casa nome, grau de parentesco ou tipo de relacionamento, sem acento-sensibilidade de
-    caixa (pt-BR);
+  - **busca** casa nome, grau de parentesco ou tipo de relacionamento, ignorando caixa e acento
+    (RN-016);
   - **ordenação** por `name`, `birthDate` ou `age`, `asc`/`desc`, com limite de 100 por página;
   - **falecidos vão para o fim**, independente da ordenação escolhida;
   - quem não tem data de nascimento vai depois de quem tem, ao ordenar por nascimento ou idade.
+- **RN-016** — A busca **ignora acento nos dois sentidos**: "jose" acha "José", e "José" acha um
+  "Jose" cadastrado sem acento. Vale para todos os diacríticos do português — agudo, circunflexo,
+  crase, til e cedilha ("conceicao" acha "Conceição") — e para os três campos casados, então
+  "familia" acha o rótulo "Família" e "avo" acha tanto "Avô" quanto "Avó".
+
+  Quem digita numa busca não está soletrando: exigir o acento certo é cobrar do usuário um trabalho
+  que a máquina faz melhor. A normalização é a mesma dos dois lados — termo e campo passam pela
+  mesma função —, senão o cadastro sem acento ficaria invisível para quem digita com acento.
 
 ## Remoção
 

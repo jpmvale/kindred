@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { computeKinship } from './kinship.util';
+import { normalizeForSearch } from './search.util';
 import { FindPeopleQueryDto } from './dto/find-people-query.dto';
 
 const INCLUDE = {
@@ -138,20 +139,19 @@ export class PeopleService {
 
     const page = query?.page ?? 1;
     const limit = query?.limit ?? 10;
-    const search = query?.search?.trim().toLocaleLowerCase('pt-BR');
+    const rawSearch = query?.search?.trim();
+    const search = rawSearch ? normalizeForSearch(rawSearch) : undefined;
     const sortBy = query?.sortBy ?? 'name';
     const sortDirection = query?.sortDirection ?? 'asc';
     const direction = sortDirection === 'asc' ? 1 : -1;
 
     const filtered = search
       ? enriched.filter((person) => {
-          const name = person.name.toLocaleLowerCase('pt-BR');
-          const kinship = (person.kinshipDegree ?? '').toLocaleLowerCase(
-            'pt-BR',
+          const name = normalizeForSearch(person.name);
+          const kinship = normalizeForSearch(person.kinshipDegree ?? '');
+          const relationship = normalizeForSearch(
+            RELATIONSHIP_LABELS[person.relationshipType] ?? '',
           );
-          const relationship = (
-            RELATIONSHIP_LABELS[person.relationshipType] ?? ''
-          ).toLocaleLowerCase('pt-BR');
           return (
             name.includes(search) ||
             kinship.includes(search) ||
