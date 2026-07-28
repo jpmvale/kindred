@@ -18,6 +18,13 @@ coverage/
 *.log
 npm-debug.log*
 
+# backups do banco — dados reais de família, e este repositório é público.
+# O `db:backup` grava fora do repo (`../kindred-backups`), mas se alguém apontar
+# o KINDRED_BACKUP_DIR para cá, o git não deixa passar.
+kindred-backups/
+kindred-*.json
+!packages/db/fixtures/*.json
+
 # os / editor
 .DS_Store
 .idea/

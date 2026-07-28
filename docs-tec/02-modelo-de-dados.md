@@ -113,3 +113,30 @@ de primeira.
 pnpm db:seed             # exige banco vazio
 pnpm db:seed --force     # apaga pessoas, uniões e locais antes
 ```
+
+## Backup, restauração e o fixture anônimo
+
+O banco de desenvolvimento deixou de ser descartável quando passou a ter uma família de verdade
+dentro. O porquê da forma escolhida está no **ADR-013**; o que se usa no dia a dia é isto:
+
+```bash
+pnpm db:backup                        # copia a base para ../kindred-backups (fora do repo)
+pnpm db:restore <arquivo.json>        # devolve a base; exige banco vazio
+pnpm db:restore <arquivo.json> --force # apaga antes — e salva um backup do que apagou
+pnpm db:anonymize                     # gera packages/db/fixtures/anonimizado.json
+```
+
+O backup é **JSON pelo Prisma**, não `pg_dump`: o `pg_dump` mora no container do Postgres, e é
+justamente o Docker que se quer sobreviver. O arquivo guarda os ids originais, então restaurar devolve
+o mesmo grafo de pai/mãe — não uma cópia parecida. O `KINDRED_BACKUP_DIR` muda o destino.
+
+**O backup se recusa a gravar incompleto.** Ele lê o `Prisma.dmmf` e cobra que todo campo escalar de
+cada modelo esteja no arquivo. Mexeu no schema? Se o campo novo não entrar no `backup.ts` **e** no
+`restore.ts`, o próximo `pnpm db:backup` falha dizendo qual campo falta. É de propósito: um backup
+furado só se revela na restauração, quando o original já não existe.
+
+O `db:anonymize` copia a **forma** de uma base real para um fixture versionado — mesma quantidade,
+mesmo grafo de pai/mãe, mesmas uniões, quem faleceu, quem é a pessoa central — trocando nome e cidade
+por fictícios, descartando notas e fotos e deslocando as datas de 1 a 10 dias. Como sai no mesmo
+formato do backup, carregá-lo é `pnpm db:restore packages/db/fixtures/anonimizado.json --force`. Serve
+para desenvolver e medir com volume de base real (BL-09) num repositório que é público.

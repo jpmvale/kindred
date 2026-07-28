@@ -16,6 +16,9 @@
     "db:migrate": "pnpm --filter @kindred/db db:migrate",
     "db:migrate:dev": "pnpm --filter @kindred/db db:migrate:dev",
     "db:seed": "pnpm --filter @kindred/db db:seed",
+    "db:backup": "pnpm --filter @kindred/db db:backup",
+    "db:restore": "pnpm --filter @kindred/db db:restore",
+    "db:anonymize": "pnpm --filter @kindred/db db:anonymize",
     "db:studio": "pnpm --filter @kindred/db db:studio"
   },
   "devDependencies": {

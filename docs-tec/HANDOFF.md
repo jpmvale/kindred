@@ -7,11 +7,17 @@ _Atualizado em 28/07/2026._
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários.
 
-**Marco de retomada — 28/07/2026, fim da janela.** `main` em `adb409e`, **igual a `origin/main`**
-(nada pendente de push), working tree **limpo**, nada pela metade. Conferido agora: `pnpm typecheck`,
-`pnpm lint` (sem um aviso sequer) e `pnpm test` — **147 testes**, 40 na API e 107 no web. Os 6 e2e
-rodam à parte e precisam de banco. Para retomar, basta subir o Postgres (`docker compose up -d
-postgres`) e escolher um item da seção **Próximo passo sugerido**, no fim deste arquivo.
+**Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **152 testes**, 40 na API, 107 no
+web e 5 no `@kindred/db`. Os 6 e2e rodam à parte e precisam de banco. Para retomar, basta subir o
+Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
+fim deste arquivo.
+
+> ⚠️ **O banco de dev tem dados reais.** Deixou de ser o seed de 23 pessoas fictícias: são ~140
+> pessoas da família de quem usa o kindred, com fotos e notas. Antes de qualquer coisa destrutiva
+> (`db:seed --force`, `db:reset`, `docker compose down -v`), rode **`pnpm db:backup`**. Precisa de
+> dados de teste? Use um banco descartável (`createdb` + `DATABASE_URL=...`) ou o fixture anônimo —
+> ver a sessão de backup abaixo.
 
 ## Onde a última sessão parou
 
@@ -34,6 +40,48 @@ listagem.
   `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — backup, restauração e fixture anônimo (ADR-013)
+
+O pedido chegou como "salve meus dados atuais no seed, mas não quero minha família num repo público".
+São **dois problemas com respostas diferentes**, e juntá-los num só lugar falha nos dois: o seed vive
+no repositório (público) e é reescrito quando o schema muda, então não serve de backup; e dado real
+não serve de fixture, porque expõe pessoas e envelhece. O medo declarado era concreto: **perder o
+volume do Docker** e ir junto o progresso da árvore.
+
+| Comando | O que faz | Onde grava |
+| --- | --- | --- |
+| `pnpm db:backup` | copia a base inteira | `../kindred-backups` (fora do repo; `KINDRED_BACKUP_DIR` muda) |
+| `pnpm db:restore <arquivo>` | devolve a base | no banco do `DATABASE_URL` |
+| `pnpm db:anonymize` | copia só a **forma** | `packages/db/fixtures/anonimizado.json`, versionado |
+
+Backup é **JSON pelo Prisma**, não `pg_dump` — o `pg_dump` mora no container, e é o container que se
+quer sobreviver. Guarda os ids originais, então restaurar devolve o mesmo grafo, não algo parecido.
+
+**Três travas, e cada uma existe por um motivo:**
+
+1. O backup **se recusa a gravar incompleto**: lê o `Prisma.dmmf` e cobra todo campo escalar de cada
+   modelo. Campo novo no schema que ninguém exportou derruba o backup na hora — em vez de sumir em
+   silêncio e aparecer só na restauração, quando o original já não existe. É o único teste do
+   `@kindred/db` (5 casos).
+2. `db:restore --force` **faz backup antes** de apagar.
+3. O `.gitignore` barra `kindred-*.json` na raiz, com exceção de `packages/db/fixtures/` — testado
+   com um arquivo real solto no repo.
+
+**O que ficou provado rodando, não presumido:** backup da base real → restore num banco descartável →
+backup de novo → **JSON byte a byte idêntico**, incluindo ids, carimbos, filiação e os bytes das
+fotos. A base real não foi tocada em momento nenhum.
+
+O fixture anônimo saiu **no mesmo formato do backup**, então carregar é o `db:restore` — não há um
+segundo caminho de importação para manter. Auditoria do arquivo contra a base real: nenhum nome,
+nenhuma nota, nenhuma foto, nenhuma cidade e nenhum id em comum, e nenhuma data de nascimento
+intacta; a estrutura bate em tudo (141 pessoas, 71 com pai, 79 com mãe, 42 falecidas, 1 central).
+
+**Dois defeitos meus, achados na conferência:** o jitter das datas ia de −10 a +10 e portanto era
+**zero** para uma pessoa em cada 21 — data de nascimento exata passaria intacta ao lado de um nome
+falso; agora o deslocamento nunca é zero. E o `db:restore` com caminho **relativo** não achava o
+arquivo, porque o `pnpm --filter` executa em `packages/db`; passou a resolver contra o `INIT_CWD`, que
+é de onde o comando foi chamado — o tipo de detalhe que só apareceria na hora de recuperar algo.
 
 ## Sessão de 28/07 — o parentesco deixou de ser quadrático (BL-09, parcial)
 
@@ -391,6 +439,11 @@ Na sessão de 26/07 (monorepo):
   vale para "no máximo uma união vigente por pessoa" (RN-014).
 - **O teto das notas está escrito em dois arquivos** (DTO da API e `PersonFormPage`), por causa do
   ADR-005. Mudar um sem o outro faz a tela deixar digitar o que o servidor recusa.
+- **Mexeu no schema? O backup também precisa saber.** Um campo escalar novo tem de entrar no
+  `backup.ts` **e** no `restore.ts` — o `pnpm db:backup` falha dizendo qual falta, mas quem só roda
+  migration e testa a tela não descobre até precisar restaurar (ADR-013).
+- **O backup é manual.** Não há agendamento: é um comando que alguém roda. Enquanto for assim, vale
+  rodar `pnpm db:backup` antes de fechar a sessão em que se cadastrou gente.
 
 ## Próximo passo sugerido
 

@@ -71,6 +71,19 @@ pnpm db:studio                  # Prisma Studio
 pnpm --filter @kindred/db db:reset   # dropa, remigra e reaplica o seed
 ```
 
+**Backup (ADR-013):** a base de desenvolvimento vira a base de verdade de quem usa o kindred, e ela
+mora num volume do Docker — que some com um `docker compose down -v`.
+
+```bash
+pnpm db:backup                        # copia a base para ../kindred-backups, fora do repositório
+pnpm db:restore <arquivo.json>        # devolve a base (--force apaga antes, salvando o que apagou)
+pnpm db:anonymize                     # gera o fixture anônimo com a forma da base real
+```
+
+> Dados de família **não entram neste repositório**, que é público. O `db:backup` grava fora dele, e
+> o `.gitignore` barra `kindred-*.json` na raiz. O que é versionado é o fixture do `db:anonymize`:
+> mesma estrutura, nomes fictícios, sem notas nem fotos.
+
 **Testes e verificações:**
 
 ```bash

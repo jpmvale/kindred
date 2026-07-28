@@ -13,12 +13,16 @@
   "scripts": {
     "build": "pnpm db:generate && tsc -b",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:generate": "tsx src/cli.ts generate",
     "db:migrate": "tsx src/cli.ts migrate deploy",
     "db:migrate:dev": "tsx src/cli.ts migrate dev",
     "db:reset": "tsx src/cli.ts migrate reset",
     "db:studio": "tsx src/cli.ts studio",
     "db:seed": "tsx src/seed.ts",
+    "db:backup": "tsx src/backup.ts",
+    "db:restore": "tsx src/restore.ts",
+    "db:anonymize": "tsx src/anonymize.ts",
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "prisma": {
@@ -32,6 +36,7 @@
     "@types/node": "^22.10.7",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.10"
   }
 }

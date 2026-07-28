@@ -7,6 +7,7 @@
 | **Unidade da API** (Jest) | `apps/api/src/**/*.spec.ts` | não |
 | **Unidade do web** (Vitest) | `apps/web/src/**/*.test.ts` | não |
 | **Páginas do web** (Vitest + jsdom + testing-library) | `apps/web/src/**/*.test.tsx` | não |
+| **Cobertura do backup** (Vitest) | `packages/db/src/backup.test.ts` | não |
 | **E2E** (Jest + supertest) | `apps/api/test/*.e2e-spec.ts` | **sim** |
 
 ```bash
@@ -15,6 +16,12 @@ pnpm --filter @kindred/api test:e2e    # e2e: precisa de docker compose up -d po
 pnpm typecheck                         # tsc --noEmit / tsc -b em todos os pacotes
 pnpm lint
 ```
+
+**O `@kindred/db` tem teste por um motivo só:** a `assertCoverage` do `db:backup`, que cobra do
+`schema.prisma` que todo campo escalar esteja no arquivo (ADR-013). É a proteção contra um backup sair
+furado, e um backup furado só se revela na restauração, quando o dado original já não existe. O teste
+inclui o caso em que a pessoa exportada perde campos — é o formato do vazamento silencioso que se quer
+impedir.
 
 O teste que carrega peso é o de `computeKinship` (ADR-007): monta uma árvore de quatro gerações e
 confere pai, mãe, avós, irmã, tio, primo, filha e o caso sem caminho. É a lógica que mais se mexe e a

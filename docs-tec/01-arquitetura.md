@@ -328,3 +328,52 @@ continua sendo calculado para a base inteira — o que mudou é quantas vezes o 
 todas as pessoas com pai, mãe, local, uniões e foto. O caminho conhecido é varrer uma consulta enxuta
 e buscar os includes só das linhas da página (medido: 21 ms + 2 ms), mas isso ficou como item próprio
 do backlog — a decisão desta rodada foi atacar só o custo quadrático, que era 93% do problema.
+
+---
+
+## ADR-013 — Backup em JSON pelo Prisma, e o fixture público é anônimo
+
+**Contexto.** A base de desenvolvimento deixou de ser descartável: passou a ter a família de quem usa
+o kindred, com fotos e notas. Isso levanta dois problemas de uma vez, e eles pedem respostas
+diferentes. O primeiro é **perder o dado** — o banco mora num volume do Docker, e volume some
+(`docker compose down -v`, uma limpeza de disco, uma máquina nova). O segundo é **expor o dado** — o
+repositório é público, então nada de família pode entrar nele.
+
+A saída óbvia — "salvar minha base no seed" — falha nos dois papéis. O seed é fixture: vive no repo
+(público) e é reescrito quando o schema muda, então não serve de backup. E dado real não serve de
+fixture, porque expõe pessoas e envelhece.
+
+**Decisão.** Separar as duas coisas, com três comandos:
+
+| Comando | O que faz | Onde grava |
+| --- | --- | --- |
+| `pnpm db:backup` | copia a base inteira | **fora do repositório** (`../kindred-backups`, ou `KINDRED_BACKUP_DIR`) |
+| `pnpm db:restore <arquivo>` | devolve a base | no banco apontado por `DATABASE_URL` |
+| `pnpm db:anonymize` | copia a **forma** da base | `packages/db/fixtures/anonimizado.json`, versionado |
+
+O backup é **JSON pelo Prisma**, não `pg_dump`. O `pg_dump` mora no container do Postgres, então
+depende do Docker estar de pé — e é justamente o Docker que se quer sobreviver. O JSON também é
+legível, restaura em qualquer Postgres com as migrations aplicadas, e é o formato que o BL-06
+(exportar/importar pela aplicação) vai reaproveitar. O arquivo guarda os **ids originais**: restaurar
+devolve o mesmo grafo de pai/mãe, não uma cópia parecida.
+
+O fixture anônimo sai no **mesmo formato do backup**, então carregá-lo é o `db:restore` — não há um
+segundo caminho de importação para manter. Ele preserva o que dá valor a um fixture (o grafo de
+pai/mãe, as uniões, sexo, quem faleceu, quem é a pessoa central) e descarta o que identifica: nomes
+viram fictícios, notas e fotos saem, cidades viram fictícias, datas andam de 1 a 10 dias — nunca
+zero, senão uma data em cada vinte passaria intacta ao lado de um nome falso.
+
+**Consequências.** O `db:backup` **se recusa a gravar um arquivo incompleto**: ele lê o
+`Prisma.dmmf` e cobra que todo campo escalar de cada modelo esteja no arquivo, então um campo novo no
+schema que ninguém lembrou de exportar derruba o backup na hora, em vez de sumir em silêncio e só
+aparecer na restauração — quando o original já não existe. É a única parte do pacote `@kindred/db`
+com teste próprio, e é por isso.
+
+Duas travas contra o acidente: o `db:restore --force` **faz um backup antes** de apagar o que está
+lá, e o `.gitignore` barra `kindred-*.json` na raiz, para um backup escrito por engano dentro do repo
+não virar commit num repositório público.
+
+**O que este ADR não resolve.** Rodar o backup continua sendo um ato manual — não há agendamento. E
+o fixture anônimo preserva a topologia da família, que para quem já conhece a família não é
+informação nova, mas também não é anonimato absoluto: ele protege contra quem lê o repositório, não
+contra quem já sabe.

@@ -5,5 +5,8 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  // Teste não vai para o `dist`: o pacote publicado não os carrega, e o vitest
+  // tropeçaria no `.js` compilado (CommonJS) achando que é uma segunda suíte.
+  "exclude": ["src/**/*.test.ts"]
 }
