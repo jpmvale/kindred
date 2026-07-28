@@ -5,8 +5,9 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 | # | Item | Por quê |
 | --- | --- | --- |
 | BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
-| BL-09 | **Aliviar a consulta da listagem** | O custo quadrático do parentesco já saiu (ADR-012), e com ele 93% do problema. Sobra o `findMany` com todos os includes, que traz as 5000 pessoas com pai, mãe, local, uniões e foto — 167 ms e 7,5 MB medidos. O caminho conhecido: varrer uma consulta enxuta (21 ms) e buscar os includes só das linhas da página (2 ms). Levar a busca para o SQL de verdade é outra conversa, e cobra caro: o Postgres precisaria de `unaccent` para a RN-016, e o grau de parentesco, por ser calculado, não tem como ser filtrado lá. |
 | BL-10 | **Multiusuário com login** | Mudaria o produto de "base pessoal" para serviço; fora do escopo atual. |
+
+| BL-14 | **Enxugar a resposta da árvore e do calendário** | A chamada sem paginação ainda traz a base inteira com pai, mãe e local aninhados — 7,5 MB com 5000 pessoas. A árvore usa `fatherId`/`motherId`, uniões e foto; o calendário, menos ainda. Mexe no contrato da API, por isso ficou fora do BL-09 (ADR-014). |
 
 **Concluídos.**
 
@@ -32,3 +33,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   busca (RN-019). Cobre o `friendshipOrigin` da spec original sem precisar de entidade nova.
 - **BL-07** — o calendário deixou de olhar só o nascimento: quem faleceu volta com as duas datas,
   distintas na tela, e há um filtro para desligá-las (RN-020).
+- **BL-09** — a listagem parou de arrastar a base inteira com todos os includes: varre linhas
+  estreitas e busca os detalhes só da página (ADR-014). Com 5000 pessoas, 202 ms viraram ~35 ms. O
+  custo quadrático do parentesco tinha saído antes (ADR-012). O que sobrou virou BL-14.

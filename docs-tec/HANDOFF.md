@@ -8,7 +8,7 @@ O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de paren
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários.
 
 **Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **152 testes**, 40 na API, 107 no
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **158 testes**, 46 na API, 107 no
 web e 5 no `@kindred/db`. Os 6 e2e rodam à parte e precisam de banco. Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
 fim deste arquivo.
@@ -21,12 +21,12 @@ fim deste arquivo.
 
 ## Onde a última sessão parou
 
-Fecharam **BL-05** (notas por pessoa) e **BL-07** (falecimento no calendário), e o **BL-09** andou
-mais da metade: o custo quadrático do parentesco saiu (ADR-012), e sobrou só a consulta pesada da
-listagem.
+Fecharam o **BL-09** (a listagem parou de arrastar a base inteira, ADR-014) e entrou o **backup**
+com o fixture anônimo (ADR-013) — que foi o que tirou do caminho o risco de perder a base real.
+Antes disso, na mesma data, tinham fechado BL-05 (notas) e BL-07 (falecimento no calendário).
 
-`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**147 testes**: 40 na API e 107 no web), mais os
-6 e2e que rodam à parte, com banco.
+`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**158 testes**: 46 na API, 107 no web e 5 no
+`@kindred/db`), mais os 6 e2e que rodam à parte, com banco.
 
 ### Coisas do ambiente que custaram tempo
 
@@ -40,6 +40,34 @@ listagem.
   `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — a listagem parou de arrastar a base inteira (BL-09, fechado)
+
+A metade que faltava do BL-09. O `GET /api/people` carregava **todas** as pessoas com pai, mãe,
+local, uniões e foto para devolver dez — e a página 250 custava o mesmo que a primeira, porque o
+custo não dependia da página.
+
+Agora são duas consultas (ADR-014): uma **enxuta** varre a base com só o que o parentesco, a busca e
+a ordenação precisam (sem nenhum join), e a segunda busca os `include` **só dos ids da página**.
+
+| requisição | antes | depois |
+| --- | --- | --- |
+| página 1 | 202 ms | **39 ms** |
+| página 250 | 202 ms | **36 ms** |
+| busca por nome | 206 ms | **31 ms** |
+| ordenar por idade | 201 ms | **35 ms** |
+| lista inteira (árvore) | 250 ms | 252 ms — de propósito |
+
+Medido numa base de bench de **5000 pessoas**, criada e derrubada na hora — a base real não foi
+tocada. As cinco respostas foram capturadas antes e depois e conferidas **byte a byte**: idênticas.
+
+**A armadilha que a mudança introduz**, e que tem teste: `where: { id: { in } }` não promete ordem. A
+ordenação é decidida sobre as linhas enxutas, então a segunda consulta precisa ser remontada contra
+ela — esquecer devolve a página embaralhada, sem erro nenhum. O teste entrega as linhas na ordem
+inversa de propósito. É o primeiro teste do `people.service` (6 casos, com um Prisma dublê).
+
+O que sobrou — a árvore e o calendário ainda recebem 7,5 MB — virou **BL-14**: mexe no contrato da
+API, então não cabia emendar aqui.
 
 ## Sessão de 28/07 — backup, restauração e fixture anônimo (ADR-013)
 
@@ -340,6 +368,19 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão de 28/07 (BL-09 e ADR-013):
+
+- **Bancada de 5000 pessoas**, num banco `kindred_bench` criado e derrubado na hora. As cinco
+  requisições (página 1, página 250, busca, ordenação por idade, lista inteira) foram capturadas
+  antes e depois da mudança e comparadas: **JSON idêntico**, e o tempo caiu de ~202 ms para ~35 ms
+  nas paginadas. A base real não foi tocada.
+- Depois, contra a **base real** (143 pessoas, com a API na `:3005`): a listagem devolve nome dos
+  pais, local, foto e grau; na tela, `?search=santos&sortBy=age&sortDirection=desc` mostra "Tia-avó",
+  "Avó" e "Tio-avô" com os pais embaixo de cada nome.
+- Backup: base real → restore em banco descartável → backup de novo → **JSON byte a byte idêntico**.
+  Fixture anônimo auditado contra a base real: nenhum nome, nota, foto, cidade ou id em comum, e
+  nenhuma data de nascimento intacta, com a estrutura batendo em tudo.
+
 Na sessão de 28/07 (BL-07), web em `:5173` contra o seed, que tem dois falecidos (Antônio, nascido
 em 18/01 e falecido em 12/03; Maria, nascida em 04/07 e falecida em 02/11):
 
@@ -450,17 +491,15 @@ Na sessão de 26/07 (monorepo):
 Nada travado e nada pela metade. O backlog só tem itens grandes, que são **escolha de rumo** — vale
 decidir com o usuário, não emendar:
 
-1. **BL-09, a parte que sobrou** — aliviar o `findMany` da listagem, que ainda traz todas as pessoas
-   com pai, mãe, local, uniões e foto (167 ms e 7,5 MB com 5023 pessoas). O caminho já está medido:
-   varrer uma consulta enxuta com só os campos de busca e ordenação (21 ms) e buscar os includes das
-   10 linhas da página (2 ms). Nada de comportamento precisa mudar — a busca por parentesco e a
-   ordenação por idade continuam em memória, sobre linhas estreitas. **Não** confundir com levar a
-   busca para o SQL: aquilo exige `unaccent` no Postgres e mata a busca por grau de parentesco, que é
-   calculado e não existe como coluna.
-2. **BL-06** — exportar/importar. JSON resolve backup; GEDCOM abriria a porta para trocar dados com
-   outros programas de genealogia, e é bem mais trabalho.
+1. **BL-06 — exportar/importar**, e ele ficou **bem mais barato**: o formato JSON e as duas metades
+   (coletar e restaurar) já existem no `@kindred/db` (ADR-013). Falta expor pela aplicação — um botão
+   que baixa o arquivo e outro que sobe. GEDCOM continua sendo outra conversa, bem maior.
+2. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
+   pai, mãe e local aninhados (7,5 MB com 5000 pessoas). Diferente do BL-09, isto **mexe no contrato
+   da API**: precisa decidir o que cada tela realmente consome antes de cortar.
 3. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
 
-**Uma lição desta rodada, que vale para o resto:** o BL-09 estava escrito culpando a coisa errada, e
-medir antes de mexer custou dez minutos e mudou o trabalho inteiro. O gargalo era 14× maior do que o
-que o backlog apontava.
+**Uma lição que se repetiu duas vezes:** medir antes de mexer. Na primeira metade do BL-09 o backlog
+culpava a consulta, e o gargalo era o cálculo — 14× maior do que o apontado. Na segunda, o ganho real
+só apareceu porque havia uma base de 5000 pessoas para medir: na base de 143, a diferença entre 202 ms
+e 35 ms não aparece.

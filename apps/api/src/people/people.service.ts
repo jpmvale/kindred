@@ -7,7 +7,11 @@ import type { Person, UnionStatus } from '@kindred/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { computeKinship, createKinshipResolver } from './kinship.util';
+import {
+  computeKinship,
+  createKinshipResolver,
+  type PersonNode,
+} from './kinship.util';
 import { normalizeForSearch } from './search.util';
 import { MAX_PHOTO_BYTES, matchesMimeType } from './photo.util';
 import { UploadPhotoDto } from './dto/upload-photo.dto';
@@ -22,6 +26,25 @@ const INCLUDE = {
   // Só a data: os bytes moram na mesma tabela e não têm o que fazer numa listagem
   // de pessoas (ADR-011).
   photo: { select: { updatedAt: true } },
+} as const;
+
+/**
+ * O mínimo para calcular parentesco (ADR-007/012), buscar e ordenar — sem pai,
+ * mãe, local, uniões nem foto. É o que a listagem paginada varre para a base
+ * inteira: os includes só são buscados para as poucas linhas que a página mostra
+ * (ADR-014).
+ */
+const LEAN_SELECT = {
+  id: true,
+  name: true,
+  sex: true,
+  birthDate: true,
+  deathDate: true,
+  deceased: true,
+  relationshipType: true,
+  isCentralUser: true,
+  fatherId: true,
+  motherId: true,
 } as const;
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
@@ -118,29 +141,6 @@ export class PeopleService {
   }
 
   async findAll(query?: FindPeopleQueryDto) {
-    const [people, unions] = await Promise.all([
-      this.prisma.person.findMany({
-        orderBy: { name: 'asc' },
-        include: INCLUDE,
-      }),
-      this.prisma.union.findMany({
-        select: { partnerAId: true, partnerBId: true, status: true },
-      }),
-    ]);
-
-    const central = people.find((p) => p.isCentralUser);
-
-    // O grafo é percorrido **uma vez** para a lista toda, não uma vez por pessoa
-    // (ADR-012). Sem isso, o custo cresce com o quadrado do tamanho da base.
-    const kinshipOf = central
-      ? createKinshipResolver(central.id, people, unions)
-      : null;
-
-    const enriched = people.map((p) => ({
-      ...withUnions(p),
-      kinshipDegree: kinshipOf ? kinshipOf(p.id) : null,
-    }));
-
     const hasPaginationRequest = Boolean(
       query?.page ||
       query?.limit ||
@@ -148,7 +148,45 @@ export class PeopleService {
       query?.sortBy ||
       query?.sortDirection,
     );
-    if (!hasPaginationRequest) return enriched;
+
+    // Sem paginação, quem chama é a árvore ou o calendário: os dois querem a base
+    // inteira, com uniões e foto. Não há o que enxugar aqui.
+    if (!hasPaginationRequest) {
+      const [people, unions] = await Promise.all([
+        this.prisma.person.findMany({
+          orderBy: { name: 'asc' },
+          include: INCLUDE,
+        }),
+        this.prisma.union.findMany({
+          select: { partnerAId: true, partnerBId: true, status: true },
+        }),
+      ]);
+
+      const kinshipOf = this.kinshipResolverFor(people, unions);
+      return people.map((p) => ({
+        ...withUnions(p),
+        kinshipDegree: kinshipOf(p.id),
+      }));
+    }
+
+    // Paginado: varre a base **enxuta** (ADR-014). Parentesco precisa do grafo
+    // inteiro e a busca casa o grau calculado, então não há como filtrar no SQL —
+    // mas dá para não arrastar pai, mãe, local, uniões e foto de todo mundo.
+    const [people, unions] = await Promise.all([
+      this.prisma.person.findMany({
+        orderBy: { name: 'asc' },
+        select: LEAN_SELECT,
+      }),
+      this.prisma.union.findMany({
+        select: { partnerAId: true, partnerBId: true, status: true },
+      }),
+    ]);
+
+    const kinshipOf = this.kinshipResolverFor(people, unions);
+    const enriched = people.map((p) => ({
+      ...p,
+      kinshipDegree: kinshipOf(p.id),
+    }));
 
     const page = query?.page ?? 1;
     const limit = query?.limit ?? 10;
@@ -208,7 +246,10 @@ export class PeopleService {
     const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
     const safePage = Math.min(page, totalPages);
     const start = (safePage - 1) * limit;
-    const data = sorted.slice(start, start + limit);
+    const pageRows = sorted.slice(start, start + limit);
+
+    // Só agora os includes, e só para as linhas que a página mostra.
+    const data = await this.withIncludes(pageRows);
 
     return {
       data,
@@ -217,6 +258,46 @@ export class PeopleService {
       limit,
       totalPages,
     };
+  }
+
+  /**
+   * O grafo é percorrido **uma vez** para a lista toda, não uma vez por pessoa
+   * (ADR-012). Sem pessoa central não há de onde medir parentesco, e todo mundo
+   * responde `null`.
+   */
+  private kinshipResolverFor(
+    people: (PersonNode & { isCentralUser: boolean })[],
+    unions: { partnerAId: string; partnerBId: string; status: UnionStatus }[],
+  ): (id: string) => string | null {
+    const central = people.find((p) => p.isCentralUser);
+    if (!central) return () => null;
+
+    return createKinshipResolver(central.id, people, unions);
+  }
+
+  /**
+   * Busca pai, mãe, local, uniões e foto das pessoas de uma página e devolve na
+   * **mesma ordem** que entrou — o `where: { id: { in } }` não promete ordem, e a
+   * ordenação já foi decidida sobre a lista enxuta.
+   */
+  private async withIncludes<
+    T extends { id: string; kinshipDegree: string | null },
+  >(rows: T[]) {
+    if (!rows.length) return [];
+
+    const full = await this.prisma.person.findMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+      include: INCLUDE,
+    });
+
+    const byId = new Map(full.map((p) => [p.id, p]));
+    return rows.flatMap((row) => {
+      const person = byId.get(row.id);
+      // Sumiu entre as duas consultas (apagada no meio): sai da página em vez de
+      // virar um buraco na lista.
+      if (!person) return [];
+      return [{ ...withUnions(person), kinshipDegree: row.kinshipDegree }];
+    });
   }
 
   async findCentral() {

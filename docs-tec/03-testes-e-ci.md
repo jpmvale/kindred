@@ -17,6 +17,12 @@ pnpm typecheck                         # tsc --noEmit / tsc -b em todos os pacot
 pnpm lint
 ```
 
+**O `people.service` tem teste desde o ADR-014**, e o alvo é uma armadilha específica: a listagem
+paginada virou duas consultas, e a segunda usa `where: { id: { in } }`, que **não promete ordem**. O
+Prisma dublê entrega as linhas na ordem inversa de propósito — se a remontagem sumir, a página sai
+embaralhada sem erro nenhum. Os mesmos testes seguram o formato das duas consultas (a varredura não
+pode voltar a pedir `include`) e o caso de alguém ser apagado entre uma e outra.
+
 **O `@kindred/db` tem teste por um motivo só:** a `assertCoverage` do `db:backup`, que cobra do
 `schema.prisma` que todo campo escalar esteja no arquivo (ADR-013). É a proteção contra um backup sair
 furado, e um backup furado só se revela na restauração, quando o dado original já não existe. O teste

@@ -377,3 +377,47 @@ não virar commit num repositório público.
 o fixture anônimo preserva a topologia da família, que para quem já conhece a família não é
 informação nova, mas também não é anonimato absoluto: ele protege contra quem lê o repositório, não
 contra quem já sabe.
+
+---
+
+## ADR-014 — A listagem varre a base enxuta e busca os detalhes só da página
+
+**Contexto.** Depois do ADR-012 o parentesco deixou de ser quadrático, mas o `GET /api/people`
+continuava carregando **todas** as pessoas com pai, mãe, local, uniões e foto — para devolver dez.
+Medido numa base de 5000 pessoas, qualquer página custava ~202 ms, e a resposta da lista inteira,
+7,5 MB. O custo não dependia da página pedida: a de número 250 custava o mesmo que a primeira.
+
+Levar o filtro para o SQL resolveria de vez, mas cobra caro e muda comportamento: a busca casa o
+**grau de parentesco**, que é calculado e não existe como coluna (ADR-007), e a acento-insensibilidade
+da RN-016 exigiria `unaccent` no Postgres. Some as duas coisas e a busca deixa de achar "primo".
+
+**Decisão.** Separar o que a varredura precisa do que a página mostra:
+
+1. uma consulta **enxuta** (`LEAN_SELECT`) traz a base inteira com só o necessário para calcular
+   parentesco, buscar e ordenar — sem nenhum join;
+2. o filtro, a ordenação e o corte da página acontecem sobre essas linhas estreitas;
+3. uma segunda consulta busca `include` completo **só dos ids da página**, e o resultado é remontado
+   na ordem que a ordenação decidiu.
+
+A chamada **sem paginação** continua como era: quem a faz é a árvore ou o calendário, e os dois
+querem a base inteira com uniões e foto. Não há o que enxugar ali sem mudar o contrato.
+
+**Consequências.** Na mesma base de 5000 pessoas, medido antes e depois com resposta conferida
+**byte a byte idêntica**:
+
+| requisição | antes | depois |
+| --- | --- | --- |
+| página 1 | 202 ms | 39 ms |
+| página 250 | 202 ms | 36 ms |
+| busca por nome | 206 ms | 31 ms |
+| ordenar por idade | 201 ms | 35 ms |
+| lista inteira (árvore) | 250 ms | 252 ms — de propósito |
+
+O que sobra é a varredura em si, que é o piso desta arquitetura: enquanto o grau de parentesco for
+calculado e a busca casar por ele, alguma leitura da base inteira tem de acontecer a cada consulta.
+
+**A armadilha que isto introduz:** `where: { id: { in: [...] } }` **não promete ordem**. A ordenação
+foi decidida sobre as linhas enxutas, então a segunda consulta tem de ser remontada contra ela —
+esquecer isso devolve a página embaralhada sem erro nenhum. Há teste que entrega as linhas na ordem
+inversa de propósito. Se alguém for apagado entre as duas consultas, a linha some da página em vez de
+virar um buraco, e o `total` continua sendo o que a varredura contou.
