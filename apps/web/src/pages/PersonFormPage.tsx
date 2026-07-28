@@ -184,8 +184,9 @@ export default function PersonFormPage() {
       <div className="form-card">
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Nome *</label>
+            <label htmlFor="pessoa-nome">Nome *</label>
             <input
+              id="pessoa-nome"
               required
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
@@ -194,8 +195,9 @@ export default function PersonFormPage() {
           </div>
 
           <div className="form-group">
-            <label>Sexo</label>
+            <label htmlFor="pessoa-sexo">Sexo</label>
             <select
+              id="pessoa-sexo"
               value={form.sex ?? ''}
               onChange={(e) => set('sex', (e.target.value || null) as Sex | null)}
             >
@@ -206,8 +208,9 @@ export default function PersonFormPage() {
           </div>
 
           <div className="form-group">
-            <label>Data de nascimento</label>
+            <label htmlFor="pessoa-nascimento">Data de nascimento</label>
             <input
+              id="pessoa-nascimento"
               type="date"
               value={form.birthDate ?? ''}
               onChange={(e) => set('birthDate', e.target.value)}
@@ -215,8 +218,9 @@ export default function PersonFormPage() {
           </div>
 
           <div className="form-group">
-            <label>Data de falecimento</label>
+            <label htmlFor="pessoa-falecimento">Data de falecimento</label>
             <input
+              id="pessoa-falecimento"
               type="date"
               value={form.deathDate ?? ''}
               onChange={(e) => set('deathDate', e.target.value)}
@@ -241,8 +245,9 @@ export default function PersonFormPage() {
           </div>
 
           <div className="form-group">
-            <label>Tipo de relacionamento *</label>
+            <label htmlFor="pessoa-relacionamento">Tipo de relacionamento *</label>
             <select
+              id="pessoa-relacionamento"
               value={form.relationshipType}
               onChange={(e) => set('relationshipType', e.target.value as RelationshipType)}
             >
@@ -256,8 +261,9 @@ export default function PersonFormPage() {
           </div>
 
           <div className="form-group">
-            <label>Local de convívio</label>
+            <label htmlFor="pessoa-local">Local de convívio</label>
             <select
+              id="pessoa-local"
               value={form.locationId ?? ''}
               onChange={(e) => set('locationId', e.target.value || null)}
             >
@@ -280,8 +286,9 @@ export default function PersonFormPage() {
             </legend>
 
             <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-              <label>Pai</label>
+              <label htmlFor="pessoa-pai">Pai</label>
               <select
+                id="pessoa-pai"
                 value={form.fatherId ?? ''}
                 onChange={(e) => set('fatherId', e.target.value || null)}
               >
@@ -293,8 +300,9 @@ export default function PersonFormPage() {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label>Mãe</label>
+              <label htmlFor="pessoa-mae">Mãe</label>
               <select
+                id="pessoa-mae"
                 value={form.motherId ?? ''}
                 onChange={(e) => set('motherId', e.target.value || null)}
               >
@@ -336,6 +344,7 @@ export default function PersonFormPage() {
                       disabled={unionBusy}
                       onChange={(e) => handleUnionStatus(union.id, e.target.value as UnionStatus)}
                       style={{ width: 'auto' }}
+                      aria-label={`Situação da união com ${union.partner.name}`}
                     >
                       {UNION_STATUS_OPTIONS.map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
@@ -346,6 +355,7 @@ export default function PersonFormPage() {
                       className="btn-ghost"
                       disabled={unionBusy}
                       onClick={() => handleRemoveUnion(union.id, union.partner.name)}
+                      aria-label={`Remover a união com ${union.partner.name}`}
                     >
                       Remover
                     </button>
@@ -358,6 +368,7 @@ export default function PersonFormPage() {
                     disabled={unionBusy}
                     onChange={(e) => setNewPartnerId(e.target.value)}
                     style={{ width: 'auto', minWidth: '10rem' }}
+                    aria-label="Cônjuge a adicionar"
                   >
                     <option value="">Adicionar cônjuge...</option>
                     {availableForUnion.map((p) => (
@@ -369,6 +380,7 @@ export default function PersonFormPage() {
                     disabled={unionBusy}
                     onChange={(e) => setNewStatus(e.target.value as UnionStatus)}
                     style={{ width: 'auto' }}
+                    aria-label="Situação da nova união"
                   >
                     {UNION_STATUS_OPTIONS.map(([value, label]) => (
                       <option key={value} value={value}>{label}</option>
@@ -402,8 +414,9 @@ export default function PersonFormPage() {
           </fieldset>
 
           <div className="form-group">
-            <label>URL da foto de perfil</label>
+            <label htmlFor="pessoa-foto">URL da foto de perfil</label>
             <input
+              id="pessoa-foto"
               type="url"
               value={form.profilePhoto ?? ''}
               onChange={(e) => set('profilePhoto', e.target.value)}

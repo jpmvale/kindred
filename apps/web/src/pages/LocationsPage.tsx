@@ -57,8 +57,9 @@ export default function LocationsPage() {
       <div className="form-card" style={{ marginBottom: '1.5rem' }}>
         <form onSubmit={handleAdd} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
           <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label>Novo local</label>
+            <label htmlFor="novo-local">Novo local</label>
             <input
+              id="novo-local"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="ex: Faculdade USP, Vizinhança, Trabalho..."

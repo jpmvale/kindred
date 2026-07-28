@@ -42,8 +42,9 @@ export default function SetupPage() {
       <div className="form-card">
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Nome *</label>
+            <label htmlFor="setup-nome">Nome *</label>
             <input
+              id="setup-nome"
               required
               value={form.name}
               onChange={(e) => set('name', e.target.value)}
@@ -51,24 +52,30 @@ export default function SetupPage() {
             />
           </div>
           <div className="form-group">
-            <label>Sexo</label>
-            <select value={form.sex} onChange={(e) => set('sex', e.target.value)}>
+            <label htmlFor="setup-sexo">Sexo</label>
+            <select
+              id="setup-sexo"
+              value={form.sex}
+              onChange={(e) => set('sex', e.target.value)}
+            >
               <option value="">Não informado</option>
               <option value="MALE">Masculino</option>
               <option value="FEMALE">Feminino</option>
             </select>
           </div>
           <div className="form-group">
-            <label>Data de nascimento</label>
+            <label htmlFor="setup-nascimento">Data de nascimento</label>
             <input
+              id="setup-nascimento"
               type="date"
               value={form.birthDate}
               onChange={(e) => set('birthDate', e.target.value)}
             />
           </div>
           <div className="form-group">
-            <label>URL da foto de perfil</label>
+            <label htmlFor="setup-foto">URL da foto de perfil</label>
             <input
+              id="setup-foto"
               type="url"
               value={form.profilePhoto}
               onChange={(e) => set('profilePhoto', e.target.value)}

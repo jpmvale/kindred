@@ -130,70 +130,70 @@ export default function CalendarPage() {
         <h1>Calendário</h1>
       </div>
 
-          <div className="calendar-card">
-            <div className="calendar-month-nav">
-              <button type="button" className="btn-ghost" onClick={() => shiftMonth(-1)} aria-label="Mês anterior">
-                ←
-              </button>
-              <h2>{monthLabel}</h2>
-              <button type="button" className="btn-ghost" onClick={() => shiftMonth(1)} aria-label="Próximo mês">
-                →
-              </button>
-            </div>
+      <div className="calendar-card">
+        <div className="calendar-month-nav">
+          <button type="button" className="btn-ghost" onClick={() => shiftMonth(-1)} aria-label="Mês anterior">
+            ←
+          </button>
+          <h2>{monthLabel}</h2>
+          <button type="button" className="btn-ghost" onClick={() => shiftMonth(1)} aria-label="Próximo mês">
+            →
+          </button>
+        </div>
 
-            <div className="calendar-grid">
-              {WEEK_DAYS.map((label) => (
-                <div key={label} className="calendar-weekday">{label}</div>
-              ))}
+        <div className="calendar-grid">
+          {WEEK_DAYS.map((label) => (
+            <div key={label} className="calendar-weekday">{label}</div>
+          ))}
 
-              {Array.from({ length: firstDayWeekIndex }).map((_, idx) => (
-                <div key={`empty-${idx}`} className="calendar-day calendar-day-empty" />
-              ))}
+          {Array.from({ length: firstDayWeekIndex }).map((_, idx) => (
+            <div key={`empty-${idx}`} className="calendar-day calendar-day-empty" />
+          ))}
 
-              {Array.from({ length: daysInMonth }).map((_, idx) => {
-                const day = idx + 1;
-                const birthdays = birthdaysByDay.get(day) ?? [];
-                const isToday = year === todayYear && monthIndex === todayMonth && day === todayDay;
+          {Array.from({ length: daysInMonth }).map((_, idx) => {
+            const day = idx + 1;
+            const birthdays = birthdaysByDay.get(day) ?? [];
+            const isToday = year === todayYear && monthIndex === todayMonth && day === todayDay;
 
-                return (
-                  <div key={day} className={`calendar-day ${isToday ? 'calendar-day-today' : ''}`}>
-                    <div className="calendar-day-number">{day}</div>
-                    {birthdays.map((entry) => (
-                      <div key={entry.id} className="calendar-birthday-chip" title={entry.name}>
-                        🎂 {entry.name}
-                      </div>
-                    ))}
+            return (
+              <div key={day} className={`calendar-day ${isToday ? 'calendar-day-today' : ''}`}>
+                <div className="calendar-day-number">{day}</div>
+                {birthdays.map((entry) => (
+                  <div key={entry.id} className="calendar-birthday-chip" title={entry.name}>
+                    🎂 {entry.name}
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-          <div className="calendar-upcoming-card">
-            <h3>Próximos 5 aniversários (pessoas vivas)</h3>
-            {nextFiveBirthdays.length === 0 ? (
-              <p className="calendar-empty-text">Nenhum aniversário cadastrado para pessoas vivas.</p>
-            ) : (
-              <table className="calendar-upcoming-table">
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>Data</th>
-                    <th>Dias faltantes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {nextFiveBirthdays.map((entry) => (
-                    <tr key={`${entry.id}-${entry.nextDate.toISOString()}`}>
-                      <td>{entry.name}</td>
-                      <td>{entry.nextDate.toLocaleDateString('pt-BR')}</td>
-                      <td>{entry.daysUntil}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+      <div className="calendar-upcoming-card">
+        <h3>Próximos 5 aniversários (pessoas vivas)</h3>
+        {nextFiveBirthdays.length === 0 ? (
+          <p className="calendar-empty-text">Nenhum aniversário cadastrado para pessoas vivas.</p>
+        ) : (
+          <table className="calendar-upcoming-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Data</th>
+                <th>Dias faltantes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {nextFiveBirthdays.map((entry) => (
+                <tr key={`${entry.id}-${entry.nextDate.toISOString()}`}>
+                  <td>{entry.name}</td>
+                  <td>{entry.nextDate.toLocaleDateString('pt-BR')}</td>
+                  <td>{entry.daysUntil}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

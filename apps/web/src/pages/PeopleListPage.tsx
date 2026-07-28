@@ -34,14 +34,17 @@ export default function PeopleListPage() {
   // link colado —, o campo se realinha com ela; ajustar estado durante o render
   // é o jeito que o React recomenda para isso, e não custa um efeito.
   //
-  // Daí guardar o último termo enviado: sem essa comparação, a resposta do
-  // próprio debounce contaria como mudança de fora e apagaria o que a pessoa
-  // digitou enquanto a busca anterior ia e voltava.
+  // O que interessa é a URL *mudar*, não o que ela diz agora: entre mandar a
+  // busca e o loader responder, a URL ainda mostra o termo velho, e comparar
+  // valores nesse intervalo apagaria o que a pessoa digitou. Daí a mudança ser
+  // detectada contra o render anterior, e só valer quando o termo novo não é o
+  // que este mesmo campo pediu.
   const [searchInput, setSearchInput] = useState(query.search);
-  const [sentSearch, setSentSearch] = useState(query.search);
-  if (sentSearch !== query.search) {
-    setSentSearch(query.search);
-    setSearchInput(query.search);
+  const [lastUrlSearch, setLastUrlSearch] = useState(query.search);
+  const [expectedSearch, setExpectedSearch] = useState(query.search);
+  if (lastUrlSearch !== query.search) {
+    setLastUrlSearch(query.search);
+    if (query.search !== expectedSearch) setSearchInput(query.search);
   }
 
   function go(changes: Partial<PeopleListQuery>) {
@@ -54,7 +57,7 @@ export default function PeopleListPage() {
     const term = searchInput.trim();
     if (term === query.search) return;
     const timeoutId = window.setTimeout(() => {
-      setSentSearch(term);
+      setExpectedSearch(term);
       setSearchParams(
         serializePeopleListQuery({ ...query, search: term, page: 1 }),
         { replace: true },
@@ -117,8 +120,9 @@ export default function PeopleListPage() {
       <div className="form-card" style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ marginBottom: 0, maxWidth: 320, width: '100%' }}>
-            <label>Busca</label>
+            <label htmlFor="busca">Busca</label>
             <input
+              id="busca"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder='Ex: Maria, Avó, Primo'
@@ -126,8 +130,9 @@ export default function PeopleListPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'end', gap: '0.75rem' }}>
             <div className="form-group" style={{ marginBottom: 0, minWidth: 170 }}>
-              <label>Ordenar por</label>
+              <label htmlFor="ordenar-por">Ordenar por</label>
               <select
+                id="ordenar-por"
                 value={query.sortBy}
                 onChange={(e) =>
                   go({ sortBy: e.target.value as PeopleSortField, page: 1 })
@@ -139,8 +144,9 @@ export default function PeopleListPage() {
               </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0, minWidth: 140 }}>
-              <label>Direção</label>
+              <label htmlFor="direcao">Direção</label>
               <select
+                id="direcao"
                 value={query.sortDirection}
                 onChange={(e) =>
                   go({
