@@ -8,6 +8,15 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   (`400`, "Já existe uma pessoa central cadastrada").
 - **RN-002** — Enquanto não houver pessoa central, o web redireciona para a tela de setup; a pessoa
   cadastrada ali nasce com `relationshipType = FAMILY` e `isCentralUser = true`.
+- **RN-018** — O posto de pessoa central pode ser **transferido** para outra pessoa já cadastrada
+  (`PUT /api/people/central`). Não é criar uma segunda: quem era central vira pessoa comum no mesmo
+  movimento, e passa a ter grau de parentesco como todo mundo. Todos os graus são recalculados a
+  partir da nova referência — quem era "Pai" pode virar "Avô", e o cônjuge de quem assume vira
+  "Marido" ou "Esposa".
+
+  Trocar para quem já é central não faz nada. A criação continua barrando uma segunda (RN-001), e o
+  `PATCH` de pessoa **ignora** `isCentralUser` de propósito: essa mudança mexe em duas pessoas, então
+  tem operação própria.
 
 ## Cadastro
 

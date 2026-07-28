@@ -16,6 +16,7 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { FindPeopleQueryDto } from './dto/find-people-query.dto';
 import { UploadPhotoDto } from './dto/upload-photo.dto';
+import { SetCentralDto } from './dto/set-central.dto';
 
 @Controller('people')
 export class PeopleController {
@@ -34,6 +35,15 @@ export class PeopleController {
   @Get('central')
   findCentral() {
     return this.peopleService.findCentral();
+  }
+
+  /**
+   * Troca quem é a pessoa central (RN-018). É `PUT` num recurso só — "a pessoa
+   * central" é uma —, e não um `PATCH` na pessoa: a operação mexe em duas.
+   */
+  @Put('central')
+  setCentral(@Body() dto: SetCentralDto) {
+    return this.peopleService.setCentral(dto.personId);
   }
 
   /**

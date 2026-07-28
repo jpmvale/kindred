@@ -22,8 +22,18 @@ que mais quebra sem avisar. Com a união conjugal (ADR-008) ele ganhou a metade 
 e ex, sogro, cunhado, genro, padrasto — e, principalmente, o corte da afinidade quando a união é
 desfeita (RN-013), que é o comportamento fácil de quebrar sem perceber.
 
-O e2e é de fumaça: sobe a app inteira e bate em `/api/health`. Fica fora do `pnpm test` de propósito —
-CI e desenvolvedor rodam a unidade sem infra.
+**O e2e é onde vive o que precisa de banco.** Além da fumaça (`/api/health`), ele cobre a troca da
+pessoa central (RN-018): a operação mexe em duas linhas ao mesmo tempo e a regra "existe no máximo
+uma" não tem constraint no Postgres — quem garante é o serviço, e isso não se verifica com dublê. O
+teste cria as próprias pessoas, e no `afterAll` devolve o posto a quem tinha e apaga o que criou, de
+modo que rodar contra o banco de dev não deixa rastro.
+
+Fica fora do `pnpm test` de propósito: CI e desenvolvedor rodam a unidade sem infra.
+
+```bash
+docker compose up -d postgres && pnpm db:migrate
+pnpm --filter @kindred/api test:e2e
+```
 
 ## O front
 

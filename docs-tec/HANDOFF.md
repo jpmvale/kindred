@@ -134,6 +134,23 @@ Duas coisas para saber ao mexer aqui:
 - A URL da foto não muda quando a foto muda, então ela leva o `photoUpdatedAt` na query. Tirar isso
   faz o navegador mostrar a foto antiga depois de trocar.
 
+## Sessão de 27/07 — trocar a pessoa central (BL-04)
+
+Dava para cadastrar a pessoa central e nunca mais mudar de ideia: a RN-001 barra a segunda, e não
+havia operação de transferência. Agora há `PUT /api/people/central`, e um botão na tela de edição de
+quem ainda não é.
+
+É **transferência, não criação**: as duas escritas vão na mesma transação e nesta ordem — tirar de
+quem tem, depois dar a quem recebe. Um instante com dois centrais quebraria o cálculo de parentesco,
+que procura um só. O `PATCH` de pessoa continua ignorando `isCentralUser` de propósito (RN-018).
+
+O efeito é o produto inteiro girando: passando o posto do Miguel para a Fernanda, ele vira "Marido",
+o pai dela vira "Pai", o pai dele vira "Sogro" e a irmã dele vira "Cunhada" — verificado rodando.
+
+**De quebra, o e2e voltou a funcionar.** Ele montava o `AppModule` direto, sem chamar `loadRootEnv()`,
+então o Prisma subia sem `DATABASE_URL` e **nenhum** e2e passava — inclusive o de health, que estava
+assim havia tempo. Agora o `jest-e2e.json` tem um `setupFiles` que carrega o `.env` da raiz.
+
 ## Sessão de 26/07 — monorepo
 
 O que estava em dois diretórios soltos (`kindred-api`, `kindred-web`), com um repositório git de um
@@ -171,6 +188,10 @@ não há resposta.
 
 Na sessão de 27/07:
 
+- BL-04 na tela e pela API: passar o posto para a Fernanda faz o Miguel virar "Marido", o Heitor
+  "Pai", o Carlos "Sogro" e a Beatriz "Cunhada"; passar para o Carlos faz o Miguel virar "Filho" e a
+  Fernanda "Nora". Sempre **um** central. O botão some de quem já é, e aparece o selo. Os 6 testes
+  e2e passam contra o Postgres de dev e devolvem o banco como estava — 23 pessoas, Miguel central.
 - BL-02 ponta a ponta, com a API no ar: um PNG de 111 KB subido pela API volta **byte a byte igual**,
   com `Content-Type: image/png` e `ETag`; a listagem das 23 pessoas ocupa 35 KB de JSON **sem
   nenhum byte de imagem**. As recusas respondem certo — arquivo que mente sobre o tipo, tipo fora da
@@ -201,8 +222,9 @@ Na sessão de 27/07:
   19/07/1987" sem parentesco nenhum. A busca continua achando por rótulo social ("amigo" → 2) e por
   grau ("primo" → 1).
 
-- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**117 testes**: 36 na API e 81 no web, entre módulos
-  puros, loaders e páginas) — verdes. O lint passa **sem aviso nenhum**.
+- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**121 testes**: 36 na API e 85 no web, entre módulos
+  puros, loaders e páginas) — verdes, mais 6 de e2e que rodam à parte, com banco. O lint passa **sem
+  aviso nenhum**.
 - Árvore no navegador contra o seed, colapsada e com tudo aberto: **nenhum par mais perto que o
   espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e as
   linhas de união todas no vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as

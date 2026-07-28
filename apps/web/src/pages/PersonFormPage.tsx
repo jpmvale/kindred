@@ -89,6 +89,9 @@ export default function PersonFormPage() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
 
+  const [centralError, setCentralError] = useState<string | null>(null);
+  const [centralBusy, setCentralBusy] = useState(false);
+
   const savedPhoto = person ? photoUrl(person) : null;
   const photoPreview = pendingPreview ?? savedPhoto;
 
@@ -116,6 +119,29 @@ export default function PersonFormPage() {
       );
     } finally {
       setPhotoBusy(false);
+    }
+  }
+
+  async function handleMakeCentral() {
+    if (!id || !person) return;
+    if (
+      !confirm(
+        `Tornar ${person.name} a pessoa central? O grau de parentesco de todo mundo passa a ser calculado em relação a ela.`,
+      )
+    )
+      return;
+
+    setCentralError(null);
+    setCentralBusy(true);
+    try {
+      await peopleApi.setCentral(id);
+      revalidator.revalidate();
+    } catch (error) {
+      setCentralError(
+        errorMessage(error, 'Não foi possível trocar a pessoa central.'),
+      );
+    } finally {
+      setCentralBusy(false);
     }
   }
 
@@ -236,7 +262,35 @@ export default function PersonFormPage() {
     <div className="page">
       <div className="page-header">
         <h1>{isEdit ? 'Editar pessoa' : 'Nova pessoa'}</h1>
+        {person?.isCentralUser && (
+          <span className="badge badge-FAMILY">Pessoa central</span>
+        )}
       </div>
+
+      {isEdit && person && !person.isCentralUser && (
+        <div className="form-card" style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+              O parentesco de todo mundo é calculado em relação à pessoa central.
+              Passar o posto para {person.name} recalcula a lista e a árvore inteiras.
+            </span>
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={centralBusy}
+              onClick={handleMakeCentral}
+            >
+              {centralBusy ? 'Trocando...' : 'Tornar pessoa central'}
+            </button>
+          </div>
+          {centralError && (
+            <p style={{ fontSize: '0.85rem', color: '#dc2626', margin: '0.5rem 0 0' }}>
+              {centralError}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="form-card">
         <form onSubmit={handleSubmit}>
           <div className="form-group">

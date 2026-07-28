@@ -21,6 +21,9 @@ export const peopleApi = {
   }) =>
     api.get<PaginatedPeopleResponse>('/people', { params }).then((r) => r.data),
   getCentral: () => api.get<Person | null>('/people/central').then((r) => r.data),
+  /** Transfere o posto de pessoa central (RN-018) — não cria uma segunda. */
+  setCentral: (personId: string) =>
+    api.put<Person>('/people/central', { personId }).then((r) => r.data),
   getOne: (id: string) => api.get<Person>(`/people/${id}`).then((r) => r.data),
   create: (data: PersonFormData) => api.post<Person>('/people', data).then((r) => r.data),
   update: (id: string, data: Partial<PersonFormData>) =>

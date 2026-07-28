@@ -12,6 +12,7 @@ vi.mock('../api/people', () => ({
     update: vi.fn(),
     savePhoto: vi.fn(),
     removePhoto: vi.fn(),
+    setCentral: vi.fn(),
   },
 }));
 // O redimensionamento usa canvas e `createImageBitmap`, que o jsdom não tem; o
@@ -278,6 +279,57 @@ describe('PersonFormPage — edição', () => {
     await screen.findByLabelText('Nome *');
     expect(
       screen.queryByRole('button', { name: 'Remover foto' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('dá para passar o posto de pessoa central', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(peopleApi.setCentral).mockResolvedValue({
+      ...MIGUEL,
+      isCentralUser: true,
+    });
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    await user.click(screen.getByRole('button', { name: 'Tornar pessoa central' }));
+
+    expect(peopleApi.setCentral).toHaveBeenCalledWith(MIGUEL.id);
+    await waitFor(() => expect(peopleApi.getOne).toHaveBeenCalledTimes(2));
+  });
+
+  it('desistir da confirmação não troca a pessoa central', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    await user.click(screen.getByRole('button', { name: 'Tornar pessoa central' }));
+
+    expect(peopleApi.setCentral).not.toHaveBeenCalled();
+  });
+
+  it('quem já é a pessoa central não tem o que trocar', async () => {
+    vi.mocked(peopleApi.getOne).mockResolvedValue({
+      ...MIGUEL,
+      isCentralUser: true,
+      unions: [],
+    });
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    expect(
+      screen.queryByRole('button', { name: 'Tornar pessoa central' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Pessoa central')).toBeInTheDocument();
+  });
+
+  it('no cadastro não há posto para passar', async () => {
+    montar('/people/new');
+    await screen.findByLabelText('Nome *');
+
+    expect(
+      screen.queryByRole('button', { name: 'Tornar pessoa central' }),
     ).not.toBeInTheDocument();
   });
 

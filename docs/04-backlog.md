@@ -4,7 +4,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-04 | **Trocar a pessoa central** sem mexer no banco | RN-001 impede a segunda; falta a operação de transferência. |
 | BL-05 | **Notas por pessoa** (origem da amizade, histórias) | A spec original tinha `friendshipOrigin`; virou texto livre que ainda não existe. |
 | BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
 | BL-07 | **Aniversário de falecimento** no calendário | O calendário só olha nascimento. |
@@ -23,6 +22,8 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   (RN-016).
 - **BL-11** — os dados vêm de loaders de rota, não de `useEffect`; a lista de pessoas passou a morar
   na URL, e as regras de lint voltaram a ser erro (ADR-010).
+- **BL-04** — a pessoa central pode ser trocada pela tela: o posto é transferido numa transação, e
+  todos os graus são recalculados a partir de quem assume (RN-018).
 - **BL-02** — a foto virou arquivo de verdade: sobe reduzida pelo navegador e fica no Postgres, ao
   lado do resto dos dados (ADR-011, RN-017).
 - **BL-08** — as páginas do front ganharam teste: a rota inteira montada com a API dublada, buscando

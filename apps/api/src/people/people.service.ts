@@ -290,6 +290,36 @@ export class PeopleService {
     return this.prisma.person.delete({ where: { id } });
   }
 
+  /**
+   * Passa o posto de pessoa central para outra pessoa (RN-018).
+   *
+   * Não é criar uma segunda — é **transferir**: o antigo central vira uma pessoa
+   * comum no mesmo movimento. Por isso as duas escritas vão na mesma transação,
+   * e nesta ordem: tirar de quem tem antes de dar a quem vai receber. Um instante
+   * com dois centrais quebraria o cálculo de parentesco, que procura um só.
+   */
+  async setCentral(id: string) {
+    const alvo = await this.prisma.person.findUnique({
+      where: { id },
+      select: { isCentralUser: true },
+    });
+    if (!alvo) throw new NotFoundException(`Pessoa "${id}" não encontrada`);
+    if (alvo.isCentralUser) return this.findOne(id);
+
+    await this.prisma.$transaction([
+      this.prisma.person.updateMany({
+        where: { isCentralUser: true },
+        data: { isCentralUser: false },
+      }),
+      this.prisma.person.update({
+        where: { id },
+        data: { isCentralUser: true },
+      }),
+    ]);
+
+    return this.findOne(id);
+  }
+
   // ─── Foto de perfil (ADR-011, RN-017) ──────────────────────────────────────
 
   async savePhoto(id: string, dto: UploadPhotoDto) {
