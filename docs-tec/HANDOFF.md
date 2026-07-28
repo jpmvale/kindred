@@ -7,6 +7,12 @@ _Atualizado em 28/07/2026._
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários.
 
+**Marco de retomada — 28/07/2026, fim da janela.** `main` em `adb409e`, **igual a `origin/main`**
+(nada pendente de push), working tree **limpo**, nada pela metade. Conferido agora: `pnpm typecheck`,
+`pnpm lint` (sem um aviso sequer) e `pnpm test` — **147 testes**, 40 na API e 107 no web. Os 6 e2e
+rodam à parte e precisam de banco. Para retomar, basta subir o Postgres (`docker compose up -d
+postgres`) e escolher um item da seção **Próximo passo sugerido**, no fim deste arquivo.
+
 ## Onde a última sessão parou
 
 Fecharam **BL-05** (notas por pessoa) e **BL-07** (falecimento no calendário), e o **BL-09** andou
@@ -18,10 +24,14 @@ listagem.
 
 ### Coisas do ambiente que custaram tempo
 
-- **A porta 3000 estava ocupada por outro projeto** (`expense-analyzer`) nesta máquina. A API do
-  kindred foi rodada com `PORT=3005 pnpm --filter @kindred/api dev`, e o web com
-  `API_URL=http://localhost:3005 pnpm --filter @kindred/web dev` para o proxy do Vite achá-la. Se o
-  `docker compose up` reclamar de porta, é isso.
+- **A porta 3000 vive ocupada por outro projeto** nesta máquina (já foi o `coda`, já foi o
+  `expense-analyzer`), e a 5173 também. A API do kindred foi rodada com
+  `PORT=3005 pnpm --filter @kindred/api dev`, e o web com
+  `API_URL=http://localhost:3005 pnpm --filter @kindred/web dev` para o proxy do Vite achá-la (o
+  `--port` do Vite resolve o outro lado). Se o `docker compose up` reclamar de porta, é isso.
+- **Encerrar os servidores por caminho do projeto, nunca por processo.** Um `pkill -f vite` numa
+  destas sessões derrubou junto o dev server do projeto irmão que estava na 5173. O certo é
+  `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
 
@@ -372,8 +382,8 @@ Na sessão de 26/07 (monorepo):
 
 ## Pontos de atenção
 
-- **Portas.** O projeto irmão *coda* também usa 3000 e 5432. Rodar os dois ao mesmo tempo exige
-  mudar as portas de um deles (`docker compose stop` no coda foi o que se fez aqui).
+- **Portas.** Outros projetos desta máquina usam 3000, 5173 e 5432. Rodar dois ao mesmo tempo exige
+  mudar as portas de um deles — ver "Coisas do ambiente que custaram tempo", acima.
 - **O grupo de afinidade se desloca como bloco, mas o espaçamento é linha a linha.** Num caso
   extremo (muitos cônjuges com família aberta na mesma geração) o grupo pode sair torto — nunca
   sobreposto, mas desalinhado do cônjuge. Não apareceu com o seed.
