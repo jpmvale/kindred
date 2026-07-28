@@ -28,10 +28,16 @@ import {
  * Porta de entrada: sem pessoa central não há parentesco para calcular, então o
  * app inteiro desvia para o cadastro dela (RN-001). O `/setup` fica fora deste
  * layout justamente para não cair no próprio desvio.
+ *
+ * O `/backup` é a **exceção** dentro do layout: é para lá que se vai depois de
+ * perder a base (o cenário que motiva restaurar um backup, para começo de
+ * conversa), então ele não pode ficar atrás do mesmo desvio que ele existe
+ * para resolver.
  */
-export async function layoutLoader() {
+export async function layoutLoader({ request }: LoaderFunctionArgs) {
+  const indoParaBackup = new URL(request.url).pathname === '/backup';
   const central = await peopleApi.getCentral();
-  if (!central) return redirect('/setup');
+  if (!central && !indoParaBackup) return redirect('/setup');
   return { central };
 }
 

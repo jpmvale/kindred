@@ -471,3 +471,46 @@ ninguém abre no mesmo minuto. Não há lint que pegue isso; o que pega é
 `grep -rE '#[0-9a-fA-F]{6}' apps/web/src --include='*.tsx'` não devolver nada. A única exceção legítima
 hoje é o `photo.ts`, que pinta de branco o fundo do JPEG ao achatar um PNG transparente — isso é
 conteúdo gravado no banco, não cor de tela, e não deve seguir tema nenhum.
+
+---
+
+## ADR-016 — Exportar/importar reusa o backup, e a restauração é sempre transação
+
+**Contexto.** O BL-06 pedia exportar/importar pela aplicação. A tentação era construir um segundo
+formato — um "export" da API, separado do "backup" do CLI — mas isso duplicaria a lógica de coletar
+cada modelo e abriria espaço para as duas formas divergirem sem ninguém perceber.
+
+**Decisão.** `GET /api/backup` e `POST /api/backup/restore` **são** o `db:backup`/`db:restore`, só
+que sem passar por disco: `buildBackupPayload` monta o mesmo objeto que o CLI escreve em arquivo, e
+`buildRestoreOperations` monta a mesma lista de operações que o CLI executa — ambos exportados de
+`@kindred/db` (ADR-013) e reusados dos dois lados. Baixar pelo navegador e rodar `pnpm db:backup`
+produzem o mesmo arquivo; um serve para restaurar o outro.
+
+A diferença que a API precisava e o CLI não: **restaurar é sempre uma transação** (RN-021). O CLI
+original apagava e recriava com `await` sequencial, sem transação — aceitável quando quem aperta
+`--force` é a mesma pessoa que escreveu o arquivo, minutos antes. Pela web, o arquivo pode ter vindo
+de qualquer lugar, então uma união apontando para um id que não existe (por exemplo) não pode deixar
+o banco pela metade. A saída foi trocar o laço de `await` por um **array de `PrismaPromise`**
+(`buildRestoreOperations`) que vai inteiro para `$transaction([...])` — a mesma forma batch que
+`setCentral` já usa em `people.service.ts`, sem precisar do tipo `Prisma.TransactionClient` nem de
+callback interativo, porque nenhuma operação depende do resultado de outra: os ids já vêm prontos do
+arquivo.
+
+**Verificado rodando:** um arquivo com uma união referenciando gente inexistente, mandado com
+`force=true` contra uma base com 141 pessoas, devolve 500 — e a base **continua com as 141 pessoas
+originais**, não vazia nem pela metade. É o teste que a versão sequencial do CLI não tinha como
+passar.
+
+**Consequências.** `parseBackupFile` (a mesma validação do CLI) é quem decide se o corpo da
+requisição é um backup de verdade; o controller não usa DTO validado (`@Body() body: Record<string,
+unknown>`), porque o `ValidationPipe` global (`whitelist: true`) pularia a validação de qualquer jeito
+— o TypeScript apaga `Record<string, unknown>` para `Object` em tempo de execução, e é isso que o
+`ValidationPipe` exclui de propósito. O limite do corpo JSON subiu de 3 MB (o suficiente só para uma
+foto) para 10 MB, porque agora o corpo pode ser a base inteira; o app não tem autenticação, então
+esse número não é uma linha de defesa, só uma folga para uma base pessoal razoável.
+
+**O que só existe do lado do produto, não do CLI:** o `/backup` precisa ser alcançável **mesmo sem
+pessoa central** — é a tela que resolve exatamente o cenário de "perdi minha base". O
+`layoutLoader` (ADR-010), que desvia todo mundo para `/setup` quando não há central, ganhou uma
+exceção de uma linha para esse caminho; sem ela, restaurar um backup ficaria atrás do próprio muro
+que existe para forçar o cadastro do zero.

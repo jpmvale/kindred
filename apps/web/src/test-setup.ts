@@ -14,3 +14,8 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 };
+
+// O jsdom não implementa createObjectURL/revokeObjectURL — usado no download
+// do backup (BL-06). O identificador em si não importa, só não pode lançar.
+URL.createObjectURL ??= () => 'blob:teste';
+URL.revokeObjectURL ??= () => {};

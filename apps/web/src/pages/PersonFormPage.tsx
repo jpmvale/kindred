@@ -5,9 +5,9 @@ import {
   useParams,
   useRevalidator,
 } from 'react-router-dom';
-import axios from 'axios';
 import { peopleApi } from '../api/people';
 import { unionsApi } from '../api/unions';
+import { errorMessage } from '../api-error';
 import { ACCEPTED_PHOTO_TYPES, fileToPhotoUpload, photoUrl } from '../photo';
 import type { PersonFormPageData } from '../loaders';
 import { RELATIONSHIP_LABELS, UNION_STATUS_LABELS } from '../labels';
@@ -37,17 +37,6 @@ const UNION_STATUS_OPTIONS = Object.entries(UNION_STATUS_LABELS) as [
  * para avisar na tela antes de o servidor recusar, não para substituir a validação.
  */
 const NOTES_MAX_LENGTH = 2000;
-
-/** A API responde com `message` nos erros de regra de negócio (400/404). */
-function errorMessage(error: unknown, fallback: string): string {
-  if (axios.isAxiosError(error)) {
-    const message = (error.response?.data as { message?: string | string[] })
-      ?.message;
-    if (Array.isArray(message)) return message.join(', ');
-    if (message) return message;
-  }
-  return fallback;
-}
 
 const EMPTY: PersonFormData = {
   name: '',

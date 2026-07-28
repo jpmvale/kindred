@@ -50,7 +50,7 @@ describe('layoutLoader', () => {
   it('desvia para o /setup quando não há pessoa central', async () => {
     vi.mocked(peopleApi.getCentral).mockResolvedValue(null);
 
-    const resposta = (await layoutLoader()) as Response;
+    const resposta = (await layoutLoader(args('http://x/people'))) as Response;
 
     expect(resposta.status).toBe(302);
     expect(resposta.headers.get('Location')).toBe('/setup');
@@ -59,7 +59,25 @@ describe('layoutLoader', () => {
   it('deixa passar quando há', async () => {
     vi.mocked(peopleApi.getCentral).mockResolvedValue(pessoa());
 
-    expect(await layoutLoader()).toEqual({ central: pessoa() });
+    expect(await layoutLoader(args('http://x/people'))).toEqual({
+      central: pessoa(),
+    });
+  });
+
+  it('não desvia quando o destino já é o /backup — é para lá que se vai sem central', async () => {
+    vi.mocked(peopleApi.getCentral).mockResolvedValue(null);
+
+    const resultado = await layoutLoader(args('http://x/backup'));
+
+    expect(resultado).toEqual({ central: null });
+  });
+
+  it('deixa passar o /backup normalmente quando há pessoa central', async () => {
+    vi.mocked(peopleApi.getCentral).mockResolvedValue(pessoa());
+
+    expect(await layoutLoader(args('http://x/backup'))).toEqual({
+      central: pessoa(),
+    });
   });
 });
 

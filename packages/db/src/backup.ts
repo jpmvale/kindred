@@ -31,11 +31,12 @@ export function backupDir(): string {
   return resolve(__dirname, "..", "..", "..", "..", "kindred-backups");
 }
 
-function timestamp(agora = new Date()): string {
+/** Nome do arquivo, com a hora do carimbo — reusado pelo CLI e pelo download da API. */
+export function backupFilename(now = new Date()): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return (
-    `${agora.getFullYear()}${p(agora.getMonth() + 1)}${p(agora.getDate())}` +
-    `-${p(agora.getHours())}${p(agora.getMinutes())}`
+    `kindred-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}` +
+    `-${p(now.getHours())}${p(now.getMinutes())}.json`
   );
 }
 
@@ -94,22 +95,32 @@ export async function collect(prisma: PrismaClient) {
   };
 }
 
-export async function createBackup(prisma: PrismaClient, destino?: string) {
+/**
+ * Monta o conteúdo do backup em memória — sem tocar em disco. É o que o CLI
+ * escreve em arquivo e o que a API devolve como download (`GET /api/backup`):
+ * as duas pontas compartilham exatamente o mesmo formato, então uma nunca lê o
+ * que a outra não sabe escrever.
+ */
+export async function buildBackupPayload(prisma: PrismaClient) {
   const dados = await collect(prisma);
   assertCoverage(dados as unknown as Record<string, unknown[]>);
 
-  const conteudo = {
+  return {
     formato: BACKUP_FORMAT,
     geradoEm: new Date().toISOString(),
     contagem: Object.fromEntries(
       Object.entries(dados).map(([modelo, linhas]) => [modelo, linhas.length]),
-    ),
+    ) as Record<(typeof MODELS)[number], number>,
     dados,
   };
+}
+
+export async function createBackup(prisma: PrismaClient, destino?: string) {
+  const conteudo = await buildBackupPayload(prisma);
 
   const dir = destino ?? backupDir();
   mkdirSync(dir, { recursive: true });
-  const arquivo = join(dir, `kindred-${timestamp()}.json`);
+  const arquivo = join(dir, backupFilename());
   writeFileSync(arquivo, JSON.stringify(conteudo, null, 2), "utf-8");
 
   return { arquivo, contagem: conteudo.contagem };

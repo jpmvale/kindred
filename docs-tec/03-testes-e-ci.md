@@ -29,6 +29,15 @@ furado, e um backup furado só se revela na restauração, quando o dado origina
 inclui o caso em que a pessoa exportada perde campos — é o formato do vazamento silencioso que se quer
 impedir.
 
+**`backup.service.spec.ts` protege o controle de fluxo da restauração** (ADR-016, RN-021), não o
+formato do arquivo — isso já é do `@kindred/db`. Um Prisma dublê grava a ordem em que cada método foi
+chamado, e os testes conferem: sem `force` e banco ocupado, nada é tocado; com `force`, apagar vem
+antes de recriar, tudo num `$transaction` só. A garantia mais forte — que um arquivo malformado no
+meio da restauração deixa o banco exatamente como estava — não dá para provar com um dublê (ele não
+sabe fazer rollback de verdade); essa foi provada rodando contra um Postgres de teste: uma união
+apontando para gente inexistente derruba a transação inteira, e as pessoas que já estavam lá
+continuam intactas.
+
 O teste que carrega peso é o de `computeKinship` (ADR-007): monta uma árvore de quatro gerações e
 confere pai, mãe, avós, irmã, tio, primo, filha e o caso sem caminho. É a lógica que mais se mexe e a
 que mais quebra sem avisar. Com a união conjugal (ADR-008) ele ganhou a metade da afinidade: cônjuge

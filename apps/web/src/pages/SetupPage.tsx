@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { peopleApi } from '../api/people';
 import { ACCEPTED_PHOTO_TYPES, fileToPhotoUpload } from '../photo';
 import type { PhotoUploadData, Sex } from '@kindred/types';
@@ -126,6 +126,9 @@ export default function SetupPage() {
           </div>
         </form>
       </div>
+      <p className="text-muted" style={{ marginTop: '1rem', textAlign: 'center' }}>
+        Já tem um backup? <Link to="/backup">Restaurar em vez de cadastrar</Link>
+      </p>
     </div>
   );
 }

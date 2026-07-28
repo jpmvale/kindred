@@ -135,6 +135,14 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   próximas 5 datas de falecimento. Separadas porque respondem a perguntas diferentes — a quem dar
   parabéns, e de quem lembrar.
 
+## Backup e restauração
+
+- **RN-021** — Restaurar um backup é **tudo ou nada** (BL-06, ADR-016): as escritas acontecem numa
+  única transação, então um arquivo malformado ou com referência para gente que não existe deixa o
+  banco exatamente como estava, nunca vazio ou pela metade. Sem confirmação explícita
+  (`force`), restaurar sobre um banco que já tem gente é recusado — quem decide apagar é quem está do
+  outro lado da tela, não a operação sozinha.
+
 ## Remoção
 
 - **RN-010** — Remover uma pessoa que é pai ou mãe de outra **limpa a referência nos filhos**

@@ -22,3 +22,4 @@ export type {
   SortDirection,
 } from "./person";
 export type { PersonUnion, UnionFormData, UnionStatus } from "./union";
+export type { BackupCounts } from "./backup";

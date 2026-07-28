@@ -14,7 +14,7 @@
  */
 import { readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { BACKUP_FORMAT, createBackup } from "./backup";
 import { loadRootEnv } from "./env";
 
@@ -31,7 +31,7 @@ function fromCallerCwd(caminho: string): string {
   return resolve(process.env.INIT_CWD ?? process.cwd(), caminho);
 }
 
-type Arquivo = {
+export type BackupFile = {
   formato: number;
   geradoEm: string;
   contagem: Record<string, number>;
@@ -45,14 +45,17 @@ type Arquivo = {
 
 const data = (valor: unknown) => (valor ? new Date(valor as string) : null);
 
-export function readBackupFile(caminho: string): Arquivo {
-  const arquivo = JSON.parse(
-    readFileSync(fromCallerCwd(caminho), "utf-8"),
-  ) as Arquivo;
+/**
+ * Confere que um valor já desserializado é um backup válido — usado tanto pelo
+ * CLI (depois de ler o arquivo) quanto pela API (o corpo do upload já chega
+ * como objeto, sem passar por disco).
+ */
+export function parseBackupFile(raw: unknown): BackupFile {
+  const arquivo = raw as BackupFile;
 
-  if (arquivo.formato !== BACKUP_FORMAT) {
+  if (arquivo?.formato !== BACKUP_FORMAT) {
     throw new Error(
-      `formato ${arquivo.formato} não é o desta versão (${BACKUP_FORMAT}).`,
+      `formato ${arquivo?.formato} não é o desta versão (${BACKUP_FORMAT}).`,
     );
   }
   if (!arquivo.dados?.Person) {
@@ -61,87 +64,131 @@ export function readBackupFile(caminho: string): Arquivo {
   return arquivo;
 }
 
-export async function restoreInto(prisma: PrismaClient, arquivo: Arquivo) {
+export function readBackupFile(caminho: string): BackupFile {
+  return parseBackupFile(
+    JSON.parse(readFileSync(fromCallerCwd(caminho), "utf-8")),
+  );
+}
+
+/**
+ * Monta as operações de restauração **sem executá-las** — cada `create`/`update`
+ * do Prisma é uma promessa preguiçosa, que só roda dentro do `$transaction` que
+ * as recebe. É o mesmo formato batch que `setCentral` já usa em
+ * `people.service.ts`: a ordem do array é a ordem de execução, tudo numa
+ * transação só, sem precisar do resultado de uma operação para montar a
+ * próxima — os ids já vêm prontos do arquivo.
+ */
+export function buildRestoreOperations(
+  prisma: PrismaClient,
+  arquivo: BackupFile,
+): Prisma.PrismaPromise<unknown>[] {
   const { Location, Person, Union, PersonPhoto } = arquivo.dados;
+  const ops: Prisma.PrismaPromise<unknown>[] = [];
 
   for (const local of Location) {
-    await prisma.location.create({
-      data: {
-        id: local.id as string,
-        name: local.name as string,
-        createdAt: data(local.createdAt)!,
-        updatedAt: data(local.updatedAt)!,
-      },
-    });
+    ops.push(
+      prisma.location.create({
+        data: {
+          id: local.id as string,
+          name: local.name as string,
+          createdAt: data(local.createdAt)!,
+          updatedAt: data(local.updatedAt)!,
+        },
+      }),
+    );
   }
 
   // Primeira volta sem filiação: o pai pode vir depois do filho no arquivo.
   for (const pessoa of Person) {
-    await prisma.person.create({
-      data: {
-        id: pessoa.id as string,
-        name: pessoa.name as string,
-        sex: pessoa.sex as never,
-        birthDate: data(pessoa.birthDate),
-        deathDate: data(pessoa.deathDate),
-        deceased: pessoa.deceased as boolean,
-        relationshipType: pessoa.relationshipType as never,
-        isCentralUser: pessoa.isCentralUser as boolean,
-        notes: (pessoa.notes as string | null) ?? null,
-        locationId: (pessoa.locationId as string | null) ?? null,
-        createdAt: data(pessoa.createdAt)!,
-        updatedAt: data(pessoa.updatedAt)!,
-      },
-    });
+    ops.push(
+      prisma.person.create({
+        data: {
+          id: pessoa.id as string,
+          name: pessoa.name as string,
+          sex: pessoa.sex as never,
+          birthDate: data(pessoa.birthDate),
+          deathDate: data(pessoa.deathDate),
+          deceased: pessoa.deceased as boolean,
+          relationshipType: pessoa.relationshipType as never,
+          isCentralUser: pessoa.isCentralUser as boolean,
+          notes: (pessoa.notes as string | null) ?? null,
+          locationId: (pessoa.locationId as string | null) ?? null,
+          createdAt: data(pessoa.createdAt)!,
+          updatedAt: data(pessoa.updatedAt)!,
+        },
+      }),
+    );
   }
 
   // Segunda volta: agora todo mundo existe e a filiação pode ser fechada.
   for (const pessoa of Person) {
     if (!pessoa.fatherId && !pessoa.motherId) continue;
-    await prisma.person.update({
-      where: { id: pessoa.id as string },
-      data: {
-        fatherId: (pessoa.fatherId as string | null) ?? null,
-        motherId: (pessoa.motherId as string | null) ?? null,
-        // O `@updatedAt` mexeria no timestamp; devolve o do arquivo.
-        updatedAt: data(pessoa.updatedAt)!,
-      },
-    });
+    ops.push(
+      prisma.person.update({
+        where: { id: pessoa.id as string },
+        data: {
+          fatherId: (pessoa.fatherId as string | null) ?? null,
+          motherId: (pessoa.motherId as string | null) ?? null,
+          // O `@updatedAt` mexeria no timestamp; devolve o do arquivo.
+          updatedAt: data(pessoa.updatedAt)!,
+        },
+      }),
+    );
   }
 
   for (const uniao of Union) {
-    await prisma.union.create({
-      data: {
-        id: uniao.id as string,
-        partnerAId: uniao.partnerAId as string,
-        partnerBId: uniao.partnerBId as string,
-        status: uniao.status as never,
-        startDate: data(uniao.startDate),
-        endDate: data(uniao.endDate),
-        createdAt: data(uniao.createdAt)!,
-        updatedAt: data(uniao.updatedAt)!,
-      },
-    });
+    ops.push(
+      prisma.union.create({
+        data: {
+          id: uniao.id as string,
+          partnerAId: uniao.partnerAId as string,
+          partnerBId: uniao.partnerBId as string,
+          status: uniao.status as never,
+          startDate: data(uniao.startDate),
+          endDate: data(uniao.endDate),
+          createdAt: data(uniao.createdAt)!,
+          updatedAt: data(uniao.updatedAt)!,
+        },
+      }),
+    );
   }
 
   for (const foto of PersonPhoto) {
-    await prisma.personPhoto.create({
-      data: {
-        personId: foto.personId as string,
-        bytes: Buffer.from(foto.bytes as string, "base64"),
-        mimeType: foto.mimeType as string,
-        createdAt: data(foto.createdAt)!,
-        updatedAt: data(foto.updatedAt)!,
-      },
-    });
+    ops.push(
+      prisma.personPhoto.create({
+        data: {
+          personId: foto.personId as string,
+          bytes: Buffer.from(foto.bytes as string, "base64"),
+          mimeType: foto.mimeType as string,
+          createdAt: data(foto.createdAt)!,
+          updatedAt: data(foto.updatedAt)!,
+        },
+      }),
+    );
   }
 
+  return ops;
+}
+
+function countsOf(arquivo: BackupFile) {
   return {
-    Location: Location.length,
-    Person: Person.length,
-    Union: Union.length,
-    PersonPhoto: PersonPhoto.length,
+    Location: arquivo.dados.Location.length,
+    Person: arquivo.dados.Person.length,
+    Union: arquivo.dados.Union.length,
+    PersonPhoto: arquivo.dados.PersonPhoto.length,
   };
+}
+
+/**
+ * Restaura num banco vazio, numa única transação — ou tudo entra, ou nada
+ * entra. É a forma batch do `$transaction` (a mesma que `setCentral` usa em
+ * `people.service.ts`), cujo teto é o do Postgres, não um número escolhido
+ * aqui — generoso o bastante para uma base pessoal (centenas de linhas).
+ */
+export async function restoreInto(prisma: PrismaClient, arquivo: BackupFile) {
+  const ops = buildRestoreOperations(prisma, arquivo);
+  if (ops.length) await prisma.$transaction(ops);
+  return countsOf(arquivo);
 }
 
 async function main() {

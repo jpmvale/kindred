@@ -8,7 +8,7 @@ O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de paren
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro.
 
 **Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **169 testes**, 46 na API, 118 no
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **185 testes**, 51 na API, 129 no
 web e 5 no `@kindred/db`. Os 6 e2e rodam à parte e precisam de banco. Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
 fim deste arquivo.
@@ -21,16 +21,16 @@ fim deste arquivo.
 
 ## Onde a última sessão parou
 
-Entrou o **tema escuro** e a reforma dos campos de formulário (ADR-015). Antes disso, na mesma data,
-tinham fechado o **BL-09** (a listagem parou de arrastar a base inteira, ADR-014), o **backup** com o
+Fechou o **BL-06** (exportar/importar pela própria tela, ADR-016) — o último item do backlog que
+tinha um dono claro. Antes dele, na mesma data: **tema escuro** (ADR-015), **BL-15** (a árvore vazia
+ao abrir tudo), **BL-09** (a listagem parou de arrastar a base inteira, ADR-014), o **backup** com o
 fixture anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendário).
 
-`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**169 testes**: 46 na API, 118 no web e 5 no
+`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**185 testes**: 51 na API, 129 no web e 5 no
 `@kindred/db`), mais os 6 e2e que rodam à parte, com banco.
 
-Depois disso entrou o **BL-15**, um defeito antigo que apareceu na conferência do tema: o botão
-"Abrir todos relacionamentos" deixava a árvore vazia na base real. Fechado — a seção abaixo conta o
-que era.
+**O backlog está vazio de itens com dono óbvio.** Sobram BL-14 (enxugar árvore/calendário) e BL-10
+(multiusuário) — os dois são escolha de rumo, não continuação natural. Ver "Próximo passo sugerido".
 
 ### Coisas do ambiente que custaram tempo
 
@@ -44,6 +44,40 @@ que era.
   `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — exportar e importar pela tela (BL-06, ADR-016)
+
+O que faltava do BL-06 era só a exposição: o formato do arquivo, coletar cada modelo e restaurar já
+existiam desde o backup (ADR-013). `GET /api/backup` e `POST /api/backup/restore` **são** o mesmo
+`buildBackupPayload`/`buildRestoreOperations` do `@kindred/db`, sem passar por disco — baixar pelo
+navegador e rodar `pnpm db:backup` produzem o mesmo arquivo, e um serve para restaurar o outro.
+
+A diferença real que a API precisava e o CLI nunca teve: **restaurar virou transação** (RN-021). O
+CLI apagava e recriava com `await` sequencial — tolerável quando quem confirma `--force` escreveu o
+arquivo minutos antes. Pela web, o arquivo pode vir de qualquer lugar, então a saída foi trocar o
+laço por um array de `PrismaPromise` que vai inteiro para `$transaction([...])` — a mesma forma batch
+que `setCentral` já usa, sem precisar do tipo de cliente de transação interativa, porque nenhuma
+operação depende do resultado de outra (os ids já vêm prontos do arquivo).
+
+Na tela: `/backup`, com duas seções. Exportar baixa o arquivo. Importar lê o arquivo **no navegador**
+antes de mandar (mostra "141 pessoa(s), 4 local(is)..." de cara), tenta restaurar sem `force`, e se o
+banco já tem gente, mostra a mensagem que a API devolveu — a mesma RN-021 — com um botão vermelho
+"Apagar e restaurar" e um "Cancelar". Depois de restaurar, a página redireciona de verdade (não é
+`useRevalidator`): central, pais, fotos, tudo pode ter mudado, e uma navegação real garante que todo
+loader da rota roda de novo.
+
+**Um defeito achado escrevendo o teste automatizado, antes de qualquer coisa manual:** o `/backup`
+estava dentro do mesmo layout que redireciona para `/setup` quando não há pessoa central — e é
+justamente sem pessoa central que alguém mais precisaria restaurar um backup. O `layoutLoader`
+ganhou uma exceção de uma linha para esse caminho, e o `/setup` ganhou um link "Restaurar em vez de
+cadastrar" para quem chega lá sem saber que `/backup` existe.
+
+**A prova de que "tudo ou nada" funciona de verdade**, não só na intenção: um arquivo com uma união
+apontando para gente inexistente, mandado com `force=true` contra uma base de 141 pessoas (banco de
+teste, nunca o real), derrubou a transação com 500 — e a base **continuou com as 141 pessoas
+originais**, nem vazia nem pela metade. É a garantia que a versão sequencial do CLI nunca teve como
+dar, e não dá para provar com um Prisma dublê (ele não sabe fazer rollback de verdade); só rodando
+contra um Postgres de teste.
 
 ## Sessão de 28/07 — a árvore vazia ao abrir tudo (BL-15, fechado)
 
@@ -455,6 +489,23 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão de 28/07 (BL-06, ADR-016), tudo num **banco `kindred_bl06` descartável** (populado com o
+fixture anônimo, 141 pessoas) — a base real nunca entrou nesta bancada:
+
+- **API pelo curl**: `GET /api/backup` devolve `Content-Disposition` correto e o mesmo formato do
+  CLI; `POST /api/backup/restore` sem `force` contra banco ocupado devolve 409 com a mensagem que a
+  tela usa; com `force=true` apaga e recria, confirmado no banco (141 → 141); arquivo sem `formato`
+  devolve 400; **um arquivo com FK inválida e `force=true` devolve 500 e deixa as 141 pessoas
+  originais intactas** — a prova de que a transação reverte de verdade.
+- **Pelo navegador de verdade** (não só jsdom): banco vazio → upload → resumo do arquivo → clique em
+  "Restaurar" → redireciona para `/people` com as pessoas do arquivo. Banco ocupado → mesmo caminho
+  mostra a caixa de confirmação vermelha com a mensagem da API → "Apagar e restaurar" → as pessoas
+  antigas somem e entram as do arquivo novo. `/setup` com banco vazio mostra o link "Restaurar em vez
+  de cadastrar", e ele chega em `/backup` sem cair de volta no `/setup` (o defeito do `layoutLoader`
+  corrigido antes de qualquer teste manual).
+- **Depois**: bancada derrubada (API, web, banco `kindred_bl06`), e a base real conferida — **143
+  pessoas**, do jeito que estava antes de começar.
+
 Na sessão de 28/07 (tema escuro, ADR-015), web em `:5174` contra a **base real** com a API na
 `:3005` — só leitura, nada foi escrito:
 
@@ -593,21 +644,28 @@ Na sessão de 26/07 (monorepo):
 - **Mexeu no schema? O backup também precisa saber.** Um campo escalar novo tem de entrar no
   `backup.ts` **e** no `restore.ts` — o `pnpm db:backup` falha dizendo qual falta, mas quem só roda
   migration e testa a tela não descobre até precisar restaurar (ADR-013).
-- **O backup é manual.** Não há agendamento: é um comando que alguém roda. Enquanto for assim, vale
-  rodar `pnpm db:backup` antes de fechar a sessão em que se cadastrou gente.
+- **O backup é manual — mas agora também é um botão.** `/backup` faz o mesmo que `pnpm db:backup`;
+  não há agendamento em nenhum dos dois. Vale exportar antes de fechar a sessão em que se cadastrou
+  gente.
+- **Restaurar pela web é sempre transação; pelo CLI, não.** `POST /api/backup/restore` reverte
+  inteiro se algo falhar no meio (RN-021); `pnpm db:restore` continua com o `await` sequencial de
+  antes — aceitável porque quem roda o CLI é quem escreveu o arquivo minutos antes. Se um dia o CLI
+  também precisar dessa garantia, `buildRestoreOperations` já monta as operações prontas para
+  `$transaction`, só falta trocar o laço em `restore.ts`.
 
 ## Próximo passo sugerido
 
-Nada travado, nada pela metade e **nenhum defeito conhecido em aberto**. O backlog só tem itens
-grandes, que são **escolha de rumo** — vale decidir com o usuário, não emendar:
+Nada travado, nada pela metade e **nenhum defeito conhecido em aberto**. O backlog só tem dois itens,
+e os dois são **escolha de rumo** — vale decidir com o usuário, não emendar:
 
-1. **BL-06 — exportar/importar**, e ele ficou **bem mais barato**: o formato JSON e as duas metades
-   (coletar e restaurar) já existem no `@kindred/db` (ADR-013). Falta expor pela aplicação — um botão
-   que baixa o arquivo e outro que sobe. GEDCOM continua sendo outra conversa, bem maior.
-2. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
+1. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
    pai, mãe e local aninhados (7,5 MB com 5000 pessoas). Diferente do BL-09, isto **mexe no contrato
    da API**: precisa decidir o que cada tela realmente consome antes de cortar.
-3. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
+2. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
+
+Fora do backlog: **GEDCOM** ficou de fora do BL-06 de propósito (trocar dados com outros programas de
+genealogia é bem mais trabalho que o JSON que já existe), e não tem número — só entra se alguém
+pedir.
 
 **Uma lição que já se repetiu três vezes:** medir antes de mexer. Na primeira metade do BL-09 o
 backlog culpava a consulta, e o gargalo era o cálculo — 14× maior do que o apontado. Na segunda, o

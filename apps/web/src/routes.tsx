@@ -6,6 +6,7 @@ import LocationsPage from './pages/LocationsPage';
 import SetupPage from './pages/SetupPage';
 import TreePage from './pages/TreePage';
 import CalendarPage from './pages/CalendarPage';
+import BackupPage from './pages/BackupPage';
 import {
   layoutLoader,
   locationsLoader,
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: 'locations', element: <LocationsPage />, loader: locationsLoader },
       { path: 'calendar', element: <CalendarPage />, loader: peopleLoader },
       { path: 'tree', element: <TreePage />, loader: peopleLoader },
+      { path: 'backup', element: <BackupPage /> },
     ],
   },
 ]);

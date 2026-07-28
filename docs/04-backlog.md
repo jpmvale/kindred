@@ -4,7 +4,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
 | BL-14 | **Enxugar a resposta da árvore e do calendário** | A chamada sem paginação ainda traz a base inteira com pai, mãe e local aninhados — 7,5 MB com 5000 pessoas. A árvore usa `fatherId`/`motherId`, uniões e foto; o calendário, menos ainda. Mexe no contrato da API, por isso ficou fora do BL-09 (ADR-014). |
 | BL-10 | **Multiusuário com login** | Mudaria o produto de "base pessoal" para serviço; fora do escopo atual. |
 
@@ -42,3 +41,7 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 - **BL-15** — a árvore deixou de ficar vazia ao abrir todos os relacionamentos. O `fitView` era
   chamado por cronômetro, antes de o reactflow medir os nós, e desistia em silêncio deixando a
   viewport no zoom anterior; agora espera o `useNodesInitialized`. Só aparecia em base grande.
+- **BL-06** — exportar e importar pela própria tela (`/backup`), reusando exatamente o formato do
+  `db:backup`/`db:restore` (ADR-013): baixar gera o arquivo, subir restaura, e restaurar sobre um
+  banco ocupado pede confirmação antes de apagar (RN-021, ADR-016). GEDCOM — trocar dados com outros
+  programas de genealogia — continua de fora, e é bem mais trabalho.
