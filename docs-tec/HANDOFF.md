@@ -7,6 +7,46 @@ _Atualizado em 27/07/2026._
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários.
 
+## Onde a última sessão parou
+
+**Tudo o que foi feito está commitado e empurrado, com o CI verde** — o último commit é
+`742ff73 feat: a pessoa central pode passar o posto`. Não há trabalho pela metade nem arquivo solto:
+`git status` limpo, `pnpm typecheck`, `pnpm lint` e `pnpm test` verdes, e os 6 e2e passando contra o
+Postgres de dev.
+
+A sessão fechou, nesta ordem, **BL-03** (busca sem acento), **BL-11** (dados por loader de rota),
+**BL-08** (testes das páginas), **BL-02** (foto de perfil) e **BL-04** (trocar a pessoa central) —
+cada um tem sua seção abaixo.
+
+### O que ficou de fora
+
+**BL-05 — notas por pessoa. Não foi começado.** Era o terceiro item combinado da sessão e não houve
+tempo; nenhuma linha de código foi escrita para ele. O que já se sabe, para não recomeçar do zero:
+
+- A spec original tinha um campo `friendshipOrigin` (texto curto, "de onde veio a amizade") que nunca
+  chegou ao schema — ver [`specs/001-setup-e-crud-de-pessoas.md`](specs/001-setup-e-crud-de-pessoas.md).
+  O backlog pede algo mais amplo: **texto livre** para histórias, não só a origem.
+- A decisão de desenho a tomar primeiro: **um campo `notes` em `people`** ou **uma tabela de notas**
+  (várias por pessoa, com data). Um campo é muito mais barato e provavelmente suficiente para uma
+  base pessoal; várias notas datadas viram um diário e mudam a tela. Vale perguntar antes de escrever.
+- Se for campo único, o caminho é curto e conhecido: coluna `notes String?` no schema + migration,
+  `notes` na `Person` e na `PersonFormData` do `@kindred/types`, `@IsOptional() @IsString()` no
+  `CreatePersonDto`, o mesmo `...(dto.notes !== undefined && …)` no `update` do serviço, um
+  `<textarea>` no `PersonFormPage` e um caso no `PersonFormPage.test.tsx`. Vale decidir também se a
+  busca (RN-016) passa a casar o texto da nota — hoje ela casa nome, grau e rótulo social.
+- Atenção a **um detalhe que morde**: se a nota puder ser longa, ela **não** deve viajar na listagem
+  de pessoas, pelo mesmo motivo da foto (ADR-011) — a lista, a árvore e o calendário carregam todo
+  mundo de uma vez. Ou a nota fica curta, ou sai do `findMany` como a foto saiu.
+
+### Coisas do ambiente que custaram tempo
+
+- **A porta 3000 estava ocupada por outro projeto** (`expense-analyzer`) nesta máquina. A API do
+  kindred foi rodada com `PORT=3005 pnpm --filter @kindred/api dev`, e o web com
+  `API_URL=http://localhost:3005 pnpm --filter @kindred/web dev` para o proxy do Vite achá-la. Se o
+  `docker compose up` reclamar de porta, é isso.
+- O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
+  primeiro tropeço da sessão.
+
 ## Sessão de 27/07 — união conjugal (BL-01)
 
 Cônjuge deixou de ser rótulo e virou vínculo. O valor `WIFE` saiu do `RelationshipType` e entrou a
