@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom';
 import { peopleApi } from '../api/people';
 import { photoUrl } from '../photo';
+import { formatDateOnly, getAgeInYears } from '../date';
 import type { PeopleSortField, SortDirection } from '@kindred/types';
 import type { PeopleListData } from '../loaders';
 import {
@@ -71,35 +72,6 @@ export default function PeopleListPage() {
     if (!confirm(`Remover "${name}"?`)) return;
     await peopleApi.remove(id);
     revalidator.revalidate();
-  }
-
-  function parseDateOnly(dateStr?: string | null) {
-    if (!dateStr) return null;
-    const [year, month, day] = dateStr.slice(0, 10).split('-').map(Number);
-    if (!year || !month || !day) return null;
-    return new Date(year, month - 1, day);
-  }
-
-  function formatDate(dateStr?: string | null) {
-    const date = parseDateOnly(dateStr);
-    if (!date) return null;
-    return date.toLocaleDateString('pt-BR');
-  }
-
-  function getAgeInYears(birthDate?: string | null, endDate?: string | null) {
-    const birth = parseDateOnly(birthDate);
-    if (!birth) return null;
-    const end = endDate ? parseDateOnly(endDate) : new Date();
-    if (!end) return null;
-
-    let years = end.getFullYear() - birth.getFullYear();
-    const monthDiff = end.getMonth() - birth.getMonth();
-    const dayDiff = end.getDate() - birth.getDate();
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-      years -= 1;
-    }
-
-    return years >= 0 ? years : null;
   }
 
   function getYearsSinceDate(dateStr?: string | null) {
@@ -215,10 +187,10 @@ export default function PeopleListPage() {
                 <span className="person-meta">· {SEX_LABELS[person.sex]}</span>
               )}
               {person.birthDate && (
-                <span className="person-meta">· {formatDate(person.birthDate)}</span>
+                <span className="person-meta">· {formatDateOnly(person.birthDate)}</span>
               )}
               {person.deathDate && (
-                <span className="person-meta is-faint">· † {formatDate(person.deathDate)}</span>
+                <span className="person-meta is-faint">· † {formatDateOnly(person.deathDate)}</span>
               )}
               {person.deceased && !person.deathDate && (
                 <span className="person-meta is-faint">· † Falecido</span>

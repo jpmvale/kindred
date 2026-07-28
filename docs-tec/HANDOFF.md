@@ -8,7 +8,7 @@ O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de paren
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro.
 
 **Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **185 testes**, 51 na API, 129 no
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **205 testes**, 51 na API, 149 no
 web e 5 no `@kindred/db`. Os 6 e2e rodam à parte e precisam de banco. Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
 fim deste arquivo.
@@ -21,12 +21,14 @@ fim deste arquivo.
 
 ## Onde a última sessão parou
 
-Fechou o **BL-06** (exportar/importar pela própria tela, ADR-016) — o último item do backlog que
-tinha um dono claro. Antes dele, na mesma data: **tema escuro** (ADR-015), **BL-15** (a árvore vazia
-ao abrir tudo), **BL-09** (a listagem parou de arrastar a base inteira, ADR-014), o **backup** com o
-fixture anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendário).
+Entrou o **card de detalhe na árvore** — pedido do usuário, fora do backlog: clicar num nó abre um
+painel à direita com nome, notas, nascimento, pai, mãe, filhos e irmãos, e um botão para editar.
+Antes dele, na mesma data: **BL-06** (exportar/importar pela própria tela, ADR-016) — o último item
+do backlog que tinha um dono claro —, **tema escuro** (ADR-015), **BL-15** (a árvore vazia ao abrir
+tudo), **BL-09** (a listagem parou de arrastar a base inteira, ADR-014), o **backup** com o fixture
+anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendário).
 
-`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**185 testes**: 51 na API, 129 no web e 5 no
+`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**205 testes**: 51 na API, 149 no web e 5 no
 `@kindred/db`), mais os 6 e2e que rodam à parte, com banco.
 
 **O backlog está vazio de itens com dono óbvio.** Sobram BL-14 (enxugar árvore/calendário) e BL-10
@@ -44,6 +46,37 @@ fixture anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendári
   `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — card de detalhe ao clicar num nó da árvore
+
+Pedido direto do usuário, sem passar pelo backlog: "clicar numa pessoa na árvore" abre um painel à
+direita com nome, notas, nascimento, pai, mãe, filhos e irmãos, e um botão que leva para
+`/people/:id/edit`.
+
+**A família mostrada é a de verdade, não só quem está desenhado.** `relationsOf` (novo
+`person-relations.ts`) busca pai/mãe/filhos/irmãos na lista **inteira** de pessoas do loader, não nos
+nós visíveis da árvore — então clicar em alguém cujos pais nunca foram expandidos ainda mostra quem
+são. É módulo puro, sem reactflow, seguindo o mesmo caminho que `tree-layout.ts` (ADR-009) e
+`calendar-entries.ts` já tinham aberto: lógica que pode ser testada sem jsdom sai da página.
+
+**Clicar num parente listado troca o card para ele**, sem sair da árvore nem navegar — foi além do
+pedido original (que só falava em mostrar informação), mas é o tipo de interação óbvia para um card
+de família: ver o pai leva a querer ver os pais *dele*. `PersonDetailPanel` é só apresentação —
+recebe `relations` prontas e dispara `onSelectPerson`, `onClose`.
+
+**Verificado que `elementsSelectable={false}` não bloqueia `onNodeClick`** — a suspeita óbvia antes de
+mexer, já que aquela prop está lá desde sempre para desligar a seleção visual do reactflow. Não
+bloqueia; são coisas independentes. Testado contra a **base real** (só leitura): abrir o card do
+usuário central mostra pai, mãe, 0 filhos e 2 irmãos certos; clicar no pai troca para o card dele,
+com os avós e o tio dele carregados na hora — pessoas que não estavam desenhadas na árvore; fechar
+funciona pelo ×, e pelo clique no fundo (`onPaneClick`). Tema claro e escuro conferidos.
+
+**Duas datas duplicadas viraram um módulo (`date.ts`).** `parseDateOnly`/`formatDate`/`getAgeInYears`
+já existiam soltos dentro do `PeopleListPage`; o card ia precisar dos dois primeiros de novo. Em vez
+de copiar pela segunda vez, os três saíram para `apps/web/src/date.ts` — inclusive `getAgeInYears`,
+que ninguém mais usava ainda, mas ia crescer para três cópias assim que o card mostrasse idade. O
+`parseDateOnly` existe porque `new Date("2026-01-01")` sozinho cai um dia antes num fuso negativo; o
+teste novo (`date.test.ts`) prende exatamente esse caso.
 
 ## Sessão de 28/07 — exportar e importar pela tela (BL-06, ADR-016)
 
@@ -488,6 +521,19 @@ Tereza do seed, que é `OTHER`, continua "Ex-esposa" pela união. A regra só de
 não há resposta.
 
 ## O que foi verificado rodando
+
+Na sessão do card de detalhe, direto contra a **base real** (só leitura, nada escrito), pelo
+navegador de verdade:
+
+- Clicar no nó do usuário central abriu o card com pai, mãe, 0 filhos e 2 irmãos certos, nascimento
+  com idade calculada.
+- Clicar no nome do pai (link dentro do card) trocou o card inteiro para ele — mostrando os avós e o
+  tio do usuário, **nenhum dos quais estava desenhado na árvore** naquele momento, confirmando que a
+  família vem da lista inteira, não só dos nós visíveis.
+- Fechar funcionou pelos dois caminhos: o × e o clique no fundo da árvore (`onPaneClick`).
+- `elementsSelectable={false}` (que desliga a seleção visual do reactflow) **não** bloqueou
+  `onNodeClick` — verificado antes de assumir, era a dúvida óbvia da mudança.
+- Tema claro e escuro, os dois com contraste correto (badge, links do card, botão de editar).
 
 Na sessão de 28/07 (BL-06, ADR-016), tudo num **banco `kindred_bl06` descartável** (populado com o
 fixture anônimo, 141 pessoas) — a base real nunca entrou nesta bancada:

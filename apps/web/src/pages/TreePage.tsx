@@ -26,6 +26,8 @@ import {
   NODE_H,
   type NodeData,
 } from './tree-layout';
+import { relationsOf } from './person-relations';
+import PersonDetailPanel from '../components/PersonDetailPanel';
 
 // ─── Person node ──────────────────────────────────────────────────────────────
 
@@ -264,6 +266,14 @@ function TreeContent() {
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [expandedSideDown, setExpandedSideDown] = useState<Set<string>>(new Set());
   const [hoveredPersonId, setHoveredPersonId] = useState<string | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+
+  // A lista inteira, não só quem está desenhado: o card mostra a família de
+  // verdade mesmo quando parte dela não foi expandida na árvore.
+  const selectedRelations = useMemo(
+    () => (selectedPersonId ? relationsOf(selectedPersonId, people) : null),
+    [selectedPersonId, people],
+  );
 
   const applyHoverStyling = useCallback((hoveredId: string | null) => {
     const peopleById = new Map(people.map((p) => [p.id, p]));
@@ -417,6 +427,8 @@ function TreeContent() {
         proOptions={{ hideAttribution: true }}
         onNodeMouseEnter={(_, node) => setHoveredPersonId(node.id)}
         onNodeMouseLeave={() => setHoveredPersonId(null)}
+        onNodeClick={(_, node) => setSelectedPersonId(node.id)}
+        onPaneClick={() => setSelectedPersonId(null)}
       >
         <Controls showInteractive={false} style={{ boxShadow: 'var(--shadow-panel)', borderRadius: 8 }} />
 
@@ -486,6 +498,14 @@ function TreeContent() {
           </div>
         </Panel>
       </ReactFlow>
+
+      {selectedRelations && (
+        <PersonDetailPanel
+          relations={selectedRelations}
+          onClose={() => setSelectedPersonId(null)}
+          onSelectPerson={setSelectedPersonId}
+        />
+      )}
     </div>
   );
 }

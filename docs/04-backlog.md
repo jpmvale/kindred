@@ -45,3 +45,7 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   `db:backup`/`db:restore` (ADR-013): baixar gera o arquivo, subir restaura, e restaurar sobre um
   banco ocupado pede confirmação antes de apagar (RN-021, ADR-016). GEDCOM — trocar dados com outros
   programas de genealogia — continua de fora, e é bem mais trabalho.
+- **Card de detalhe na árvore** — clicar num nó abre um card à direita com nome, notas, nascimento,
+  pai, mãe, filhos e irmãos, e um botão para editar. Clicar num parente listado troca o card para ele
+  — a família mostrada é a de verdade (`person-relations.ts`), não só quem está desenhado na árvore
+  naquele momento.
