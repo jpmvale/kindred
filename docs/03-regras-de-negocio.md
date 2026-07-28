@@ -117,6 +117,24 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   que a máquina faz melhor. A normalização é a mesma dos dois lados — termo e campo passam pela
   mesma função —, senão o cadastro sem acento ficaria invisível para quem digita com acento.
 
+## Calendário
+
+- **RN-020** — O calendário mostra **três** datas, distintas na tela:
+  - **aniversário** de quem está vivo;
+  - **aniversário de quem já faleceu** — o "hoje ele faria X anos";
+  - **data do falecimento**.
+
+  Quem faleceu rende as duas últimas. Sabendo-se que faleceu mas não quando (RN-006), entra só pelo
+  nascimento. Quem não tem data nenhuma não entra.
+
+  As datas de falecimento podem ser **desligadas** por um filtro, ligado por padrão: é assunto que
+  nem todo dia se quer ter na frente. Desligado, o calendário volta a ser só o aniversário de quem
+  está vivo.
+
+  No rodapé são **duas listas**: os próximos 5 aniversários (com os de falecidos marcados) e as
+  próximas 5 datas de falecimento. Separadas porque respondem a perguntas diferentes — a quem dar
+  parabéns, e de quem lembrar.
+
 ## Remoção
 
 - **RN-010** — Remover uma pessoa que é pai ou mãe de outra **limpa a referência nos filhos**

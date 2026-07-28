@@ -24,7 +24,7 @@ Com isso, três leituras da mesma base:
 1. **Lista** — quem está cadastrado, com busca, ordenação (nome, nascimento, idade) e o grau de
    parentesco já calculado.
 2. **Árvore** — a genealogia navegável, expandindo ancestrais, descendentes, irmãos e primos.
-3. **Calendário** — os aniversários do mês e os próximos.
+3. **Calendário** — os aniversários do mês e os próximos, com as datas de falecimento junto (RN-020).
 
 ## Princípios
 

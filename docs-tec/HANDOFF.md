@@ -9,13 +9,11 @@ busca/ordenação/paginação, árvore genealógica, calendário de aniversário
 
 ## Onde a última sessão parou
 
-**BL-05 (notas por pessoa) foi fechado** — era o único item que a sessão anterior deixou em aberto.
-Com ele, **o backlog não tem mais nenhum item pequeno**: o que resta (BL-06 exportar/importar, BL-07
-aniversário de falecimento, BL-09 paginação no banco, BL-10 multiusuário) é escolha de rumo, não
-dívida.
+Fecharam **BL-05** (notas por pessoa) e **BL-07** (falecimento no calendário). Sobram três itens no
+backlog, todos grandes: BL-06 (exportar/importar), BL-09 (paginação no banco) e BL-10 (multiusuário).
 
-`git status` limpo, `pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**124 testes**: 36 na API e
-88 no web), mais os 6 e2e que rodam à parte, com banco.
+`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**143 testes**: 36 na API e 107 no web), mais os
+6 e2e que rodam à parte, com banco.
 
 ### Coisas do ambiente que custaram tempo
 
@@ -25,6 +23,34 @@ dívida.
   `docker compose up` reclamar de porta, é isso.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — falecimento no calendário (BL-07)
+
+O calendário só olhava nascimento, e filtrava quem morreu **inteiramente** — nem a data de nascimento
+deles aparecia. Agora são **três** datas distintas (RN-020): aniversário de vivo (🎂 índigo),
+aniversário de quem já se foi (🎂 lilás dessaturado) e falecimento (🕯️ cinza quente). Uma legenda
+embaixo da grade diz qual é qual.
+
+Três decisões foram tomadas com o usuário antes de escrever:
+
+| Decisão | Escolha |
+| --- | --- |
+| o que mostrar de quem faleceu | **as duas datas** — o "hoje ele faria X anos" é o tipo de lembrança que justifica o produto |
+| o rodapé | **duas listas** — próximos aniversários e próximas datas de falecimento, porque respondem a perguntas diferentes |
+| filtro | **sim, ligado por padrão** — desligar devolve o calendário ao que ele era |
+
+A conta saiu da página para [`calendar-entries.ts`](../apps/web/src/pages/calendar-entries.ts) —
+módulo puro, mesmo caminho que o `tree-layout.ts` seguiu no BL-12 — e ganhou **18 casos** sem precisar
+de jsdom. A página ficou só com o desenho.
+
+**O que morde aqui:** quem tem `deceased: true` mas nenhuma data de falecimento (RN-006) entra só
+pelo nascimento; e quem tem data de morte mas não de nascimento entra só pelo falecimento. As duas
+pontas têm teste, porque é o tipo de caso que um `if` mal escrito engole em silêncio.
+
+**Um teste antigo mudou de lado, de propósito:** `quem morreu sai do calendário e da lista` descrevia
+exatamente o comportamento que o BL-07 veio derrubar, e foi substituído. Outro precisou passar a
+procurar **dentro da grade** — o `title` agora existe também nas células do rodapé, e a busca na
+página inteira achava as duas.
 
 ## Sessão de 28/07 — notas por pessoa (BL-05)
 
@@ -233,6 +259,19 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão de 28/07 (BL-07), web em `:5173` contra o seed, que tem dois falecidos (Antônio, nascido
+em 18/01 e falecido em 12/03; Maria, nascida em 04/07 e falecida em 02/11):
+
+- Julho de 2026: a Maria aparece no dia 4 com a marca de falecida (`is-memorial`, "faria 91 anos"),
+  ao lado do Bruno vivo no dia 19 (`is-birthday`, "faz 39 anos") — duas marcas visualmente distintas
+  no mesmo mês.
+- Novembro de 2026: a Maria reaparece no dia 2, agora como falecimento (`is-death`, "8 anos de
+  falecimento"), com a Fernanda viva no mesmo mês.
+- As duas tabelas do rodapé não se misturam: aniversários traz 5 vivos, falecimentos traz Maria
+  (02/11, 98 dias) e Antônio (12/03/2027, 228 dias).
+- Desmarcar **Mostrar falecimentos** deixa só `is-birthday` na grade, some com a segunda tabela e
+  com a legenda — o calendário volta a ser o de antes.
+
 Na sessão de 28/07 (BL-05), com a API em `:3005` contra o seed:
 
 - As três notas do seed chegam na listagem, e o JSON das 23 pessoas ficou em **33,8 KB** — o texto
@@ -325,11 +364,10 @@ Na sessão de 26/07 (monorepo):
 Nada travado e nada pela metade. O backlog só tem itens grandes, que são **escolha de rumo** — vale
 decidir com o usuário, não emendar:
 
-1. **BL-07** — aniversário de falecimento no calendário. É o menor dos quatro, e o calendário já
-   tem toda a estrutura; falta decidir como distinguir as duas datas na tela.
+1. **BL-09** — paginação de verdade no banco. **É o que está combinado a seguir.** Cobra caro e tem
+   uma trava de verdade: a busca sem acento precisa de `unaccent` no Postgres, e o **grau de
+   parentesco é calculado, não é coluna** — não há como filtrar nem ordenar por ele em SQL. Ou a
+   busca por parentesco sai, ou a paginação vira híbrida. Vale decidir antes de escrever.
 2. **BL-06** — exportar/importar. JSON resolve backup; GEDCOM abriria a porta para trocar dados com
    outros programas de genealogia, e é bem mais trabalho.
-3. **BL-09** — paginação de verdade no banco. Só vale a pena com uma base grande, e cobra caro: a
-   busca sem acento precisa de `unaccent` no Postgres, e o grau de parentesco, que é calculado e não
-   existe como coluna, não tem como ser filtrado em SQL.
-4. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
+3. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.

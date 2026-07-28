@@ -318,6 +318,64 @@ button {
   text-overflow: ellipsis;
 }
 
+/*
+ * As três datas do calendário (RN-020). A cor separa o que é comemoração do que
+ * é lembrança: o aniversário de quem está vivo fica no índigo de sempre, o de
+ * quem já se foi perde a saturação, e o falecimento vai para um cinza quente.
+ */
+.calendar-birthday-chip.is-memorial {
+  background: #f5f3ff;
+  color: #7c74a8;
+}
+
+.calendar-birthday-chip.is-death {
+  background: #f4f2f0;
+  color: #6b6560;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 0.25rem 0;
+  border-top: 1px solid #f3f4f6;
+  margin-top: 0.75rem;
+}
+
+.calendar-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.calendar-legend-item.is-memorial {
+  background: #f5f3ff;
+  color: #7c74a8;
+}
+
+.calendar-legend-item.is-death {
+  background: #f4f2f0;
+  color: #6b6560;
+}
+
+.calendar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.calendar-memorial-mark {
+  opacity: 0.7;
+}
+
 .calendar-upcoming-card {
   padding: 1rem 1rem 0.5rem;
 }
