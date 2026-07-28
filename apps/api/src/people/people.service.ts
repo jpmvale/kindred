@@ -7,7 +7,7 @@ import type { Person, UnionStatus } from '@kindred/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { computeKinship } from './kinship.util';
+import { computeKinship, createKinshipResolver } from './kinship.util';
 import { normalizeForSearch } from './search.util';
 import { MAX_PHOTO_BYTES, matchesMimeType } from './photo.util';
 import { UploadPhotoDto } from './dto/upload-photo.dto';
@@ -130,13 +130,15 @@ export class PeopleService {
 
     const central = people.find((p) => p.isCentralUser);
 
+    // O grafo é percorrido **uma vez** para a lista toda, não uma vez por pessoa
+    // (ADR-012). Sem isso, o custo cresce com o quadrado do tamanho da base.
+    const kinshipOf = central
+      ? createKinshipResolver(central.id, people, unions)
+      : null;
+
     const enriched = people.map((p) => ({
       ...withUnions(p),
-      kinshipDegree: p.isCentralUser
-        ? 'Você'
-        : central
-          ? computeKinship(p.id, central.id, people, unions)
-          : null,
+      kinshipDegree: kinshipOf ? kinshipOf(p.id) : null,
     }));
 
     const hasPaginationRequest = Boolean(

@@ -5,7 +5,7 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 | # | Item | Por quê |
 | --- | --- | --- |
 | BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
-| BL-09 | **Paginação de verdade no banco** | Hoje a API carrega todas as pessoas e filtra em memória — está ótimo para centenas, não para milhares. Levar a busca para o SQL cobra a RN-016 junto: o Postgres precisaria de `unaccent` (ou coluna normalizada), e o grau de parentesco, que é calculado e não existe como coluna, não tem como ser filtrado lá. |
+| BL-09 | **Aliviar a consulta da listagem** | O custo quadrático do parentesco já saiu (ADR-012), e com ele 93% do problema. Sobra o `findMany` com todos os includes, que traz as 5000 pessoas com pai, mãe, local, uniões e foto — 167 ms e 7,5 MB medidos. O caminho conhecido: varrer uma consulta enxuta (21 ms) e buscar os includes só das linhas da página (2 ms). Levar a busca para o SQL de verdade é outra conversa, e cobra caro: o Postgres precisaria de `unaccent` para a RN-016, e o grau de parentesco, por ser calculado, não tem como ser filtrado lá. |
 | BL-10 | **Multiusuário com login** | Mudaria o produto de "base pessoal" para serviço; fora do escopo atual. |
 
 **Concluídos.**

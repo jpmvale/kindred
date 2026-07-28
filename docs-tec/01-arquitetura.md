@@ -124,7 +124,8 @@ pessoa central contando **subidas** e **descidas**, com limite de 8 passos, e tr
 
 **Consequências.** Simples de ler, testar (`kinship.util.spec.ts`) e evoluir em pt-BR — e nada fica
 desatualizado, porque nada é persistido. Em troca, `GET /api/people` carrega todas as pessoas para
-calcular. Para uma base pessoal (centenas de pessoas) é irrelevante; ver BL-09.
+calcular: o grau de uma pessoa depende do grafo inteiro, então não há como escapar disso sem parar de
+calcular. **Quantas vezes** esse grafo é percorrido, porém, importa muito — ver ADR-012.
 
 ---
 
@@ -292,3 +293,38 @@ Preço assumido: o `pg_dump` engorda junto com o álbum, e os bytes passam pelo 
 servidor de arquivos. Para uma base pessoal de centenas de pessoas isso é irrelevante; se um dia
 virar milhares, o caminho é mover a tabela para armazenamento de objetos — e aí o backup precisa de
 uma resposta nova, que é a mesma conversa do BL-06.
+
+---
+
+## ADR-012 — Uma travessia do grafo, não uma por pessoa
+
+**Contexto.** O BL-09 nasceu no backlog culpando a consulta: "a API carrega todas as pessoas e filtra
+em memória". Medindo com **5023 pessoas**, a culpa estava no lugar errado:
+
+| O que | Antes |
+| --- | --- |
+| `computeKinship` para todos | **2280 ms** |
+| `findMany` com todos os includes | 167 ms (7,52 MB) |
+
+A consulta era 7% do custo. O `computeKinship` chamava `buildGraph(allPeople)` **a cada pessoa** —
+5023 reconstruções do grafo inteiro — e depois fazia uma busca em largura por pessoa, quando **uma
+única busca a partir da pessoa central já visita todo mundo**. Havia ainda um segundo custo
+quadrático escondido: a fila da busca andava com `queue.shift()`, que é O(n) em array de JavaScript.
+
+**Decisão.** `createKinshipResolver(centralId, people, unions)` prepara uma vez o que não depende do
+alvo — o grafo, a travessia a partir do centro e a de cada cônjuge vigente dele — e devolve uma
+função que responde o grau de qualquer pessoa por consulta a mapa. O `computeKinship` de uma pessoa
+só continua existindo, como atalho por cima do resolver, para `findOne` e para os testes.
+
+**Consequências.** 2280 ms viraram **1 ms** (1708×) sobre a mesma base, com resposta idêntica nas
+5023 pessoas — há teste que compara o resolver com o cálculo pessoa a pessoa para todo mundo, e outro
+que garante que responder não volta a ler o grafo. O `GET /api/people` de 5023 pessoas passou a
+responder em ~190 ms.
+
+Nada de comportamento mudou: buscar por "primo" e ordenar por idade seguem funcionando, porque o grau
+continua sendo calculado para a base inteira — o que mudou é quantas vezes o grafo é percorrido.
+
+**O que este ADR não resolve.** Os ~170 ms que sobram são o `findMany` com os includes, que ainda traz
+todas as pessoas com pai, mãe, local, uniões e foto. O caminho conhecido é varrer uma consulta enxuta
+e buscar os includes só das linhas da página (medido: 21 ms + 2 ms), mas isso ficou como item próprio
+do backlog — a decisão desta rodada foi atacar só o custo quadrático, que era 93% do problema.

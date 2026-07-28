@@ -9,10 +9,11 @@ busca/ordenação/paginação, árvore genealógica, calendário de aniversário
 
 ## Onde a última sessão parou
 
-Fecharam **BL-05** (notas por pessoa) e **BL-07** (falecimento no calendário). Sobram três itens no
-backlog, todos grandes: BL-06 (exportar/importar), BL-09 (paginação no banco) e BL-10 (multiusuário).
+Fecharam **BL-05** (notas por pessoa) e **BL-07** (falecimento no calendário), e o **BL-09** andou
+mais da metade: o custo quadrático do parentesco saiu (ADR-012), e sobrou só a consulta pesada da
+listagem.
 
-`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**143 testes**: 36 na API e 107 no web), mais os
+`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**147 testes**: 40 na API e 107 no web), mais os
 6 e2e que rodam à parte, com banco.
 
 ### Coisas do ambiente que custaram tempo
@@ -23,6 +24,28 @@ backlog, todos grandes: BL-06 (exportar/importar), BL-09 (paginação no banco) 
   `docker compose up` reclamar de porta, é isso.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — o parentesco deixou de ser quadrático (BL-09, parcial)
+
+O BL-09 estava escrito culpando a consulta. **Medindo antes de mexer, a culpa estava no lugar
+errado** — com 5023 pessoas, o `computeKinship` para a lista toda levava **2280 ms** e o `findMany`
+com todos os includes, 167 ms. A consulta era 7% do custo.
+
+O motivo: `computeKinship` chamava `buildGraph(allPeople)` **a cada pessoa** e fazia uma busca em
+largura por pessoa, quando uma única busca a partir da pessoa central já visita todo mundo. Havia um
+segundo custo quadrático escondido — a fila da busca andava com `queue.shift()`, O(n) em array.
+
+Entrou o `createKinshipResolver` (ADR-012): prepara o grafo e as travessias uma vez, devolve uma
+função que responde por consulta a mapa. **2280 ms viraram 1 ms** (1708×), com resposta idêntica nas
+5023 pessoas. O `GET /api/people` dessa base responde em ~190 ms.
+
+**Isto foi decidido com o usuário: só o custo quadrático nesta rodada.** A consulta pesada (os ~170 ms
+que sobram) continua no backlog, com o caminho já medido — consulta enxuta 21 ms + página com
+includes 2 ms.
+
+Dois testes guardam a otimização: um compara o resolver com o cálculo pessoa a pessoa para **todas**
+as pessoas do cenário, e outro conta as leituras do grafo para garantir que responder não volta a
+percorrê-lo. Cronômetro em teste seria instável; contar leitura, não.
 
 ## Sessão de 28/07 — falecimento no calendário (BL-07)
 
@@ -364,10 +387,17 @@ Na sessão de 26/07 (monorepo):
 Nada travado e nada pela metade. O backlog só tem itens grandes, que são **escolha de rumo** — vale
 decidir com o usuário, não emendar:
 
-1. **BL-09** — paginação de verdade no banco. **É o que está combinado a seguir.** Cobra caro e tem
-   uma trava de verdade: a busca sem acento precisa de `unaccent` no Postgres, e o **grau de
-   parentesco é calculado, não é coluna** — não há como filtrar nem ordenar por ele em SQL. Ou a
-   busca por parentesco sai, ou a paginação vira híbrida. Vale decidir antes de escrever.
+1. **BL-09, a parte que sobrou** — aliviar o `findMany` da listagem, que ainda traz todas as pessoas
+   com pai, mãe, local, uniões e foto (167 ms e 7,5 MB com 5023 pessoas). O caminho já está medido:
+   varrer uma consulta enxuta com só os campos de busca e ordenação (21 ms) e buscar os includes das
+   10 linhas da página (2 ms). Nada de comportamento precisa mudar — a busca por parentesco e a
+   ordenação por idade continuam em memória, sobre linhas estreitas. **Não** confundir com levar a
+   busca para o SQL: aquilo exige `unaccent` no Postgres e mata a busca por grau de parentesco, que é
+   calculado e não existe como coluna.
 2. **BL-06** — exportar/importar. JSON resolve backup; GEDCOM abriria a porta para trocar dados com
    outros programas de genealogia, e é bem mais trabalho.
 3. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
+
+**Uma lição desta rodada, que vale para o resto:** o BL-09 estava escrito culpando a coisa errada, e
+medir antes de mexer custou dez minutos e mudou o trabalho inteiro. O gargalo era 14× maior do que o
+que o backlog apontava.

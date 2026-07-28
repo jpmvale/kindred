@@ -5,6 +5,12 @@
  * sangue é percorrido em largura contando subidas e descidas; o de uniões entra
  * depois, só para nomear a afinidade (sogro, cunhado, genro), e só através de uniões
  * vigentes — o parente do ex deixa de ser parente (RN-013).
+ *
+ * **A travessia acontece uma vez, não uma por pessoa** (ADR-012). Uma busca em
+ * largura a partir da pessoa central já visita todo mundo alcançável, então o
+ * grau de cada um é leitura de mapa. Quem precisa do grau da lista inteira usa o
+ * `createKinshipResolver`; o `computeKinship` de uma pessoa só é um atalho por
+ * cima dele.
  */
 
 export type PersonNode = {
@@ -36,33 +42,103 @@ type Graph = {
   childrenOf: Map<string, string[]>;
 };
 
+/**
+ * Prepara tudo o que não depende do alvo — o grafo, a travessia a partir da
+ * pessoa central e a das pessoas com quem ela tem união vigente — e devolve uma
+ * função que responde o grau de qualquer pessoa em tempo constante.
+ *
+ * É isto que torna a listagem viável: antes, cada pessoa remontava o grafo e
+ * fazia a própria busca, o que dava um custo quadrático (ADR-012).
+ */
+export function createKinshipResolver(
+  centralId: string,
+  allPeople: PersonNode[],
+  unions: UnionEdge[] = [],
+): (targetId: string) => string | null {
+  const graph = buildGraph(allPeople);
+  const unionsOf = indexUnionsByPerson(unions);
+
+  // Uma travessia a partir do centro dá o caminho de sangue até todo mundo.
+  const bloodFromCentral = bloodPathsFrom(centralId, graph);
+
+  // E uma por cônjuge vigente da pessoa central (na prática, um só) resolve a
+  // afinidade pelo lado dele: sogro, cunhado, enteado.
+  const bloodFromPartners = (unionsOf.get(centralId) ?? [])
+    .filter((union) => union.status === 'CURRENT')
+    .map((union) => bloodPathsFrom(otherSide(union, centralId), graph));
+
+  return (targetId: string): string | null => {
+    if (targetId === centralId) return 'Você';
+
+    const target = graph.people.get(targetId);
+    const targetSex = target?.sex ?? null;
+
+    // O vínculo conjugal direto vem antes do sangue: quem é casado com a pessoa
+    // central é "Esposa", mesmo no caso raro de também ser primo em 3º grau.
+    const ownUnion = (unionsOf.get(targetId) ?? []).find(
+      (union) => otherSide(union, targetId) === centralId,
+    );
+    if (ownUnion) return spouseLabel(ownUnion.status, targetSex);
+
+    const blood = bloodFromCentral.get(targetId);
+    if (blood) return kinshipLabel(blood.ups, blood.downs, targetSex);
+
+    // Direção 1 da afinidade: o alvo é parente de sangue do cônjuge do centro.
+    for (const paths of bloodFromPartners) {
+      const path = paths.get(targetId);
+      if (!path) continue;
+      const named = IN_LAW_VIA_SPOUSE[`${path.ups}:${path.downs}`];
+      if (named) return gender(targetSex, named);
+      return `${kinshipLabel(path.ups, path.downs, targetSex)} do cônjuge`;
+    }
+
+    // Direção 2: o alvo é cônjuge de um parente de sangue do centro.
+    for (const union of unionsOf.get(targetId) ?? []) {
+      if (union.status !== 'CURRENT') continue;
+      const relativeId = otherSide(union, targetId);
+      const path = bloodFromCentral.get(relativeId);
+      if (!path) continue;
+      const named = IN_LAW_VIA_RELATIVE[`${path.ups}:${path.downs}`];
+      if (named) return gender(targetSex, named);
+      const relativeSex = graph.people.get(relativeId)?.sex ?? null;
+      return `Cônjuge de ${kinshipLabel(path.ups, path.downs, relativeSex)}`;
+    }
+
+    // Sem caminho nenhum. Para quem é da família isso é "não se sabe como, mas é
+    // parente"; para amigo ou conhecido não é resposta — é ruído (RN-015).
+    const relationshipType = target?.relationshipType ?? 'FAMILY';
+    return relationshipType === 'FAMILY' ? 'Parente distante' : null;
+  };
+}
+
+/**
+ * O grau de **uma** pessoa. Atalho por cima do resolver — use-o para uma consulta
+ * avulsa; para uma lista inteira, crie o resolver uma vez e chame-o N vezes.
+ */
 export function computeKinship(
   targetId: string,
   centralId: string,
   allPeople: PersonNode[],
   unions: UnionEdge[] = [],
 ): string | null {
-  if (targetId === centralId) return 'Você';
+  return createKinshipResolver(centralId, allPeople, unions)(targetId);
+}
 
-  const graph = buildGraph(allPeople);
-  const target = graph.people.get(targetId);
-  const targetSex = target?.sex ?? null;
+/** As uniões de cada pessoa, para não varrer a lista inteira a cada consulta. */
+function indexUnionsByPerson(unions: UnionEdge[]): Map<string, UnionEdge[]> {
+  const byPerson = new Map<string, UnionEdge[]>();
+  for (const union of unions) {
+    for (const id of [union.partnerAId, union.partnerBId]) {
+      const list = byPerson.get(id);
+      if (list) list.push(union);
+      else byPerson.set(id, [union]);
+    }
+  }
+  return byPerson;
+}
 
-  // O vínculo conjugal direto vem antes do sangue: quem é casado com a pessoa
-  // central é "Esposa", mesmo no caso raro de também ser primo em 3º grau.
-  const ownUnion = unions.find((u) => joins(u, centralId, targetId));
-  if (ownUnion) return spouseLabel(ownUnion.status, targetSex);
-
-  const blood = findBloodPath(centralId, targetId, graph);
-  if (blood) return kinshipLabel(blood.ups, blood.downs, targetSex);
-
-  const affinity = affinityLabel(targetId, centralId, graph, unions);
-  if (affinity) return affinity;
-
-  // Sem caminho nenhum. Para quem é da família isso é "não se sabe como, mas é
-  // parente"; para amigo ou conhecido não é resposta — é ruído (RN-015).
-  const relationshipType = target?.relationshipType ?? 'FAMILY';
-  return relationshipType === 'FAMILY' ? 'Parente distante' : null;
+function otherSide(union: UnionEdge, personId: string): string {
+  return union.partnerAId === personId ? union.partnerBId : union.partnerAId;
 }
 
 function buildGraph(allPeople: PersonNode[]): Graph {
@@ -82,29 +158,33 @@ function buildGraph(allPeople: PersonNode[]): Graph {
 }
 
 /**
- * Caminho consanguíneo de `fromId` até `toId`, em subidas e descidas. A subida só
- * acontece antes de qualquer descida: o caminho é sempre "sobe até o ancestral
- * comum, depois desce", o que impede rotular sogro e cunhado como sangue.
+ * Caminho consanguíneo de `sourceId` até **cada** pessoa alcançável, em subidas e
+ * descidas. A subida só acontece antes de qualquer descida: o caminho é sempre
+ * "sobe até o ancestral comum, depois desce", o que impede rotular sogro e
+ * cunhado como sangue.
+ *
+ * Como a busca é em largura, a primeira vez que um nó sai da fila é pelo caminho
+ * mais curto — daí bastar guardar essa primeira visita. A fila anda por índice,
+ * e não por `shift()`, que é O(n) em array e sozinho já tornava a travessia
+ * quadrática.
  */
-function findBloodPath(
-  fromId: string,
-  toId: string,
+function bloodPathsFrom(
+  sourceId: string,
   graph: Graph,
-): BloodPath | null {
-  if (fromId === toId) return { ups: 0, downs: 0 };
-
+): Map<string, BloodPath> {
+  const paths = new Map<string, BloodPath>();
   const visited = new Set<string>();
   const queue: { id: string; ups: number; downs: number }[] = [
-    { id: fromId, ups: 0, downs: 0 },
+    { id: sourceId, ups: 0, downs: 0 },
   ];
 
-  while (queue.length > 0) {
-    const { id, ups, downs } = queue.shift()!;
+  for (let head = 0; head < queue.length; head++) {
+    const { id, ups, downs } = queue[head];
     const key = `${id}:${ups}:${downs}`;
     if (visited.has(key)) continue;
     visited.add(key);
 
-    if (id === toId) return { ups, downs };
+    if (!paths.has(id)) paths.set(id, { ups, downs });
     if (ups + downs >= MAX_STEPS) continue;
 
     const current = graph.people.get(id);
@@ -122,59 +202,7 @@ function findBloodPath(
     }
   }
 
-  return null;
-}
-
-/**
- * Afinidade: um único salto conjugal, em uma das duas direções — o parente do meu
- * cônjuge (sogro, cunhado, enteado) ou o cônjuge do meu parente (genro, cunhado,
- * padrasto). Só uniões vigentes contam (RN-013).
- */
-function affinityLabel(
-  targetId: string,
-  centralId: string,
-  graph: Graph,
-  unions: UnionEdge[],
-): string | null {
-  const targetSex = graph.people.get(targetId)?.sex ?? null;
-
-  // Direção 1: o alvo é parente de sangue do cônjuge da pessoa central.
-  for (const partnerId of currentPartnersOf(centralId, unions)) {
-    const path = findBloodPath(partnerId, targetId, graph);
-    if (!path) continue;
-    const named = IN_LAW_VIA_SPOUSE[`${path.ups}:${path.downs}`];
-    if (named) return gender(targetSex, named);
-    return `${kinshipLabel(path.ups, path.downs, targetSex)} do cônjuge`;
-  }
-
-  // Direção 2: o alvo é cônjuge de um parente de sangue da pessoa central.
-  for (const relativeId of currentPartnersOf(targetId, unions)) {
-    const path = findBloodPath(centralId, relativeId, graph);
-    if (!path) continue;
-    const named = IN_LAW_VIA_RELATIVE[`${path.ups}:${path.downs}`];
-    if (named) return gender(targetSex, named);
-    const relativeSex = graph.people.get(relativeId)?.sex ?? null;
-    return `Cônjuge de ${kinshipLabel(path.ups, path.downs, relativeSex)}`;
-  }
-
-  return null;
-}
-
-function currentPartnersOf(personId: string, unions: UnionEdge[]): string[] {
-  const partners: string[] = [];
-  for (const union of unions) {
-    if (union.status !== 'CURRENT') continue;
-    if (union.partnerAId === personId) partners.push(union.partnerBId);
-    else if (union.partnerBId === personId) partners.push(union.partnerAId);
-  }
-  return partners;
-}
-
-function joins(union: UnionEdge, a: string, b: string): boolean {
-  return (
-    (union.partnerAId === a && union.partnerBId === b) ||
-    (union.partnerAId === b && union.partnerBId === a)
-  );
+  return paths;
 }
 
 type Flexion = [male: string, female: string, neutral: string];

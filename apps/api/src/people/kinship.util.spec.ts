@@ -1,4 +1,8 @@
-import { computeKinship, type UnionEdge } from './kinship.util';
+import {
+  computeKinship,
+  createKinshipResolver,
+  type UnionEdge,
+} from './kinship.util';
 
 /**
  * A árvore usada nos testes (a pessoa central é o Miguel), igual em espírito ao
@@ -249,5 +253,51 @@ describe('computeKinship', () => {
       // A beatriz é irmã e continua irmã, mesmo com o marido no grafo.
       expect(kinship('beatriz')).toBe('Irmã');
     });
+  });
+});
+
+describe('createKinshipResolver (ADR-012)', () => {
+  it('responde o mesmo que o cálculo pessoa a pessoa, para todo mundo', () => {
+    // É o contrato que sustenta a otimização: uma travessia só não pode mudar
+    // nenhuma resposta. Se divergir aqui, a listagem passa a mentir.
+    const resolver = createKinshipResolver('miguel', PEOPLE, UNIONS);
+
+    for (const person of PEOPLE) {
+      expect(resolver(person.id)).toBe(
+        computeKinship(person.id, 'miguel', PEOPLE, UNIONS),
+      );
+    }
+  });
+
+  it('reconhece a pessoa central sem precisar de caso especial fora', () => {
+    expect(createKinshipResolver('miguel', PEOPLE, UNIONS)('miguel')).toBe(
+      'Você',
+    );
+  });
+
+  it('serve para quem nem está no grafo', () => {
+    const resolver = createKinshipResolver('miguel', PEOPLE, UNIONS);
+    expect(resolver('ninguem')).toBe('Parente distante');
+  });
+
+  it('atravessa o grafo uma vez só, não uma por pessoa', () => {
+    // O custo antigo crescia com o quadrado da base: cada pessoa remontava o
+    // grafo inteiro. Contar quantas vezes a lista é percorrida é o jeito de
+    // travar isso sem cronômetro, que seria teste instável.
+    let leituras = 0;
+    const espiao = PEOPLE.map((p) => ({
+      ...p,
+      get fatherId() {
+        leituras++;
+        return p.fatherId;
+      },
+    }));
+
+    const resolver = createKinshipResolver('miguel', espiao, UNIONS);
+    const depoisDoPreparo = leituras;
+    for (const p of PEOPLE) resolver(p.id);
+
+    // Depois de pronto, responder não volta a ler o grafo.
+    expect(leituras).toBe(depoisDoPreparo);
   });
 });
