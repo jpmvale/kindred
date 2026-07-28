@@ -421,3 +421,53 @@ foi decidida sobre as linhas enxutas, então a segunda consulta tem de ser remon
 esquecer isso devolve a página embaralhada sem erro nenhum. Há teste que entrega as linhas na ordem
 inversa de propósito. Se alguém for apagado entre as duas consultas, a linha some da página em vez de
 virar um buraco, e o `total` continua sendo o que a varredura contou.
+
+---
+
+## ADR-015 — Tema por token de cor, resolvido antes da pintura
+
+**Contexto.** O app nasceu com as cores escritas onde eram usadas: 80 hex no `index.css` e mais 86
+espalhados por `style={{}}` nos componentes. Um tema escuro em cima disso significaria duplicar cada
+decisão de cor em dois lugares — e a segunda cópia começa a envelhecer no dia seguinte.
+
+A referência é o projeto irmão **coda**, que já resolve isto. A **mecânica** dele foi adotada inteira;
+a **paleta** não: o kindred continua cinza claro com sotaque índigo no tema claro, e o escuro nasce
+dessa mesma família de cores. Foi decidido com o usuário.
+
+**Decisão.**
+
+1. Toda cor vira **custom property** em `:root` (`apps/web/src/index.css`), com nome semântico
+   (`--surface`, `--muted`, `--danger-soft`) e não de matiz. O tema escuro é um segundo bloco,
+   `:root[data-theme='dark']`, que redefine os mesmos nomes — nenhuma regra é escrita duas vezes.
+2. A preferência é **claro / escuro / sistema**, guardada no `localStorage`. O valor **aplicado** é
+   sempre `light` ou `dark`: "sistema" é resolvido em JS (`apps/web/src/theme.ts`) pelo
+   `prefers-color-scheme` e escrito em `data-theme` no `<html>`. **O CSS não tem media query de
+   paleta** — se tivesse, "escolhi claro num SO escuro" precisaria vencer a media query, e a briga de
+   especificidade voltaria a cada regra nova.
+3. Um **script inline no `index.html`** aplica o tema antes da pintura. É a única cópia da chave e da
+   regra fora do `theme.ts`, e existe porque sem ela a tela pisca clara até o bundle carregar.
+4. `color-scheme` acompanha o tema, então o que é desenhado pelo navegador — seletor de data,
+   checkbox, barra de rolagem — vem escuro sem uma linha de CSS.
+
+**Consequências.**
+
+- O que é do reactflow precisou de dois caminhos diferentes, e a diferença tem motivo: as arestas
+  recebem `style` **inline**, e estilo inline resolve `var(...)` normalmente, então `EDGE_COLORS`
+  (`tree-layout.ts`) virou `var(--tree-edge-*)` sem o layout saber que tema existe. Já o pontilhado
+  do fundo é o `color` do `<Background/>`, que o reactflow põe como **atributo de apresentação** no
+  SVG — e atributo não entende `var(...)`. Esse ficou no CSS
+  (`.react-flow__background-pattern { fill: ... }`), que vence o atributo.
+- Os campos de formulário passaram a ser estilizados **no app inteiro**, não só dentro de
+  `.form-group`: os controles de união vivem soltos num `fieldset` e ficavam com a aparência crua do
+  navegador ao lado dos outros. O `<textarea>` das notas nunca teve estilo nenhum — a regra antiga
+  cobria só `input` e `select`.
+- A seta do `<select>` é desenhada por nós (`appearance: none` + `--select-arrow`): a nativa não muda
+  de cor com o tema.
+- **O `.card` ganhou borda.** No claro é quase invisível; no escuro é o que separa o cartão do fundo,
+  porque sombra sobre fundo escuro não separa nada. É a única mudança visível no tema claro.
+
+**A armadilha:** cor nova escrita direto no componente funciona — e só quebra no outro tema, que
+ninguém abre no mesmo minuto. Não há lint que pegue isso; o que pega é
+`grep -rE '#[0-9a-fA-F]{6}' apps/web/src --include='*.tsx'` não devolver nada. A única exceção legítima
+hoje é o `photo.ts`, que pinta de branco o fundo do JPEG ao achatar um PNG transparente — isso é
+conteúdo gravado no banco, não cor de tela, e não deve seguir tema nenhum.

@@ -1,11 +1,10 @@
 import { NavLink } from 'react-router-dom';
+import ThemeToggle from './ThemeToggle';
 
 interface Props {
   collapsed: boolean;
   onToggle: () => void;
 }
-
-const W = { expanded: 220, collapsed: 64 };
 
 function PeopleIcon() {
   return (
@@ -77,99 +76,36 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({ collapsed, onToggle }: Props) {
-  const w = collapsed ? W.collapsed : W.expanded;
-
   return (
-    <aside
-      style={{
-        width: w,
-        minWidth: w,
-        height: '100vh',
-        background: '#fff',
-        borderRight: '1px solid #e5e7eb',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'width 0.22s ease, min-width 0.22s ease',
-        overflow: 'hidden',
-        flexShrink: 0,
-        position: 'sticky',
-        top: 0,
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          height: 56,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          padding: collapsed ? 0 : '0 0.875rem',
-          borderBottom: '1px solid #f3f4f6',
-          flexShrink: 0,
-        }}
-      >
-        {!collapsed && (
-          <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#111827', letterSpacing: '-0.02em' }}>
-            Kindred
-          </span>
-        )}
+    <aside className={`sidebar${collapsed ? ' is-collapsed' : ''}`}>
+      <div className="sidebar-header">
+        {!collapsed && <span className="sidebar-brand">Kindred</span>}
         <button
+          className="sidebar-toggle"
           onClick={onToggle}
           title={collapsed ? 'Expandir' : 'Recolher'}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '0.375rem',
-            borderRadius: '0.375rem',
-            color: '#9ca3af',
-            display: 'flex',
-            alignItems: 'center',
-            transition: 'color 0.15s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#374151')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
         >
           {collapsed ? <ChevronRight /> : <ChevronLeft />}
         </button>
       </div>
 
-      {/* Nav */}
-      <nav style={{ padding: '0.5rem', flex: 1 }}>
+      <nav className="sidebar-nav">
         {NAV_ITEMS.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
             title={collapsed ? label : undefined}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.625rem',
-              padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
-              justifyContent: collapsed ? 'center' : 'flex-start',
-              borderRadius: '0.5rem',
-              marginBottom: '0.2rem',
-              textDecoration: 'none',
-              color: isActive ? '#6366f1' : '#4b5563',
-              background: isActive ? '#eef2ff' : 'transparent',
-              fontWeight: isActive ? 600 : 400,
-              fontSize: '0.875rem',
-              transition: 'background 0.15s, color 0.15s',
-            })}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              if (!el.style.background.includes('eef2ff')) el.style.background = '#f9fafb';
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              if (!el.style.background.includes('eef2ff')) el.style.background = 'transparent';
-            }}
+            className={({ isActive }) => `sidebar-link${isActive ? ' is-active' : ''}`}
           >
             <Icon />
             {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>{label}</span>}
           </NavLink>
         ))}
       </nav>
+
+      <div className="sidebar-footer">
+        <ThemeToggle collapsed={collapsed} />
+      </div>
     </aside>
   );
 }

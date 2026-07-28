@@ -119,7 +119,7 @@ export default function PeopleListPage() {
       </div>
 
       <div className="form-card" style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="list-toolbar">
           <div className="form-group" style={{ marginBottom: 0, maxWidth: 320, width: '100%' }}>
             <label htmlFor="busca">Busca</label>
             <input
@@ -191,24 +191,16 @@ export default function PeopleListPage() {
           <div className="card-body">
             <h3>
               {person.name}
-              {isDead && (
-                <span style={{ marginLeft: '0.35rem', color: '#9ca3af', fontWeight: 700 }}>
-                  †
-                </span>
-              )}
+              {isDead && <span className="person-dagger">†</span>}
               {ageLabel !== null && (
-                <span style={{ marginLeft: '0.35rem', fontWeight: 500, color: '#374151' }}>
+                <span className="person-age">
                   - {ageLabel}{isDead ? '' : ' anos'}
                 </span>
               )}
-              {person.isCentralUser && (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#6366f1', fontWeight: 500 }}>
-                  (você)
-                </span>
-              )}
+              {person.isCentralUser && <span className="person-you">(você)</span>}
             </h3>
             {isDead && yearsSinceDeath !== null && (
-              <p style={{ marginTop: '0.15rem', fontSize: '0.78rem', color: '#9ca3af' }}>
+              <p className="person-sub" style={{ marginTop: '0.15rem', fontSize: '0.78rem' }}>
                 Falecido há {yearsSinceDeath} ano{yearsSinceDeath === 1 ? '' : 's'}.
               </p>
             )}
@@ -217,38 +209,26 @@ export default function PeopleListPage() {
                 {RELATIONSHIP_LABELS[person.relationshipType]}
               </span>
               {person.kinshipDegree && !person.isCentralUser && (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#6b7280' }}>
-                  · {person.kinshipDegree}
-                </span>
+                <span className="person-meta">· {person.kinshipDegree}</span>
               )}
               {person.sex && (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#6b7280' }}>
-                  · {SEX_LABELS[person.sex]}
-                </span>
+                <span className="person-meta">· {SEX_LABELS[person.sex]}</span>
               )}
               {person.birthDate && (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#6b7280' }}>
-                  · {formatDate(person.birthDate)}
-                </span>
+                <span className="person-meta">· {formatDate(person.birthDate)}</span>
               )}
               {person.deathDate && (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#9ca3af' }}>
-                  · † {formatDate(person.deathDate)}
-                </span>
+                <span className="person-meta is-faint">· † {formatDate(person.deathDate)}</span>
               )}
               {person.deceased && !person.deathDate && (
-                <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#9ca3af' }}>
-                  · † Falecido
-                </span>
+                <span className="person-meta is-faint">· † Falecido</span>
               )}
             </p>
             {person.location && (
-              <p style={{ marginTop: '0.25rem', fontSize: '0.8rem', color: '#9ca3af' }}>
-                {person.location.name}
-              </p>
+              <p className="person-sub">{person.location.name}</p>
             )}
             {(person.father || person.mother) && (
-              <p style={{ marginTop: '0.25rem', fontSize: '0.8rem', color: '#9ca3af' }}>
+              <p className="person-sub">
                 {[person.father?.name, person.mother?.name].filter(Boolean).join(' · ')}
               </p>
             )}
@@ -277,11 +257,9 @@ export default function PeopleListPage() {
       ))}
 
       {!loading && total > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
-          <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-            {total} pessoa(s) encontrada(s)
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="pagination">
+          <span>{total} pessoa(s) encontrada(s)</span>
+          <div className="pagination-controls">
             <button
               className="btn-ghost"
               onClick={() => go({ page: Math.max(1, page - 1) })}
@@ -289,9 +267,7 @@ export default function PeopleListPage() {
             >
               ← Anterior
             </button>
-            <span style={{ fontSize: '0.85rem', color: '#4b5563' }}>
-              Página {page} de {totalPages}
-            </span>
+            <span>Página {page} de {totalPages}</span>
             <button
               className="btn-ghost"
               onClick={() => go({ page: Math.min(totalPages, page + 1) })}

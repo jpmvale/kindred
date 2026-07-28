@@ -91,7 +91,7 @@ export default function LocationsPage() {
                   if (e.key === 'Enter') handleSaveEdit(loc.id);
                   if (e.key === 'Escape') setEditingId(null);
                 }}
-                style={{ width: '100%', padding: '0.25rem 0.5rem', border: '1px solid #6366f1', borderRadius: '0.375rem' }}
+                style={{ borderColor: 'var(--ring)' }}
               />
             ) : (
               <h3>{loc.name}</h3>

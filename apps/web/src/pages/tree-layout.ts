@@ -14,11 +14,16 @@ const HORIZONTAL_NODE_GAP = 22;
 /** Distância mínima entre dois nós do mesmo rank — e o passo do casal. */
 const MIN_GAP = NODE_W + HORIZONTAL_NODE_GAP;
 
+/**
+ * As cores das arestas são `var(...)` em vez de hex porque elas viram `style` inline no SVG do
+ * reactflow — e estilo inline resolve custom property normalmente, então a linha troca de cor junto
+ * com o tema sem o layout saber que tema existe (ADR-015).
+ */
 export const EDGE_COLORS = {
-  father: { normal: '#93c5fd', highlighted: '#2563eb' },
-  mother: { normal: '#f9a8d4', highlighted: '#db2777' },
-  union: { normal: '#c4b5fd', highlighted: '#7c3aed' },
-  unionEnded: { normal: '#d1d5db', highlighted: '#9ca3af' },
+  father: { normal: 'var(--tree-edge-father)', highlighted: 'var(--tree-edge-father-on)' },
+  mother: { normal: 'var(--tree-edge-mother)', highlighted: 'var(--tree-edge-mother-on)' },
+  union: { normal: 'var(--tree-edge-union)', highlighted: 'var(--tree-edge-union-on)' },
+  unionEnded: { normal: 'var(--tree-edge-ended)', highlighted: 'var(--tree-edge-ended-on)' },
 } as const;
 
 /** Prefixos dos ids de aresta — é por eles que o hover sabe recolorir cada tipo. */

@@ -5,11 +5,10 @@ _Atualizado em 28/07/2026._
 ## Onde o projeto está
 
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
-busca/ordenação/paginação, árvore genealógica, calendário de aniversários.
+busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro.
 
-**Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, `main` **em dia com o
-`origin`** (nada preso local), nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **158 testes**, 46 na API, 107 no
+**Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **169 testes**, 46 na API, 118 no
 web e 5 no `@kindred/db`. Os 6 e2e rodam à parte e precisam de banco. Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
 fim deste arquivo.
@@ -22,12 +21,17 @@ fim deste arquivo.
 
 ## Onde a última sessão parou
 
-Fecharam o **BL-09** (a listagem parou de arrastar a base inteira, ADR-014) e entrou o **backup**
-com o fixture anônimo (ADR-013) — que foi o que tirou do caminho o risco de perder a base real.
-Antes disso, na mesma data, tinham fechado BL-05 (notas) e BL-07 (falecimento no calendário).
+Entrou o **tema escuro** e a reforma dos campos de formulário (ADR-015). Antes disso, na mesma data,
+tinham fechado o **BL-09** (a listagem parou de arrastar a base inteira, ADR-014), o **backup** com o
+fixture anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendário).
 
-`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**158 testes**: 46 na API, 107 no web e 5 no
+`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**169 testes**: 46 na API, 118 no web e 5 no
 `@kindred/db`), mais os 6 e2e que rodam à parte, com banco.
+
+**Um defeito antigo apareceu na conferência, e não é do tema:** na base real (143 pessoas), o botão
+**"Abrir todos relacionamentos"** da árvore deixa o canvas vazio — os nós somem e sobram o fundo, os
+painéis e a legenda. Foi reproduzido no commit anterior, sem nenhuma mudança aplicada. Com o seed de
+23 pessoas não acontece. Virou **BL-15**, e é o próximo passo.
 
 ### Coisas do ambiente que custaram tempo
 
@@ -41,6 +45,58 @@ Antes disso, na mesma data, tinham fechado BL-05 (notas) e BL-07 (falecimento no
   `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — tema escuro e a reforma dos campos (ADR-015)
+
+O pedido foi tema escuro "seguindo a referência do **coda**", o projeto irmão. Duas coisas foram
+decididas com o usuário antes de escrever:
+
+| Decisão | Escolha |
+| --- | --- |
+| quanto da estética do coda vem junto | **só a mecânica** — o claro continua o cinza-e-índigo de sempre, e o escuro nasce dessa família. O "papel quente" e a serif do coda ficaram de fora |
+| onde fica o seletor | **rodapé da sidebar**, segmentado claro/escuro/sistema; recolhida, vira um botão que alterna |
+
+O trabalho de verdade não foi o escuro, foi o **antes dele**: havia 80 hex no `index.css` e mais 86
+espalhados por `style={{}}` nos componentes. Todos viraram token semântico
+(`--surface`, `--muted`, `--danger-soft`), e o tema escuro é um segundo bloco que redefine os mesmos
+nomes. Nenhuma regra ficou escrita duas vezes.
+
+Como funciona, em uma frase cada: a preferência (claro/escuro/**sistema**) mora no `localStorage`; o
+valor **aplicado** é sempre `light`/`dark`, resolvido em JS (`theme.ts`) e escrito em `data-theme` no
+`<html>`; **não há media query de paleta no CSS** — se houvesse, "escolhi claro num SO escuro"
+precisaria vencê-la a cada regra nova; e um script inline no `index.html` aplica tudo **antes da
+pintura**, senão a tela pisca clara até o bundle carregar.
+
+**Os campos ganharam mais do que cor**, que era a outra metade do pedido:
+
+- a regra passou a valer no **app inteiro**, não só dentro de `.form-group` — os controles de união
+  vivem soltos num `fieldset` e estavam com a aparência crua do navegador ao lado dos outros;
+- o **`<textarea>` das notas nunca teve estilo nenhum**: a regra antiga cobria só `input` e `select`;
+- a seta do `<select>` passou a ser nossa (`appearance: none`), porque a nativa não muda de cor;
+- foco com anel, `:disabled` com opacidade, `input[type=file]` com botão estilizado — nada disso
+  existia;
+- `color-scheme` acompanha o tema, então seletor de data, checkbox e barra de rolagem vêm escuros sem
+  uma linha de CSS.
+
+**O reactflow precisou de dois caminhos, e a diferença é o que morde aqui:** as arestas recebem
+`style` **inline**, e estilo inline resolve `var(...)` normalmente — então `EDGE_COLORS` virou
+`var(--tree-edge-*)`. Já o pontilhado do fundo é o `color` do `<Background/>`, que o reactflow põe
+como **atributo de apresentação** no SVG, e atributo **não** entende `var(...)`; esse foi para o CSS,
+que vence o atributo.
+
+**A única mudança visível no tema claro:** o `.card` ganhou borda. No claro é quase invisível; no
+escuro é o que separa o cartão do fundo, porque sombra sobre fundo escuro não separa nada.
+
+**A armadilha que isto deixa:** cor nova escrita direto no componente funciona — e só quebra no outro
+tema, que ninguém abre no mesmo minuto. Não há lint que pegue; o que pega é
+`grep -rE '#[0-9a-fA-F]{6}' apps/web/src --include='*.tsx'` não devolver nada. A única exceção
+legítima é o `photo.ts`, que pinta de branco o fundo do JPEG ao achatar um PNG transparente — isso é
+conteúdo gravado no banco, não cor de tela.
+
+**Um defeito meu, achado ao escrever teste:** o dublê do `prefers-color-scheme` aceitava
+`removeEventListener` sem remover nada, e por isso reprovou um componente correto. O dublê agora
+remove de verdade — e é justamente isso que faz o teste "escolha explícita não acompanha o SO"
+afirmar alguma coisa.
 
 ## Sessão de 28/07 — a listagem parou de arrastar a base inteira (BL-09, fechado)
 
@@ -369,6 +425,20 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão de 28/07 (tema escuro, ADR-015), web em `:5174` contra a **base real** com a API na
+`:3005` — só leitura, nada foi escrito:
+
+- **Claro está idêntico ao que o app era**: lista, cartões, campos e sidebar sem diferença visível
+  além da borda do cartão.
+- **Escuro em todas as telas**: lista, calendário (as três marcas da RN-020 continuam distintas entre
+  si), formulário de pessoa (campos, `fieldset`, controles de união, `input[type=file]`, textarea) e
+  árvore (nós, pontilhado do fundo, painéis, legenda e os controles de zoom do reactflow).
+- O seletor responde nos três estados, e **recolhida** a barra mostra o botão que alterna, com o
+  ícone certo para o tema em vigor.
+- O seletor de data e o checkbox vêm escuros pelo `color-scheme`, sem CSS para isso.
+- Nenhum erro de console (os dois que aparecem no log são do HMR do Vite durante um `git stash`, com
+  o arquivo do seletor temporariamente fora do disco).
+
 Na sessão de 28/07 (BL-09 e ADR-013):
 
 - **Bancada de 5000 pessoas**, num banco `kindred_bench` criado e derrubado na hora. As cinco
@@ -481,6 +551,14 @@ Na sessão de 26/07 (monorepo):
   vale para "no máximo uma união vigente por pessoa" (RN-014).
 - **O teto das notas está escrito em dois arquivos** (DTO da API e `PersonFormPage`), por causa do
   ADR-005. Mudar um sem o outro faz a tela deixar digitar o que o servidor recusa.
+- **Cor nova vai em token, nunca no componente** (ADR-015). Hex escrito direto funciona e só quebra
+  no outro tema, que ninguém abre no mesmo minuto. Não há lint que pegue: o que pega é
+  `grep -rE '#[0-9a-fA-F]{6}' apps/web/src --include='*.tsx'` não devolver nada.
+- **A chave do tema está em dois lugares de propósito**: `theme.ts` e o script inline do
+  `index.html`. O script existe para aplicar o tema antes da pintura, e por isso não pode importar
+  nada. Mexeu num, mexa no outro.
+- **A árvore fica vazia ao abrir todos os relacionamentos** na base real (143 pessoas). É anterior ao
+  tema — reproduzido no commit `2b7f25f` sem nenhuma mudança aplicada (BL-15).
 - **Mexeu no schema? O backup também precisa saber.** Um campo escalar novo tem de entrar no
   `backup.ts` **e** no `restore.ts` — o `pnpm db:backup` falha dizendo qual falta, mas quem só roda
   migration e testa a tela não descobre até precisar restaurar (ADR-013).
@@ -489,16 +567,18 @@ Na sessão de 26/07 (monorepo):
 
 ## Próximo passo sugerido
 
-Nada travado e nada pela metade. O backlog só tem itens grandes, que são **escolha de rumo** — vale
-decidir com o usuário, não emendar:
+Nada travado e nada pela metade. O primeiro item é **defeito**, e por isso vem antes; os outros são
+**escolha de rumo** — vale decidir com o usuário, não emendar:
 
-1. **BL-06 — exportar/importar**, e ele ficou **bem mais barato**: o formato JSON e as duas metades
+1. **BL-15 — a árvore fica vazia ao abrir todos os relacionamentos** na base real. É o único defeito
+   conhecido em aberto, e apareceu na conferência do tema (não é regressão dele).
+2. **BL-06 — exportar/importar**, e ele ficou **bem mais barato**: o formato JSON e as duas metades
    (coletar e restaurar) já existem no `@kindred/db` (ADR-013). Falta expor pela aplicação — um botão
    que baixa o arquivo e outro que sobe. GEDCOM continua sendo outra conversa, bem maior.
-2. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
+3. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
    pai, mãe e local aninhados (7,5 MB com 5000 pessoas). Diferente do BL-09, isto **mexe no contrato
    da API**: precisa decidir o que cada tela realmente consome antes de cortar.
-3. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
+4. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
 
 **Uma lição que se repetiu duas vezes:** medir antes de mexer. Na primeira metade do BL-09 o backlog
 culpava a consulta, e o gargalo era o cálculo — 14× maior do que o apontado. Na segunda, o ganho real

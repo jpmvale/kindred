@@ -65,6 +65,17 @@ São duas camadas, e a divisão não é por gosto: cada coisa é testada onde el
 - `photo.test.ts` — a conta do redimensionamento (ADR-011), o que barra o arquivo antes de decodificar
   e a versão pendurada na URL da foto. O `<canvas>` em si não é testado: o jsdom não desenha, e o que
   ele faz é chamar duas APIs do navegador com números que já vêm conferidos aqui.
+- `theme.test.ts` — a resolução do tema (ADR-015): lixo no `localStorage` não vira tema, "sistema"
+  segue o SO **e só ele**, o que chega ao `<html>` é sempre `light`/`dark`, e storage indisponível
+  (modo privado) não impede a troca na sessão.
+
+**Componente — `components/ThemeToggle.test.tsx`.** Fora do padrão de rota, porque o seletor não
+depende de loader nenhum. O que ele afirma: a opção guardada vem marcada, escolher troca o `<html>` e
+persiste, em "sistema" o SO trocando de tema troca a tela, e **escolha explícita não acompanha o SO**.
+
+O dublê do `prefers-color-scheme` precisa remover de verdade no `removeEventListener` — é isso que
+separa "o componente ignorou o aviso" de "o componente cancelou a inscrição". Um dublê que aceita e
+não remove reprova código correto, que foi exatamente o que aconteceu ao escrever este teste.
 
 **Páginas — a rota inteira, com a API dublada.** Como os dados vêm de loaders (ADR-010), montar uma
 página é montar uma **rota**: um `createMemoryRouter` com o loader de verdade e o módulo de API

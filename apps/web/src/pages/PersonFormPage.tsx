@@ -281,7 +281,7 @@ export default function PersonFormPage() {
       {isEdit && person && !person.isCentralUser && (
         <div className="form-card" style={{ marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+            <span className="text-muted" style={{ fontSize: '0.85rem' }}>
               O parentesco de todo mundo é calculado em relação à pessoa central.
               Passar o posto para {person.name} recalcula a lista e a árvore inteiras.
             </span>
@@ -295,7 +295,7 @@ export default function PersonFormPage() {
             </button>
           </div>
           {centralError && (
-            <p style={{ fontSize: '0.85rem', color: '#dc2626', margin: '0.5rem 0 0' }}>
+            <p className="field-error" style={{ margin: '0.5rem 0 0' }}>
               {centralError}
             </p>
           )}
@@ -359,7 +359,7 @@ export default function PersonFormPage() {
               Falecido
             </label>
             {form.deathDate && (
-              <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+              <span className="field-hint">
                 Marcado automaticamente porque a data de falecimento está preenchida.
               </span>
             )}
@@ -376,7 +376,7 @@ export default function PersonFormPage() {
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+            <span className="field-hint">
               Cônjuge não é um tipo daqui: registre a união logo abaixo.
             </span>
           </div>
@@ -394,17 +394,15 @@ export default function PersonFormPage() {
               ))}
             </select>
             {locations.length === 0 && (
-              <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+              <span className="field-hint">
                 Nenhum local cadastrado.{' '}
-                <a href="/locations" style={{ color: '#6366f1' }}>Cadastrar agora</a>
+                <a href="/locations" className="text-primary">Cadastrar agora</a>
               </span>
             )}
           </div>
 
-          <fieldset style={{ border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '1rem', marginBottom: '1rem' }}>
-            <legend style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', padding: '0 0.5rem' }}>
-              Filiação
-            </legend>
+          <fieldset>
+            <legend>Filiação</legend>
 
             <div className="form-group" style={{ marginBottom: '0.75rem' }}>
               <label htmlFor="pessoa-pai">Pai</label>
@@ -435,19 +433,17 @@ export default function PersonFormPage() {
             </div>
           </fieldset>
 
-          <fieldset style={{ border: '1px solid #e5e7eb', borderRadius: '0.5rem', padding: '1rem', marginBottom: '1rem' }}>
-            <legend style={{ fontSize: '0.875rem', fontWeight: 600, color: '#374151', padding: '0 0.5rem' }}>
-              Uniões
-            </legend>
+          <fieldset>
+            <legend>Uniões</legend>
 
             {!isEdit ? (
-              <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: 0 }}>
+              <p className="text-muted" style={{ fontSize: '0.85rem', margin: 0 }}>
                 Salve a pessoa primeiro; depois volte aqui para registrar o cônjuge.
               </p>
             ) : (
               <>
                 {unions.length === 0 && (
-                  <p style={{ fontSize: '0.85rem', color: '#9ca3af', marginTop: 0 }}>
+                  <p className="text-faint" style={{ fontSize: '0.85rem', marginTop: 0 }}>
                     Nenhuma união registrada.
                   </p>
                 )}
@@ -526,7 +522,7 @@ export default function PersonFormPage() {
                 </div>
 
                 {unionError && (
-                  <p style={{ fontSize: '0.85rem', color: '#dc2626', marginBottom: 0 }}>
+                  <p className="field-error" style={{ marginBottom: 0 }}>
                     {unionError}
                   </p>
                 )}
@@ -551,7 +547,7 @@ export default function PersonFormPage() {
                   onChange={handlePickPhoto}
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                  <span className="field-hint">
                     JPEG, PNG ou WebP, até 2 MB. A imagem é reduzida antes de subir.
                   </span>
                   {photoPreview && (
@@ -568,7 +564,7 @@ export default function PersonFormPage() {
               </div>
             </div>
             {photoError && (
-              <p style={{ fontSize: '0.85rem', color: '#dc2626', marginBottom: 0 }}>
+              <p className="field-error" style={{ marginBottom: 0 }}>
                 {photoError}
               </p>
             )}
@@ -583,9 +579,8 @@ export default function PersonFormPage() {
               value={form.notes ?? ''}
               onChange={(e) => set('notes', e.target.value)}
               placeholder="De onde veio a amizade, histórias, o que você não quer esquecer..."
-              style={{ resize: 'vertical', fontFamily: 'inherit' }}
             />
-            <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+            <span className="field-hint">
               {(form.notes?.length ?? 0)} de {NOTES_MAX_LENGTH} caracteres.
             </span>
           </div>

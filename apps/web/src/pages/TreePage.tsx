@@ -31,8 +31,8 @@ import {
 const HANDLE: React.CSSProperties = {
   width: 8,
   height: 8,
-  border: '2px solid #d1d5db',
-  background: '#fff',
+  border: '2px solid var(--tree-handle-border)',
+  background: 'var(--tree-node-bg)',
   pointerEvents: 'none',
 };
 
@@ -46,10 +46,10 @@ const SPOUSE_HANDLE: React.CSSProperties = {
 };
 
 function avatarBg(sex?: string | null, isCentral?: boolean) {
-  if (isCentral) return '#6366f1';
-  if (sex === 'MALE') return '#3b82f6';
-  if (sex === 'FEMALE') return '#ec4899';
-  return '#9ca3af';
+  if (isCentral) return 'var(--primary)';
+  if (sex === 'MALE') return 'var(--tree-avatar-male)';
+  if (sex === 'FEMALE') return 'var(--tree-avatar-female)';
+  return 'var(--tree-avatar-unknown)';
 }
 
 function year(d?: string | null) {
@@ -74,33 +74,33 @@ function PersonNode({ data }: NodeProps) {
           position: 'relative',
           background:
             d.isHovered || d.isParentOfHovered || d.isChildOfHovered || d.isPartnerOfHovered
-              ? '#f8fafc'
-              : '#fff',
+              ? 'var(--tree-node-bg-hover)'
+              : 'var(--tree-node-bg)',
           border: `2px solid ${
             d.isHovered
-              ? '#0f172a'
+              ? 'var(--tree-hover)'
               : d.isParentOfHovered
-                ? '#2563eb'
+                ? 'var(--tree-parent)'
                 : d.isChildOfHovered
-                  ? '#db2777'
+                  ? 'var(--tree-child)'
                   : d.isPartnerOfHovered
-                    ? '#7c3aed'
+                    ? 'var(--tree-partner)'
                     : d.isCentralUser
-                      ? '#6366f1'
-                      : '#e5e7eb'
+                      ? 'var(--primary)'
+                      : 'var(--tree-node-border)'
           }`,
           borderRadius: 12,
           boxShadow: d.isHovered
-            ? '0 0 0 4px rgba(15,23,42,.10), 0 2px 12px rgba(15,23,42,.16)'
+            ? 'var(--tree-shadow-hover)'
             : d.isParentOfHovered
-              ? '0 0 0 4px rgba(37,99,235,.12), 0 2px 10px rgba(37,99,235,.16)'
+              ? 'var(--tree-shadow-parent)'
               : d.isChildOfHovered
-                ? '0 0 0 4px rgba(219,39,119,.12), 0 2px 10px rgba(219,39,119,.16)'
+                ? 'var(--tree-shadow-child)'
                 : d.isPartnerOfHovered
-                  ? '0 0 0 4px rgba(124,58,237,.12), 0 2px 10px rgba(124,58,237,.16)'
+                  ? 'var(--tree-shadow-partner)'
                   : d.isCentralUser
-                    ? '0 0 0 4px #e0e7ff, 0 2px 10px rgba(99,102,241,.15)'
-                    : '0 1px 6px rgba(0,0,0,.07)',
+                    ? 'var(--tree-shadow-central)'
+                    : 'var(--tree-shadow-node)',
           display: 'flex',
           alignItems: 'center',
           gap: 12,
@@ -115,7 +115,7 @@ function PersonNode({ data }: NodeProps) {
             height: 40,
             borderRadius: '50%',
             background: avatarBg(d.sex, d.isCentralUser),
-            color: '#fff',
+            color: 'var(--tree-avatar-foreground)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -155,9 +155,9 @@ function PersonNode({ data }: NodeProps) {
               width: 18,
               height: 18,
               borderRadius: 999,
-              border: '1px solid #bfdbfe',
-              background: '#eff6ff',
-              color: '#2563eb',
+              border: '1px solid var(--tree-btn-parents-border)',
+              background: 'var(--tree-btn-parents-bg)',
+              color: 'var(--tree-btn-parents-fg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -195,9 +195,9 @@ function PersonNode({ data }: NodeProps) {
               width: 18,
               height: 18,
               borderRadius: 999,
-              border: '1px solid #c7d2fe',
-              background: '#eef2ff',
-              color: '#4f46e5',
+              border: '1px solid var(--tree-btn-side-border)',
+              background: 'var(--tree-btn-side-bg)',
+              color: 'var(--tree-btn-side-fg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -216,7 +216,7 @@ function PersonNode({ data }: NodeProps) {
             style={{
               fontWeight: 600,
               fontSize: 13,
-              color: '#111827',
+              color: 'var(--heading)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -226,14 +226,14 @@ function PersonNode({ data }: NodeProps) {
             {dead ? `† ${d.name}` : d.name}
           </div>
           {d.isCentralUser ? (
-            <div style={{ fontSize: 11, color: '#6366f1', fontWeight: 500, marginTop: 2 }}>Você</div>
+            <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 500, marginTop: 2 }}>Você</div>
           ) : d.kinshipDegree ? (
-            <div style={{ fontSize: 11, color: '#6366f1', fontWeight: 500, marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 500, marginTop: 2 }}>
               {d.kinshipDegree}
             </div>
           ) : null}
           {lifespan && (
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 2 }}>
               {lifespan}
             </div>
           )}
@@ -367,8 +367,8 @@ function TreeContent() {
 
   if (empty) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af', gap: 8 }}>
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <div className="tree-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="8" y="2" width="8" height="5" rx="1"/>
           <rect x="1" y="15" width="8" height="5" rx="1"/>
           <rect x="15" y="15" width="8" height="5" rx="1"/>
@@ -403,49 +403,18 @@ function TreeContent() {
         onNodeMouseEnter={(_, node) => setHoveredPersonId(node.id)}
         onNodeMouseLeave={() => setHoveredPersonId(null)}
       >
-        <Controls showInteractive={false} style={{ boxShadow: '0 1px 4px rgba(0,0,0,.1)', borderRadius: 8 }} />
+        <Controls showInteractive={false} style={{ boxShadow: 'var(--shadow-panel)', borderRadius: 8 }} />
 
         <Panel position="top-right">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <button
+              className="tree-panel-button"
               onClick={handleExpandAllRelationships}
               title="Abrir todos os relacionamentos"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 500,
-                color: '#374151',
-                cursor: 'pointer',
-                boxShadow: '0 1px 4px rgba(0,0,0,.08)',
-                transition: 'background .15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#f9fafb')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
             >
               Abrir todos relacionamentos
             </button>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: '6px 10px',
-                fontSize: 12,
-                color: '#4b5563',
-                boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-                userSelect: 'none',
-              }}
-            >
+            <label className="tree-panel-label">
               <input
                 type="checkbox"
                 checked={includeSiblings}
@@ -457,21 +426,7 @@ function TreeContent() {
               />
               Com irmãos
             </label>
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 8,
-                padding: '6px 10px',
-                fontSize: 12,
-                color: '#4b5563',
-                boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-                userSelect: 'none',
-              }}
-            >
+            <label className="tree-panel-label">
               <input
                 type="checkbox"
                 checked={includeSpouses}
@@ -482,37 +437,28 @@ function TreeContent() {
           </div>
         </Panel>
 
-        <Background variant={BackgroundVariant.Dots} color="#e5e7eb" gap={28} size={1} />
+        {/* A cor do pontilhado vem do CSS (`.react-flow__background-pattern`): o `color` daqui viraria
+            atributo de apresentação no SVG, e atributo não entende `var(...)`. */}
+        <Background variant={BackgroundVariant.Dots} gap={28} size={1} />
 
         {/* Legend */}
         <Panel position="bottom-right">
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            padding: '8px 12px',
-            fontSize: 11,
-            color: '#6b7280',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 5,
-            boxShadow: '0 1px 4px rgba(0,0,0,.07)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div className="tree-legend">
+            <div className="tree-legend-row">
               <div style={{ width: 22, height: 2, background: EDGE_COLORS.father.normal, borderRadius: 1 }} />
               <span>Linha paterna (direita)</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div className="tree-legend-row">
               <div style={{ width: 22, height: 2, background: EDGE_COLORS.mother.normal, borderRadius: 1 }} />
               <span>Linha materna (esquerda)</span>
             </div>
             {includeSpouses && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <div className="tree-legend-row">
                   <div style={{ width: 22, height: 2, background: EDGE_COLORS.union.normal, borderRadius: 1 }} />
                   <span>União vigente</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <div className="tree-legend-row">
                   <div style={{
                     width: 22,
                     height: 0,

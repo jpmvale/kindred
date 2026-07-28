@@ -5,6 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kindred</title>
+    <!--
+      O tema tem de estar no <html> antes da primeira pintura, senão a tela pisca clara até o bundle
+      carregar. É a única cópia da chave e da regra que existe fora do `src/theme.ts` — mexeu lá,
+      mexa aqui.
+    -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('kindred-theme') || 'system';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -61,7 +61,7 @@ export default function SetupPage() {
       <div className="page-header">
         <h1>Bem-vindo ao Kindred</h1>
       </div>
-      <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+      <p className="text-muted" style={{ marginBottom: '1.5rem' }}>
         Para começar, cadastre a <strong>pessoa central</strong> — geralmente você mesmo.
         O grau de parentesco de todos os outros será calculado em relação a ela.
       </p>
@@ -114,7 +114,7 @@ export default function SetupPage() {
               />
             </div>
             {photoError && (
-              <p style={{ fontSize: '0.85rem', color: '#dc2626', marginBottom: 0 }}>
+              <p className="field-error" style={{ marginBottom: 0 }}>
                 {photoError}
               </p>
             )}

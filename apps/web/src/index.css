@@ -1,3 +1,209 @@
+/*
+ * Tokens de cor. Toda cor do app sai daqui — nenhum arquivo `.tsx` carrega hex, e é isso que faz o
+ * tema escuro existir sem duplicar componente (ADR-015).
+ *
+ * O tema aplicado é sempre `light` ou `dark`, escrito em `data-theme` no <html>: "sistema" é
+ * resolvido em JS (`theme.ts`), então não há media query de paleta aqui. A primeira aplicação vem do
+ * script inline do `index.html`, antes da pintura.
+ *
+ * O bloco `:root` é a paleta que o kindred sempre teve — cinza claro com sotaque índigo. O bloco
+ * escuro é a mesma família de cores à noite: cinza-azulado no lugar do branco, e o índigo um tom
+ * mais claro para continuar legível sobre fundo escuro.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Superfícies e tinta */
+  --page: #f9fafb;
+  --surface: #ffffff;
+  --surface-hover: #f9fafb;
+  --accent: #f3f4f6;
+  --foreground: #1f2937;
+  --heading: #111827;
+  --strong: #374151;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --border: #e5e7eb;
+  --divider: #f3f4f6;
+
+  /* Campos */
+  --input-border: #d1d5db;
+  --placeholder: #9ca3af;
+  --select-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+
+  /* Sotaque */
+  --primary: #6366f1;
+  --primary-hover: #4f46e5;
+  --primary-foreground: #ffffff;
+  --primary-soft: #eef2ff;
+  --primary-soft-foreground: #4338ca;
+  --ring: #6366f1;
+  --ring-soft: rgba(99, 102, 241, 0.18);
+
+  /* Perigo */
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-soft: #fee2e2;
+  --danger-text: #dc2626;
+
+  --avatar: #e0e7ff;
+  --avatar-foreground: #6366f1;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-panel: 0 1px 4px rgba(0, 0, 0, 0.08);
+
+  /* Rótulos sociais */
+  --badge-family-bg: #fef9c3;
+  --badge-family-fg: #854d0e;
+  --badge-friend-bg: #dbeafe;
+  --badge-friend-fg: #1e40af;
+  --badge-acquaintance-bg: #dcfce7;
+  --badge-acquaintance-fg: #166534;
+  --badge-other-bg: #f3f4f6;
+  --badge-other-fg: #4b5563;
+
+  /*
+   * As três datas do calendário (RN-020). A cor separa o que é comemoração do que é lembrança: o
+   * aniversário de quem está vivo fica no índigo de sempre, o de quem já se foi perde a saturação, e
+   * o falecimento vai para um cinza quente.
+   */
+  --cal-birthday-bg: #eef2ff;
+  --cal-birthday-fg: #4338ca;
+  --cal-memorial-bg: #f5f3ff;
+  --cal-memorial-fg: #7c74a8;
+  --cal-death-bg: #f4f2f0;
+  --cal-death-fg: #6b6560;
+  --cal-today-border: #818cf8;
+
+  /* Árvore */
+  --tree-node-bg: #ffffff;
+  --tree-node-bg-hover: #f8fafc;
+  --tree-node-border: #e5e7eb;
+  --tree-dots: #e5e7eb;
+  --tree-handle-border: #d1d5db;
+  --tree-hover: #0f172a;
+  --tree-parent: #2563eb;
+  --tree-child: #db2777;
+  --tree-partner: #7c3aed;
+  --tree-shadow-node: 0 1px 6px rgba(0, 0, 0, 0.07);
+  --tree-shadow-hover: 0 0 0 4px rgba(15, 23, 42, 0.1), 0 2px 12px rgba(15, 23, 42, 0.16);
+  --tree-shadow-parent: 0 0 0 4px rgba(37, 99, 235, 0.12), 0 2px 10px rgba(37, 99, 235, 0.16);
+  --tree-shadow-child: 0 0 0 4px rgba(219, 39, 119, 0.12), 0 2px 10px rgba(219, 39, 119, 0.16);
+  --tree-shadow-partner: 0 0 0 4px rgba(124, 58, 237, 0.12), 0 2px 10px rgba(124, 58, 237, 0.16);
+  --tree-shadow-central: 0 0 0 4px #e0e7ff, 0 2px 10px rgba(99, 102, 241, 0.15);
+  --tree-avatar-male: #3b82f6;
+  --tree-avatar-female: #ec4899;
+  --tree-avatar-unknown: #9ca3af;
+  /* A inicial fica sobre um círculo saturado nos dois temas — é o único branco que não vira token. */
+  --tree-avatar-foreground: #ffffff;
+  --tree-btn-parents-bg: #eff6ff;
+  --tree-btn-parents-fg: #2563eb;
+  --tree-btn-parents-border: #bfdbfe;
+  --tree-btn-side-bg: #eef2ff;
+  --tree-btn-side-fg: #4f46e5;
+  --tree-btn-side-border: #c7d2fe;
+  --tree-edge-father: #93c5fd;
+  --tree-edge-father-on: #2563eb;
+  --tree-edge-mother: #f9a8d4;
+  --tree-edge-mother-on: #db2777;
+  --tree-edge-union: #c4b5fd;
+  --tree-edge-union-on: #7c3aed;
+  --tree-edge-ended: #d1d5db;
+  --tree-edge-ended-on: #9ca3af;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --page: #111318;
+  --surface: #181b21;
+  --surface-hover: #1f232b;
+  --accent: #23272f;
+  --foreground: #d8dce3;
+  --heading: #f2f4f7;
+  --strong: #c2c8d2;
+  --muted: #98a0ad;
+  --faint: #6f7784;
+  --border: #2a2f39;
+  --divider: #23272f;
+
+  --input-border: #3a4150;
+  --placeholder: #6f7784;
+  --select-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236f7784' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+
+  --primary: #818cf8;
+  --primary-hover: #a5b4fc;
+  --primary-foreground: #14161b;
+  --primary-soft: #262c42;
+  --primary-soft-foreground: #c7d2fe;
+  --ring: #818cf8;
+  --ring-soft: rgba(129, 140, 248, 0.22);
+
+  --danger: #e04b4b;
+  --danger-hover: #c93a3a;
+  --danger-foreground: #ffffff;
+  --danger-soft: #3a1d1f;
+  --danger-text: #f87171;
+
+  --avatar: #2c3150;
+  --avatar-foreground: #a5b4fc;
+
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-panel: 0 1px 4px rgba(0, 0, 0, 0.45);
+
+  --badge-family-bg: #3a3316;
+  --badge-family-fg: #fcd34d;
+  --badge-friend-bg: #1c2b4a;
+  --badge-friend-fg: #93c5fd;
+  --badge-acquaintance-bg: #16321f;
+  --badge-acquaintance-fg: #86efac;
+  --badge-other-bg: #262a32;
+  --badge-other-fg: #c2c8d2;
+
+  --cal-birthday-bg: #262c42;
+  --cal-birthday-fg: #c7d2fe;
+  --cal-memorial-bg: #2c2740;
+  --cal-memorial-fg: #b3a9cf;
+  --cal-death-bg: #2b2825;
+  --cal-death-fg: #bdb5aa;
+  --cal-today-border: #818cf8;
+
+  --tree-node-bg: #1e222a;
+  --tree-node-bg-hover: #262b34;
+  --tree-node-border: #2f3540;
+  --tree-dots: #2a2f39;
+  --tree-handle-border: #3a4150;
+  --tree-hover: #e2e8f0;
+  --tree-parent: #60a5fa;
+  --tree-child: #f472b6;
+  --tree-partner: #a78bfa;
+  --tree-shadow-node: 0 1px 6px rgba(0, 0, 0, 0.45);
+  --tree-shadow-hover: 0 0 0 4px rgba(226, 232, 240, 0.14), 0 2px 12px rgba(0, 0, 0, 0.5);
+  --tree-shadow-parent: 0 0 0 4px rgba(96, 165, 250, 0.18), 0 2px 10px rgba(0, 0, 0, 0.45);
+  --tree-shadow-child: 0 0 0 4px rgba(244, 114, 182, 0.18), 0 2px 10px rgba(0, 0, 0, 0.45);
+  --tree-shadow-partner: 0 0 0 4px rgba(167, 139, 250, 0.18), 0 2px 10px rgba(0, 0, 0, 0.45);
+  --tree-shadow-central: 0 0 0 4px #2c3150, 0 2px 10px rgba(0, 0, 0, 0.45);
+  --tree-avatar-male: #3b6fd4;
+  --tree-avatar-female: #d1467f;
+  --tree-avatar-unknown: #5b6472;
+  --tree-btn-parents-bg: #1e2a3f;
+  --tree-btn-parents-fg: #93c5fd;
+  --tree-btn-parents-border: #2e4059;
+  --tree-btn-side-bg: #262c42;
+  --tree-btn-side-fg: #c7d2fe;
+  --tree-btn-side-border: #3a4160;
+  --tree-edge-father: #3f6ea8;
+  --tree-edge-father-on: #93c5fd;
+  --tree-edge-mother: #a4577f;
+  --tree-edge-mother-on: #f9a8d4;
+  --tree-edge-union: #6f63a8;
+  --tree-edge-union-on: #c4b5fd;
+  --tree-edge-ended: #454b57;
+  --tree-edge-ended-on: #98a0ad;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -6,8 +212,9 @@
 
 body {
   font-family: system-ui, -apple-system, sans-serif;
-  background: #f9fafb;
-  color: #1f2937;
+  background: var(--page);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
 }
 
 .app-layout {
@@ -39,40 +246,48 @@ body {
 .page-header h1 {
   font-size: 1.75rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--heading);
 }
 
 .card {
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
   padding: 1rem 1.25rem;
   margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  box-shadow: var(--shadow-card);
 }
 
 .card-body {
   flex: 1;
+  min-width: 0;
 }
 
 .card-body h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--heading);
   margin-bottom: 0.25rem;
 }
 
 .card-body p {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .card-actions {
   display: flex;
   gap: 0.5rem;
 }
+
+/* ─── Campos ─────────────────────────────────────────────────────────────────
+ *
+ * A regra vale para o app inteiro, não só dentro de `.form-group`: os campos das uniões vivem soltos
+ * num `fieldset`, e antes disto ficavam com a aparência crua do navegador ao lado dos outros.
+ */
 
 .form-group {
   display: flex;
@@ -84,24 +299,108 @@ body {
 .form-group label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--strong);
 }
 
-.form-group input,
-.form-group select {
+input:not([type='checkbox']):not([type='radio']):not([type='file']),
+select,
+textarea {
+  width: 100%;
   padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--input-border);
   border-radius: 0.5rem;
+  font-family: inherit;
   font-size: 0.9375rem;
-  background: #fff;
-  color: #111827;
+  line-height: 1.5;
+  background: var(--surface);
+  color: var(--foreground);
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.form-group input:focus,
-.form-group select:focus {
-  border-color: #6366f1;
+textarea {
+  resize: vertical;
+}
+
+/* A seta é nossa para poder mudar de cor com o tema — a nativa não muda. */
+select {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: var(--select-arrow);
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  cursor: pointer;
+}
+
+input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px var(--ring-soft);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--placeholder);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+input[type='file'] {
+  font-size: 0.85rem;
+  color: var(--muted);
+  max-width: 100%;
+}
+
+input[type='file']::file-selector-button {
+  margin-right: 0.6rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: 0.375rem;
+  background: var(--surface);
+  color: var(--strong);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+input[type='file']::file-selector-button:hover {
+  background: var(--accent);
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+fieldset legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--strong);
+  padding: 0 0.5rem;
+}
+
+.field-hint {
+  font-size: 0.8rem;
+  color: var(--faint);
+}
+
+.field-error {
+  font-size: 0.85rem;
+  color: var(--danger-text);
 }
 
 .form-actions {
@@ -110,43 +409,234 @@ body {
   margin-top: 1.5rem;
 }
 
+/* ─── Botões ─────────────────────────────────────────────────────────────── */
+
 button {
   cursor: pointer;
   border: none;
   border-radius: 0.5rem;
   padding: 0.5rem 1rem;
+  font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
-  transition: background 0.15s, opacity 0.15s;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-primary {
-  background: #6366f1;
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
-.btn-primary:hover {
-  background: #4f46e5;
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
 }
 
 .btn-danger {
-  background: #ef4444;
-  color: #fff;
+  background: var(--danger);
+  color: var(--danger-foreground);
 }
 
-.btn-danger:hover {
-  background: #dc2626;
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-hover);
 }
 
 .btn-ghost {
   background: transparent;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: var(--strong);
+  border: 1px solid var(--input-border);
 }
 
-.btn-ghost:hover {
-  background: #f3f4f6;
+.btn-ghost:hover:not(:disabled) {
+  background: var(--accent);
 }
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  border-radius: 0.375rem;
+  padding: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-icon:hover {
+  background: var(--accent);
+  color: var(--heading);
+}
+
+.btn-icon.danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+/* ─── Barra lateral ──────────────────────────────────────────────────────── */
+
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.22s ease, min-width 0.22s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+}
+
+.sidebar.is-collapsed {
+  width: 64px;
+  min-width: 64px;
+}
+
+.sidebar-header {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.875rem;
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+
+.sidebar.is-collapsed .sidebar-header {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar-brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--heading);
+  letter-spacing: -0.02em;
+}
+
+.sidebar-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.375rem;
+  border-radius: 0.375rem;
+  color: var(--faint);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.sidebar-toggle:hover {
+  color: var(--strong);
+}
+
+.sidebar-nav {
+  padding: 0.5rem;
+  flex: 1;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  margin-bottom: 0.2rem;
+  text-decoration: none;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.875rem;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar.is-collapsed .sidebar-link {
+  justify-content: center;
+  padding: 0.625rem;
+}
+
+.sidebar-link:hover {
+  background: var(--surface-hover);
+}
+
+.sidebar-link.is-active {
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-weight: 600;
+}
+
+.sidebar-link.is-active:hover {
+  background: var(--primary-soft);
+}
+
+.sidebar-footer {
+  padding: 0.5rem;
+  border-top: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+
+/* ─── Seletor de tema ────────────────────────────────────────────────────── */
+
+.theme-toggle {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 0.2rem;
+}
+
+.theme-option {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 0.35rem 0.25rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.theme-option:hover:not(.is-active) {
+  color: var(--strong);
+}
+
+.theme-option.is-active {
+  background: var(--surface);
+  color: var(--heading);
+  box-shadow: var(--shadow-card);
+}
+
+/* Recolhida, o segmentado não cabe: vira um botão só, que alterna. */
+.theme-toggle-collapsed {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 0.5rem;
+}
+
+.theme-toggle-collapsed:hover {
+  background: var(--surface-hover);
+  color: var(--strong);
+}
+
+/* ─── Rótulos sociais ────────────────────────────────────────────────────── */
 
 .badge {
   display: inline-block;
@@ -158,23 +648,23 @@ button {
 }
 
 .badge-FAMILY {
-  background: #fef9c3;
-  color: #854d0e;
+  background: var(--badge-family-bg);
+  color: var(--badge-family-fg);
 }
 
 .badge-FRIEND {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--badge-friend-bg);
+  color: var(--badge-friend-fg);
 }
 
 .badge-ACQUAINTANCE {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--badge-acquaintance-bg);
+  color: var(--badge-acquaintance-fg);
 }
 
 .badge-OTHER {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--badge-other-bg);
+  color: var(--badge-other-fg);
 }
 
 .avatar {
@@ -183,8 +673,8 @@ button {
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  background: #e0e7ff;
-  color: #6366f1;
+  background: var(--avatar);
+  color: var(--avatar-foreground);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -202,50 +692,105 @@ button {
 .empty-state {
   text-align: center;
   padding: 3rem 1rem;
-  color: #9ca3af;
+  color: var(--faint);
 }
 
 .loading {
   text-align: center;
   padding: 2rem;
-  color: #9ca3af;
+  color: var(--faint);
 }
 
-.btn-icon {
-  background: transparent;
-  border: none;
-  border-radius: 0.375rem;
-  padding: 0.375rem;
+/* ─── Texto auxiliar ─────────────────────────────────────────────────────── */
+
+.text-muted {
+  color: var(--muted);
+}
+
+.text-faint {
+  color: var(--faint);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+/* ─── Lista de pessoas ───────────────────────────────────────────────────── */
+
+.person-meta {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.person-meta.is-faint {
+  color: var(--faint);
+}
+
+.person-sub {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--faint);
+}
+
+.person-dagger {
+  margin-left: 0.35rem;
+  color: var(--faint);
+  font-weight: 700;
+}
+
+.person-age {
+  margin-left: 0.35rem;
+  font-weight: 500;
+  color: var(--strong);
+}
+
+.person-you {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #6b7280;
-  transition: background 0.15s, color 0.15s;
+  justify-content: space-between;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
-.btn-icon:hover {
-  background: #f3f4f6;
-  color: #111827;
-}
-
-.btn-icon.danger:hover {
-  background: #fee2e2;
-  color: #dc2626;
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .form-card {
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  box-shadow: var(--shadow-card);
 }
+
+/* ─── Calendário ─────────────────────────────────────────────────────────── */
 
 .calendar-card,
 .calendar-upcoming-card {
-  background: #fff;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  box-shadow: var(--shadow-card);
 }
 
 .calendar-card {
@@ -263,7 +808,7 @@ button {
 .calendar-month-nav h2 {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--heading);
 }
 
 .calendar-grid {
@@ -275,20 +820,20 @@ button {
 .calendar-weekday {
   text-align: center;
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--muted);
   font-weight: 600;
   padding-bottom: 0.25rem;
 }
 
 .calendar-day {
   min-height: 86px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 0.35rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .calendar-day-empty {
@@ -297,40 +842,35 @@ button {
 }
 
 .calendar-day-today {
-  border-color: #818cf8;
-  box-shadow: inset 0 0 0 1px #818cf8;
+  border-color: var(--cal-today-border);
+  box-shadow: inset 0 0 0 1px var(--cal-today-border);
 }
 
 .calendar-day-number {
   font-size: 0.78rem;
   font-weight: 700;
-  color: #374151;
+  color: var(--strong);
 }
 
 .calendar-birthday-chip {
   font-size: 0.72rem;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #4338ca;
+  background: var(--cal-birthday-bg);
+  color: var(--cal-birthday-fg);
   padding: 0.15rem 0.4rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/*
- * As três datas do calendário (RN-020). A cor separa o que é comemoração do que
- * é lembrança: o aniversário de quem está vivo fica no índigo de sempre, o de
- * quem já se foi perde a saturação, e o falecimento vai para um cinza quente.
- */
 .calendar-birthday-chip.is-memorial {
-  background: #f5f3ff;
-  color: #7c74a8;
+  background: var(--cal-memorial-bg);
+  color: var(--cal-memorial-fg);
 }
 
 .calendar-birthday-chip.is-death {
-  background: #f4f2f0;
-  color: #6b6560;
+  background: var(--cal-death-bg);
+  color: var(--cal-death-fg);
 }
 
 .calendar-legend {
@@ -338,7 +878,7 @@ button {
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.75rem 0.25rem 0;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--divider);
   margin-top: 0.75rem;
 }
 
@@ -349,18 +889,18 @@ button {
   font-size: 0.75rem;
   border-radius: 999px;
   padding: 0.15rem 0.5rem;
-  background: #eef2ff;
-  color: #4338ca;
+  background: var(--cal-birthday-bg);
+  color: var(--cal-birthday-fg);
 }
 
 .calendar-legend-item.is-memorial {
-  background: #f5f3ff;
-  color: #7c74a8;
+  background: var(--cal-memorial-bg);
+  color: var(--cal-memorial-fg);
 }
 
 .calendar-legend-item.is-death {
-  background: #f4f2f0;
-  color: #6b6560;
+  background: var(--cal-death-bg);
+  color: var(--cal-death-fg);
 }
 
 .calendar-toggle {
@@ -368,7 +908,7 @@ button {
   align-items: center;
   gap: 0.4rem;
   font-size: 0.85rem;
-  color: #4b5563;
+  color: var(--muted);
   cursor: pointer;
 }
 
@@ -378,12 +918,13 @@ button {
 
 .calendar-upcoming-card {
   padding: 1rem 1rem 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .calendar-upcoming-card h3 {
   font-size: 1rem;
   margin-bottom: 0.6rem;
-  color: #111827;
+  color: var(--heading);
 }
 
 .calendar-upcoming-table {
@@ -396,16 +937,96 @@ button {
 .calendar-upcoming-table td {
   text-align: left;
   padding: 0.55rem 0.35rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--divider);
 }
 
 .calendar-upcoming-table th {
-  color: #6b7280;
+  color: var(--muted);
   font-weight: 600;
 }
 
 .calendar-empty-text {
   font-size: 0.9rem;
-  color: #9ca3af;
+  color: var(--faint);
   padding-bottom: 0.5rem;
+}
+
+/* ─── Árvore ─────────────────────────────────────────────────────────────────
+ *
+ * O reactflow traz o próprio CSS com cores fixas claras. Estas regras existem só para levar o que
+ * é dele — pontilhado do fundo e os controles — para os tokens; o resto do desenho é inline no
+ * `TreePage`, que também usa `var(...)`.
+ */
+
+.react-flow__background-pattern {
+  fill: var(--tree-dots);
+}
+
+.react-flow__controls-button {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  fill: var(--strong);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--accent);
+}
+
+.tree-panel-button,
+.tree-panel-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: var(--shadow-panel);
+}
+
+.tree-panel-button {
+  justify-content: center;
+  padding: 6px 12px;
+  font-weight: 500;
+  color: var(--strong);
+  cursor: pointer;
+}
+
+.tree-panel-button:hover {
+  background: var(--surface-hover);
+}
+
+.tree-panel-label {
+  padding: 6px 10px;
+  color: var(--muted);
+  user-select: none;
+}
+
+.tree-legend {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  box-shadow: var(--shadow-panel);
+}
+
+.tree-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tree-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--faint);
+  gap: 8px;
 }
