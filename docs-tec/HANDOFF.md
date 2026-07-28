@@ -28,10 +28,9 @@ fixture anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendári
 `pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**169 testes**: 46 na API, 118 no web e 5 no
 `@kindred/db`), mais os 6 e2e que rodam à parte, com banco.
 
-**Um defeito antigo apareceu na conferência, e não é do tema:** na base real (143 pessoas), o botão
-**"Abrir todos relacionamentos"** da árvore deixa o canvas vazio — os nós somem e sobram o fundo, os
-painéis e a legenda. Foi reproduzido no commit anterior, sem nenhuma mudança aplicada. Com o seed de
-23 pessoas não acontece. Virou **BL-15**, e é o próximo passo.
+Depois disso entrou o **BL-15**, um defeito antigo que apareceu na conferência do tema: o botão
+"Abrir todos relacionamentos" deixava a árvore vazia na base real. Fechado — a seção abaixo conta o
+que era.
 
 ### Coisas do ambiente que custaram tempo
 
@@ -45,6 +44,37 @@ painéis e a legenda. Foi reproduzido no commit anterior, sem nenhuma mudança a
   `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — a árvore vazia ao abrir tudo (BL-15, fechado)
+
+O botão **"Abrir todos relacionamentos"** deixava a árvore vazia na base real (143 pessoas): fundo,
+painéis e legenda no lugar, e nenhum nó. Com o seed de 23 pessoas nunca aconteceu.
+
+**Medir antes de mexer valeu de novo, e a primeira suspeita estava errada.** O palpite era o `fitView`
+pedindo um zoom abaixo do `minZoom={0.04}`. Rodando o `computeLayout` **fora do navegador** com os
+dados reais: 117 nós, **nenhuma posição não-finita**, caixa de 11551×1408, e o zoom necessário seria
+**0.082** — bem acima do piso. O layout estava são; a culpa era de outro lugar.
+
+No navegador, a resposta em uma linha: os 117 nós **estavam lá**, nas posições certas, e a viewport
+continuava em `matrix(2.5, …, 217.5, 215)` — o zoom e o deslocamento de quando havia **um nó só**. A
+2,5×, um nó em x=4638 cai em x≈11812 na tela. O `fitView` nunca pegou.
+
+**Por quê:** ele era chamado por cronômetro (`setTimeout(…, 20)` no efeito e `(…, 50)` no botão), e o
+reactflow só sabe calcular os limites do desenho **depois de medir** os nós. Sem largura e altura ele
+desiste **em silêncio** e deixa a viewport como estava. Com 23 pessoas o prazo dava; com 143, não —
+era uma aposta no tamanho da base.
+
+A correção troca o palpite pelo sinal: `useNodesInitialized()` do próprio reactflow, que vira `true`
+quando a medição termina. Sem prazo a chutar, e os dois `setTimeout` saíram.
+
+**O que ficou provado rodando**, contra a base real: os 117 nós enquadrados, zoom final **0.0866** (o
+cálculo sem navegador previa 0.082) e **117 de 117 dentro da viewport**.
+
+**Uma armadilha do ambiente, não do código:** no painel de navegador embutido a aba fica
+`visibilityState: "hidden"` entre uma captura e outra, e aí o `requestAnimationFrame` não roda — a
+animação do `fitView` (`duration: 350`) congela no meio e a tela parece vazia mesmo com a correção
+aplicada. Foi o que quase mandou a investigação para o buraco errado. O jeito de ler a medição é
+tirar uma captura **antes** de medir: é ela que traz a aba de volta.
 
 ## Sessão de 28/07 — tema escuro e a reforma dos campos (ADR-015)
 
@@ -557,8 +587,9 @@ Na sessão de 26/07 (monorepo):
 - **A chave do tema está em dois lugares de propósito**: `theme.ts` e o script inline do
   `index.html`. O script existe para aplicar o tema antes da pintura, e por isso não pode importar
   nada. Mexeu num, mexa no outro.
-- **A árvore fica vazia ao abrir todos os relacionamentos** na base real (143 pessoas). É anterior ao
-  tema — reproduzido no commit `2b7f25f` sem nenhuma mudança aplicada (BL-15).
+- **Enquadrar a árvore espera o `useNodesInitialized`, não um cronômetro** (BL-15). Voltar a chamar
+  `fitView` por `setTimeout` refaz o defeito, e ele só aparece em base grande: o reactflow desiste em
+  silêncio enquanto os nós não têm tamanho medido.
 - **Mexeu no schema? O backup também precisa saber.** Um campo escalar novo tem de entrar no
   `backup.ts` **e** no `restore.ts` — o `pnpm db:backup` falha dizendo qual falta, mas quem só roda
   migration e testa a tela não descobre até precisar restaurar (ADR-013).
@@ -567,20 +598,20 @@ Na sessão de 26/07 (monorepo):
 
 ## Próximo passo sugerido
 
-Nada travado e nada pela metade. O primeiro item é **defeito**, e por isso vem antes; os outros são
-**escolha de rumo** — vale decidir com o usuário, não emendar:
+Nada travado, nada pela metade e **nenhum defeito conhecido em aberto**. O backlog só tem itens
+grandes, que são **escolha de rumo** — vale decidir com o usuário, não emendar:
 
-1. **BL-15 — a árvore fica vazia ao abrir todos os relacionamentos** na base real. É o único defeito
-   conhecido em aberto, e apareceu na conferência do tema (não é regressão dele).
-2. **BL-06 — exportar/importar**, e ele ficou **bem mais barato**: o formato JSON e as duas metades
+1. **BL-06 — exportar/importar**, e ele ficou **bem mais barato**: o formato JSON e as duas metades
    (coletar e restaurar) já existem no `@kindred/db` (ADR-013). Falta expor pela aplicação — um botão
    que baixa o arquivo e outro que sobe. GEDCOM continua sendo outra conversa, bem maior.
-3. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
+2. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
    pai, mãe e local aninhados (7,5 MB com 5000 pessoas). Diferente do BL-09, isto **mexe no contrato
    da API**: precisa decidir o que cada tela realmente consome antes de cortar.
-4. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
+3. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
 
-**Uma lição que se repetiu duas vezes:** medir antes de mexer. Na primeira metade do BL-09 o backlog
-culpava a consulta, e o gargalo era o cálculo — 14× maior do que o apontado. Na segunda, o ganho real
-só apareceu porque havia uma base de 5000 pessoas para medir: na base de 143, a diferença entre 202 ms
-e 35 ms não aparece.
+**Uma lição que já se repetiu três vezes:** medir antes de mexer. Na primeira metade do BL-09 o
+backlog culpava a consulta, e o gargalo era o cálculo — 14× maior do que o apontado. Na segunda, o
+ganho real só apareceu porque havia uma base de 5000 pessoas para medir: na base de 143, a diferença
+entre 202 ms e 35 ms não aparece. No BL-15 a suspeita escrita era o `minZoom`, e bastou rodar o
+layout fora do navegador para ver que o zoom pedido estava o dobro acima do piso — o problema era
+outro, e sem medir teria virado uma tarde mexendo no número errado.

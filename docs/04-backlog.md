@@ -4,7 +4,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-15 | **A árvore fica vazia ao abrir todos os relacionamentos** | Na base real (143 pessoas), o botão "Abrir todos relacionamentos" some com os nós: sobram fundo, painéis e legenda. Com o seed de 23 não acontece. É defeito, não ideia — anterior ao ADR-015, reproduzido no commit `2b7f25f`. |
 | BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
 | BL-14 | **Enxugar a resposta da árvore e do calendário** | A chamada sem paginação ainda traz a base inteira com pai, mãe e local aninhados — 7,5 MB com 5000 pessoas. A árvore usa `fatherId`/`motherId`, uniões e foto; o calendário, menos ainda. Mexe no contrato da API, por isso ficou fora do BL-09 (ADR-014). |
 | BL-10 | **Multiusuário com login** | Mudaria o produto de "base pessoal" para serviço; fora do escopo atual. |
@@ -40,3 +39,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   aplicado antes da pintura (ADR-015). De quebra, os campos de formulário ganharam tratamento de
   verdade: o `<textarea>` não tinha estilo nenhum e os controles de união estavam com a aparência
   crua do navegador.
+- **BL-15** — a árvore deixou de ficar vazia ao abrir todos os relacionamentos. O `fitView` era
+  chamado por cronômetro, antes de o reactflow medir os nós, e desistia em silêncio deixando a
+  viewport no zoom anterior; agora espera o `useNodesInitialized`. Só aparecia em base grande.

@@ -9,6 +9,7 @@ import ReactFlow, {
   Panel,
   ReactFlowProvider,
   useReactFlow,
+  useNodesInitialized,
   type NodeProps,
   BackgroundVariant,
 } from 'reactflow';
@@ -252,6 +253,9 @@ const NODE_TYPES = { person: PersonNode };
 function TreeContent() {
   const people = useLoaderData() as Person[];
   const { fitView } = useReactFlow();
+  // Vira `false` quando entram nós que o reactflow ainda não mediu, e `true` quando
+  // todos têm tamanho. É o sinal que o enquadramento espera (ver o efeito abaixo).
+  const nodesInitialized = useNodesInitialized();
   const nodeTypes = useMemo(() => NODE_TYPES, []);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -338,10 +342,21 @@ function TreeContent() {
     if (layout.nodes.length) setTimeout(() => applyHoverStyling(null), 0);
   }, [layout, applyHoverStyling, setEdges, setNodes]);
 
+  /*
+   * Enquadrar depende de o reactflow **já ter medido** os nós: sem largura e altura ele não sabe
+   * calcular os limites do desenho, e o `fitView` desiste em silêncio, deixando a viewport no zoom e
+   * na posição de antes. Era o que acontecia ao abrir todos os relacionamentos na base real (BL-15):
+   * os 117 nós entravam nas posições certas, a viewport continuava no zoom 2,5 de quando havia um nó
+   * só, e tudo caía fora da tela — parecia árvore vazia.
+   *
+   * Esperar por cronômetro (era `setTimeout(..., 20)`) é uma aposta no tamanho da base: dava certo
+   * com as 23 pessoas do seed e não dava com 143. O `useNodesInitialized` é o próprio sinal de que a
+   * medição terminou, então não há prazo a chutar.
+   */
   useEffect(() => {
-    if (empty) return;
-    setTimeout(() => fitView({ padding: 0.06, duration: 350 }), 20);
-  }, [empty, expandedParents, expandedSideDown, includeSiblings, includeSpouses, fitView]);
+    if (empty || !nodesInitialized) return;
+    fitView({ padding: 0.06, duration: 350 });
+  }, [empty, nodesInitialized, layout, fitView]);
 
   useEffect(() => {
     if (empty) return;
@@ -362,8 +377,8 @@ function TreeContent() {
 
     setExpandedParents(idsToExpand);
     setExpandedSideDown(includeSiblings ? idsToExpandSideDown : new Set());
-    setTimeout(() => fitView({ padding: 0.06, duration: 600 }), 50);
-  }, [people, fitView, includeSiblings]);
+    // Quem enquadra é o efeito acima, quando os nós novos tiverem sido medidos.
+  }, [people, includeSiblings]);
 
   if (empty) {
     return (
