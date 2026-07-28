@@ -7,7 +7,8 @@ _Atualizado em 28/07/2026._
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários.
 
-**Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
+**Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, `main` **em dia com o
+`origin`** (nada preso local), nada pela metade. Conferido:
 `pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **158 testes**, 46 na API, 107 no
 web e 5 no `@kindred/db`. Os 6 e2e rodam à parte e precisam de banco. Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
