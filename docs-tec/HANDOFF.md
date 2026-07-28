@@ -88,6 +88,29 @@ alcançar, e precisa se realinhar quando a URL muda por fora. Comparar o campo c
 a resposta do próprio debounce conta como mudança e apaga o que foi digitado enquanto a busca ia e
 voltava. A página guarda o último termo **enviado** e só se realinha quando a URL discorda dele.
 
+## Sessão de 27/07 — testes das páginas (BL-08)
+
+O front saiu de 2 arquivos de teste para 9, e de 16 casos para 68. Entraram `jsdom`,
+`@testing-library/react` e `user-event`; o Vitest passou a ter `environment: 'jsdom'` e um
+`test-setup.ts` (limpeza entre testes e um `ResizeObserver` de mentira, que o reactflow pede).
+
+Montar uma página é montar uma **rota**: `createMemoryRouter` com o loader de verdade e o módulo de
+API trocado por `vi.mock`. Isso só é possível porque os dados vêm de loaders (ADR-010) — antes, a
+página buscava sozinha e não havia costura por onde entrar. O detalhe está em
+[`03-testes-e-ci.md`](03-testes-e-ci.md).
+
+**Dois achados, e nenhum deles era sobre teste:**
+
+1. **O defeito do BL-11 não estava corrigido.** A correção da sessão comparava o campo de busca com a
+   URL a cada render; entre mandar a busca e o loader responder, a URL ainda mostra o termo velho, e
+   essa comparação apagava o que tinha sido digitado nesse intervalo. Foi o teste de regressão — que
+   segura a resposta da API no ar de propósito — que mostrou. Agora a página detecta a **mudança** de
+   URL contra o render anterior, e só realinha o campo quando o termo novo não é o que ela mesma
+   pediu.
+2. **Os rótulos não estavam ligados aos campos.** Nenhum `<label>` tinha `htmlFor`, e os selects das
+   uniões não tinham nome nenhum — clicar no rótulo não focava o campo e um leitor de tela não sabia
+   dizer o que era cada um. Procurar elemento pelo rótulo no teste é o que fez isso aparecer.
+
 ## Sessão de 26/07 — monorepo
 
 O que estava em dois diretórios soltos (`kindred-api`, `kindred-web`), com um repositório git de um
@@ -125,6 +148,9 @@ não há resposta.
 
 Na sessão de 27/07:
 
+- Depois do BL-08, com a API no ar de novo: a busca emendada (`mari` → `maria` antes de a primeira
+  voltar) mantém o que foi digitado **e** a URL chega em `?search=maria`; o calendário desenha julho
+  de 2026 com o aniversário do dia 19; o rótulo "Busca" está de fato ligado ao campo.
 - BL-11 na tela, contra o seed: `/people?search=sonia&sortBy=age&sortDirection=desc` reconstrói
   campo, os dois selects e o resultado; `?page=0&sortBy=altura&sortDirection=cima` cai no padrão em
   vez de erro; o voltar do navegador realinha o campo de busca; digitar mais **durante** a ida da
@@ -145,9 +171,9 @@ Na sessão de 27/07:
   19/07/1987" sem parentesco nenhum. A busca continua achando por rótulo social ("amigo" → 2) e por
   grau ("primo" → 1).
 
-- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**54 testes**: 23 de parentesco, 16 do layout da
-  árvore, 8 da URL da lista, 6 da normalização da busca, 1 de health) — verdes. O lint agora passa
-  **sem aviso nenhum**.
+- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**98 testes**: 30 na API — 23 de parentesco, 6 da
+  normalização da busca, 1 de health — e 68 no web, entre módulos puros, loaders e páginas) —
+  verdes. O lint passa **sem aviso nenhum**.
 - Árvore no navegador contra o seed, colapsada e com tudo aberto: **nenhum par mais perto que o
   espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e as
   linhas de união todas no vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as
