@@ -4,7 +4,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-05 | **Notas por pessoa** (origem da amizade, histórias) | A spec original tinha `friendshipOrigin`; virou texto livre que ainda não existe. |
 | BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
 | BL-07 | **Aniversário de falecimento** no calendário | O calendário só olha nascimento. |
 | BL-09 | **Paginação de verdade no banco** | Hoje a API carrega todas as pessoas e filtra em memória — está ótimo para centenas, não para milhares. Levar a busca para o SQL cobra a RN-016 junto: o Postgres precisaria de `unaccent` (ou coluna normalizada), e o grau de parentesco, que é calculado e não existe como coluna, não tem como ser filtrado lá. |
@@ -30,3 +29,5 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   os elementos pelo rótulo. Só a árvore fica na fumaça, porque o reactflow não mede nada no jsdom.
 - **Parentesco só para quem é parente** — amigo e conhecido não aparecem mais como "Parente
   distante" (RN-015).
+- **BL-05** — notas por pessoa: um campo de texto livre de até 2000 caracteres em `people`, fora da
+  busca (RN-019). Cobre o `friendshipOrigin` da spec original sem precisar de entidade nova.

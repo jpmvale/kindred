@@ -10,8 +10,9 @@ Três entidades: **Pessoa**, **União** e **Local**. O schema que as implementa 
 | **Nome** | O único campo obrigatório junto do tipo de relacionamento. |
 | **Sexo** | `MASCULINO` / `FEMININO`, opcional. Serve para flexionar o grau de parentesco ("Tia", "Neto"). |
 | **Nascimento / falecimento** | Datas opcionais. Preencher o falecimento marca a pessoa como falecida (RN-006). |
-| **Foto** | URL de imagem. Sem foto, a interface mostra a inicial do nome (RN-007). |
+| **Foto** | Arquivo de imagem enviado pelo usuário, guardado no próprio banco (RN-017). Sem foto, a interface mostra a inicial do nome (RN-007). |
 | **Tipo de relacionamento** | Como essa pessoa entra na sua vida: `FAMILY`, `FRIEND`, `ACQUAINTANCE`, `OTHER`. É um rótulo social, não um vínculo de sangue. Cônjuge **não** está aqui: é vínculo, ver União. |
+| **Notas** | Texto livre sobre a pessoa — de onde veio a amizade, histórias. Uma nota só, até 2000 caracteres, fora da busca (RN-019). |
 | **Pai / mãe** | Referências a outras pessoas. Junto da União, são os vínculos estruturais do modelo. |
 | **Local** | Referência opcional a um Local. |
 | **Pessoa central** | Marca única: a pessoa a partir de quem o parentesco é calculado (RN-001). |

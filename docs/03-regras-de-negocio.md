@@ -30,6 +30,18 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   texto.
 - **RN-009** — Campos de referência vazios (`""`) chegando do formulário são tratados como ausência
   (`null`), não como erro de validação.
+- **RN-019** — Cada pessoa tem um campo de **notas**: texto livre, opcional, de até **2000
+  caracteres** — de onde veio a amizade, histórias, o que não se quer esquecer. É uma nota só, sem
+  data: salvar substitui o que estava lá. Campo em branco é ausência de nota (`null`), pela mesma
+  lógica da RN-009.
+
+  **A busca não olha as notas** (RN-016 segue casando nome, grau de parentesco e rótulo social). A
+  nota é para ser lida na pessoa, não para trazer resultado que o usuário não entende de onde veio.
+
+  O teto de 2000 caracteres é o que permite a nota **viajar na listagem** junto com o resto da
+  pessoa. Foi o mesmo raciocínio que tirou a foto de lá (ADR-011), com resposta oposta: a lista, a
+  árvore e o calendário carregam todo mundo de uma vez, então o que viaja precisa ter tamanho
+  conhecido. Se um dia a nota crescer sem limite, ela sai do `findMany` como a foto saiu.
 
 ## União conjugal
 

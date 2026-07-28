@@ -106,6 +106,7 @@ export class PeopleService {
         deceased: dto.deathDate ? true : (dto.deceased ?? false),
         relationshipType: dto.relationshipType,
         isCentralUser: dto.isCentralUser ?? false,
+        notes: dto.notes ?? null,
         fatherId: normalizeNullableUuid(dto.fatherId),
         motherId: normalizeNullableUuid(dto.motherId),
         locationId: normalizeNullableUuid(dto.locationId),
@@ -268,6 +269,7 @@ export class PeopleService {
         ...(dto.relationshipType !== undefined && {
           relationshipType: dto.relationshipType,
         }),
+        ...(dto.notes !== undefined && { notes: dto.notes ?? null }),
         ...(dto.fatherId !== undefined && {
           fatherId: normalizeNullableUuid(dto.fatherId),
         }),

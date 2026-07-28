@@ -15,6 +15,7 @@ PostgreSQL 16, Prisma 5. Ids são `uuid` gerados pela aplicação; `createdAt`/`
 | `deceased` | boolean | não | default `false`; derivado de `deathDate` quando ela existe (RN-006) |
 | `relationshipType` | enum `RelationshipType` | não | `FAMILY`, `FRIEND`, `ACQUAINTANCE`, `OTHER` — cônjuge **não** está aqui, virou `unions` (ADR-008) |
 | `isCentralUser` | boolean | não | default `false`; no máximo um `true` (RN-001, garantido na aplicação) |
+| `notes` | text | sim | Texto livre, até 2000 caracteres — o teto é do DTO, não do banco (RN-019) |
 | `fatherId` | uuid | sim | FK → `people.id` |
 | `motherId` | uuid | sim | FK → `people.id` |
 | `locationId` | uuid | sim | FK → `locations.id` |
@@ -94,6 +95,9 @@ A terceira, `20260728001800_foto_de_perfil`, cria `person_photos` e **derruba** 
 Não há backfill: uma URL não vira imagem sem baixá-la, e a coluna estava vazia. A migration traz no
 cabeçalho o `SELECT` para salvar as URLs antes, caso algum banco tenha alguma.
 
+A quarta, `20260728120000_notas_por_pessoa`, só acrescenta `people.notes` — aditiva e anulável, sem
+backfill: quem já estava cadastrado fica sem nota.
+
 ## Seed
 
 [`packages/db/src/seed.ts`](../packages/db/src/seed.ts) cria 4 locais, 23 pessoas fictícias em quatro
@@ -101,7 +105,9 @@ gerações e 7 uniões — avós, pais, um tio, a pessoa central (Miguel Souza),
 sogros, um cunhado de cada lado, filhos, amigos e conhecidos, com dois falecidos e datas de
 nascimento espalhadas pelo ano. Entre as uniões há uma **desfeita** (a ex-esposa da pessoa central),
 para que "Ex-esposa" e o corte da afinidade (RN-013) apareçam sem ninguém precisar montar o caso à
-mão. É o suficiente para árvore, calendário, busca e ordenação mostrarem algo real de primeira.
+mão. Três pessoas vêm com **nota** (RN-019) — um avô, um amigo e um conhecido —, para o campo não
+nascer vazio na tela. É o suficiente para árvore, calendário, busca e ordenação mostrarem algo real
+de primeira.
 
 ```bash
 pnpm db:seed             # exige banco vazio

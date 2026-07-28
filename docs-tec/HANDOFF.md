@@ -1,6 +1,6 @@
 # HANDOFF — estado atual
 
-_Atualizado em 27/07/2026._
+_Atualizado em 28/07/2026._
 
 ## Onde o projeto está
 
@@ -9,34 +9,13 @@ busca/ordenação/paginação, árvore genealógica, calendário de aniversário
 
 ## Onde a última sessão parou
 
-**Tudo o que foi feito está commitado e empurrado, com o CI verde** — o último commit é
-`742ff73 feat: a pessoa central pode passar o posto`. Não há trabalho pela metade nem arquivo solto:
-`git status` limpo, `pnpm typecheck`, `pnpm lint` e `pnpm test` verdes, e os 6 e2e passando contra o
-Postgres de dev.
+**BL-05 (notas por pessoa) foi fechado** — era o único item que a sessão anterior deixou em aberto.
+Com ele, **o backlog não tem mais nenhum item pequeno**: o que resta (BL-06 exportar/importar, BL-07
+aniversário de falecimento, BL-09 paginação no banco, BL-10 multiusuário) é escolha de rumo, não
+dívida.
 
-A sessão fechou, nesta ordem, **BL-03** (busca sem acento), **BL-11** (dados por loader de rota),
-**BL-08** (testes das páginas), **BL-02** (foto de perfil) e **BL-04** (trocar a pessoa central) —
-cada um tem sua seção abaixo.
-
-### O que ficou de fora
-
-**BL-05 — notas por pessoa. Não foi começado.** Era o terceiro item combinado da sessão e não houve
-tempo; nenhuma linha de código foi escrita para ele. O que já se sabe, para não recomeçar do zero:
-
-- A spec original tinha um campo `friendshipOrigin` (texto curto, "de onde veio a amizade") que nunca
-  chegou ao schema — ver [`specs/001-setup-e-crud-de-pessoas.md`](specs/001-setup-e-crud-de-pessoas.md).
-  O backlog pede algo mais amplo: **texto livre** para histórias, não só a origem.
-- A decisão de desenho a tomar primeiro: **um campo `notes` em `people`** ou **uma tabela de notas**
-  (várias por pessoa, com data). Um campo é muito mais barato e provavelmente suficiente para uma
-  base pessoal; várias notas datadas viram um diário e mudam a tela. Vale perguntar antes de escrever.
-- Se for campo único, o caminho é curto e conhecido: coluna `notes String?` no schema + migration,
-  `notes` na `Person` e na `PersonFormData` do `@kindred/types`, `@IsOptional() @IsString()` no
-  `CreatePersonDto`, o mesmo `...(dto.notes !== undefined && …)` no `update` do serviço, um
-  `<textarea>` no `PersonFormPage` e um caso no `PersonFormPage.test.tsx`. Vale decidir também se a
-  busca (RN-016) passa a casar o texto da nota — hoje ela casa nome, grau e rótulo social.
-- Atenção a **um detalhe que morde**: se a nota puder ser longa, ela **não** deve viajar na listagem
-  de pessoas, pelo mesmo motivo da foto (ADR-011) — a lista, a árvore e o calendário carregam todo
-  mundo de uma vez. Ou a nota fica curta, ou sai do `findMany` como a foto saiu.
+`git status` limpo, `pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**124 testes**: 36 na API e
+88 no web), mais os 6 e2e que rodam à parte, com banco.
 
 ### Coisas do ambiente que custaram tempo
 
@@ -46,6 +25,34 @@ tempo; nenhuma linha de código foi escrita para ele. O que já se sabe, para n�
   `docker compose up` reclamar de porta, é isso.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+
+## Sessão de 28/07 — notas por pessoa (BL-05)
+
+Cada pessoa ganhou um campo de **texto livre** — de onde veio a amizade, histórias — cobrindo o
+`friendshipOrigin` que a spec original pedia e nunca chegou ao schema.
+
+Três decisões foram tomadas com o usuário antes de escrever código, e são o que explica a forma:
+
+| Decisão | Escolha | Por quê |
+| --- | --- | --- |
+| campo ou entidade | **campo `notes` em `people`** | uma nota por pessoa basta para uma base pessoal; notas datadas virariam um diário e mudariam a tela |
+| busca casa a nota? | **não** | resultado que casa por um trecho de texto longo não se explica sozinho; a RN-016 segue com nome, grau e rótulo social |
+| viaja na listagem? | **sim, com teto de 2000** | é o teto que torna isso seguro — sem ele, cai no problema que tirou a foto de lá (ADR-011) |
+
+| Camada | O que entrou |
+| --- | --- |
+| `packages/db` | `notes String?` em `Person`; migration `20260728120000_notas_por_pessoa` (aditiva, sem backfill); três notas no seed |
+| `packages/types` | `notes` na `Person` e na `PersonFormData` |
+| `apps/api` | `NOTES_MAX_LENGTH` + `@MaxLength` no `CreatePersonDto`; `notes` no `create` e no `update` |
+| `apps/web` | `<textarea>` com contador de caracteres no `PersonFormPage`, e três casos de teste |
+
+**O teto de 2000 mora em dois lugares de propósito**, e não no `@kindred/types`: aquele pacote é só
+tipos, sem valor em runtime (ADR-005). A API valida; o web tem a própria cópia só para avisar antes.
+Mexeu num, mexa no outro.
+
+**Detalhe que se repete do resto do formulário:** campo em branco vira `null`, não `""` (RN-009) — o
+`Transform` do DTO e o `trim()` do submit fazem isso dos dois lados, então "apagar a nota" e "não
+mandar nota" acabam no mesmo lugar.
 
 ## Sessão de 27/07 — união conjugal (BL-01)
 
@@ -226,6 +233,17 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão de 28/07 (BL-05), com a API em `:3005` contra o seed:
+
+- As três notas do seed chegam na listagem, e o JSON das 23 pessoas ficou em **33,8 KB** — o texto
+  praticamente não pesou, que era a aposta do teto.
+- As cinco bordas do campo respondem certo: 2001 caracteres é recusado com `400`, 2000 salva, `""` e
+  `null` limpam a nota, e um `PATCH` **sem** o campo não apaga a nota de quem tem.
+- A busca **não** casa as notas: "intercambio", "Diamantina", "Coimbra" e "ferroviario" devolvem 0,
+  enquanto "antonio" (1), "familia" (18), "primo" (1) e "amigo" (2) seguem como antes.
+- Na tela (web em `:5174`): o rótulo "Notas" está ligado ao campo, o contador acompanha, o texto do
+  seed aparece ao abrir, e editar e salvar chega no banco.
+
 Na sessão de 27/07:
 
 - BL-04 na tela e pela API: passar o posto para a Fernanda faz o Miguel virar "Marido", o Heitor
@@ -297,15 +315,21 @@ Na sessão de 26/07 (monorepo):
 - **O grupo de afinidade se desloca como bloco, mas o espaçamento é linha a linha.** Num caso
   extremo (muitos cônjuges com família aberta na mesma geração) o grupo pode sair torto — nunca
   sobreposto, mas desalinhado do cônjuge. Não apareceu com o seed.
-- **Duas regras do `react-hooks` estão como aviso** no ESLint do web (BL-11), por causa do fetch em
-  `useEffect` nas páginas. O CI passa, mas a dívida existe.
-- **`isCentralUser` não tem unicidade no banco** — a garantia é só na aplicação (doc 02).
+- **`isCentralUser` não tem unicidade no banco** — a garantia é só na aplicação (doc 02). O mesmo
+  vale para "no máximo uma união vigente por pessoa" (RN-014).
+- **O teto das notas está escrito em dois arquivos** (DTO da API e `PersonFormPage`), por causa do
+  ADR-005. Mudar um sem o outro faz a tela deixar digitar o que o servidor recusa.
 
 ## Próximo passo sugerido
 
-Nada travado, e as três frentes do cônjuge estão fechadas. Em ordem de incômodo:
+Nada travado e nada pela metade. O backlog só tem itens grandes, que são **escolha de rumo** — vale
+decidir com o usuário, não emendar:
 
-1. **BL-03** — busca sem acento ("jose" achar "José"). Pequeno e aparece toda hora.
-2. **BL-11** — tirar o fetch do `useEffect`, que é a dívida que o ESLint ainda aponta.
-3. **BL-08** — os testes que faltam no front (lista, formulário, calendário). A árvore já tem os
-   seus, e o caminho está aberto: `pnpm --filter @kindred/web test` roda no Vitest.
+1. **BL-07** — aniversário de falecimento no calendário. É o menor dos quatro, e o calendário já
+   tem toda a estrutura; falta decidir como distinguir as duas datas na tela.
+2. **BL-06** — exportar/importar. JSON resolve backup; GEDCOM abriria a porta para trocar dados com
+   outros programas de genealogia, e é bem mais trabalho.
+3. **BL-09** — paginação de verdade no banco. Só vale a pena com uma base grande, e cobra caro: a
+   busca sem acento precisa de `unaccent` no Postgres, e o grau de parentesco, que é calculado e não
+   existe como coluna, não tem como ser filtrado em SQL.
+4. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.

@@ -333,6 +333,62 @@ describe('PersonFormPage — edição', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('carrega a nota existente e manda a alterada (RN-019)', async () => {
+    const user = userEvent.setup();
+    vi.mocked(peopleApi.getOne).mockResolvedValue({
+      ...MIGUEL,
+      notes: 'Amizade do intercâmbio em 2009.',
+      unions: [],
+    });
+    vi.mocked(peopleApi.update).mockResolvedValue(MIGUEL);
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    const notas = screen.getByLabelText('Notas');
+    expect(notas).toHaveValue('Amizade do intercâmbio em 2009.');
+
+    await user.clear(notas);
+    await user.type(notas, 'Dividimos apartamento em Coimbra.');
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    expect(peopleApi.update).toHaveBeenCalledWith(
+      MIGUEL.id,
+      expect.objectContaining({ notes: 'Dividimos apartamento em Coimbra.' }),
+    );
+  });
+
+  it('apagar a nota manda nulo, e não texto em branco', async () => {
+    const user = userEvent.setup();
+    vi.mocked(peopleApi.getOne).mockResolvedValue({
+      ...MIGUEL,
+      notes: 'Alguma coisa.',
+      unions: [],
+    });
+    vi.mocked(peopleApi.update).mockResolvedValue(MIGUEL);
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    await user.clear(screen.getByLabelText('Notas'));
+    await user.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    expect(peopleApi.update).toHaveBeenCalledWith(
+      MIGUEL.id,
+      expect.objectContaining({ notes: null }),
+    );
+  });
+
+  it('o campo de notas para no teto de caracteres', async () => {
+    const user = userEvent.setup();
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    const notas = screen.getByLabelText('Notas') as HTMLTextAreaElement;
+    expect(notas.maxLength).toBe(2000);
+
+    await user.type(notas, 'x'.repeat(10));
+    expect(screen.getByText('10 de 2000 caracteres.')).toBeInTheDocument();
+  });
+
   it('remover união pede confirmação', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(false);

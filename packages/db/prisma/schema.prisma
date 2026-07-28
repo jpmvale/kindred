@@ -20,6 +20,11 @@ model Person {
   relationshipType RelationshipType
   isCentralUser    Boolean          @default(false)
 
+  /// Texto livre sobre a pessoa: de onde veio a amizade, histórias, o que for.
+  /// Fica em `people` (e não em tabela à parte, como a foto) porque é limitado a
+  /// 2000 caracteres — cabe na listagem sem pesar (RN-019).
+  notes            String?
+
   fatherId         String?
   father           Person?          @relation("Father", fields: [fatherId], references: [id])
   childrenAsFather Person[]         @relation("Father")

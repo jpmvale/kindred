@@ -31,6 +31,13 @@ const UNION_STATUS_OPTIONS = Object.entries(UNION_STATUS_LABELS) as [
   string,
 ][];
 
+/**
+ * Espelha o teto da API (`NOTES_MAX_LENGTH` no `create-person.dto.ts`). A cópia
+ * existe porque o `@kindred/types` não carrega valor em runtime (ADR-005); serve
+ * para avisar na tela antes de o servidor recusar, não para substituir a validação.
+ */
+const NOTES_MAX_LENGTH = 2000;
+
 /** A API responde com `message` nos erros de regra de negócio (400/404). */
 function errorMessage(error: unknown, fallback: string): string {
   if (axios.isAxiosError(error)) {
@@ -49,6 +56,7 @@ const EMPTY: PersonFormData = {
   deathDate: '',
   deceased: false,
   relationshipType: 'FAMILY',
+  notes: '',
   fatherId: null,
   motherId: null,
   locationId: null,
@@ -64,6 +72,7 @@ function toFormData(person: Person | null): PersonFormData {
     deathDate: person.deathDate ? person.deathDate.slice(0, 10) : '',
     deceased: person.deceased ?? Boolean(person.deathDate),
     relationshipType: person.relationshipType,
+    notes: person.notes ?? '',
     fatherId: person.fatherId ?? null,
     motherId: person.motherId ?? null,
     locationId: person.locationId ?? null,
@@ -231,6 +240,8 @@ export default function PersonFormPage() {
       ...(form.birthDate ? { birthDate: form.birthDate } : {}),
       ...(form.deathDate ? { deathDate: form.deathDate } : {}),
       deceased: form.deathDate ? true : Boolean(form.deceased),
+      // Campo em branco é ausência de nota: vai como null, não como "".
+      notes: form.notes?.trim() ? form.notes.trim() : null,
       fatherId: form.fatherId || null,
       motherId: form.motherId || null,
       locationId: form.locationId || null,
@@ -561,6 +572,22 @@ export default function PersonFormPage() {
                 {photoError}
               </p>
             )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="pessoa-notas">Notas</label>
+            <textarea
+              id="pessoa-notas"
+              rows={5}
+              maxLength={NOTES_MAX_LENGTH}
+              value={form.notes ?? ''}
+              onChange={(e) => set('notes', e.target.value)}
+              placeholder="De onde veio a amizade, histórias, o que você não quer esquecer..."
+              style={{ resize: 'vertical', fontFamily: 'inherit' }}
+            />
+            <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+              {(form.notes?.length ?? 0)} de {NOTES_MAX_LENGTH} caracteres.
+            </span>
           </div>
 
           <div className="form-actions">

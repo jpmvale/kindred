@@ -33,6 +33,7 @@ type PersonSeed = {
   father?: string;
   mother?: string;
   location?: string;
+  notes?: string;
 };
 
 /** Os nomes são resolvidos para ids; a ordem do par é normalizada na gravação (RN-011). */
@@ -62,6 +63,8 @@ const PEOPLE: PersonSeed[] = [
     birthDate: "1932-01-18",
     deathDate: "2010-03-12",
     location: "Belo Horizonte, MG",
+    notes:
+      "Veio de Diamantina para Belo Horizonte aos dezenove anos, sozinho, e foi ferroviário a vida toda. Contava a viagem em detalhes toda ceia de Natal.",
   },
   {
     name: "Maria Souza",
@@ -215,6 +218,8 @@ const PEOPLE: PersonSeed[] = [
     birthDate: "1987-07-19",
     relationshipType: "FRIEND",
     location: "Curitiba, PR",
+    notes:
+      "Amizade do intercâmbio em 2009 — dividimos apartamento em Coimbra por um ano. É quem apresentou a Camila ao grupo.",
   },
   {
     name: "Camila Rocha",
@@ -229,6 +234,7 @@ const PEOPLE: PersonSeed[] = [
     birthDate: "1975-04-05",
     relationshipType: "ACQUAINTANCE",
     location: "Fortaleza, CE",
+    notes: "Contato de trabalho em Fortaleza; nos vemos uma vez por ano na feira.",
   },
   {
     name: "Lúcia Prado",
@@ -293,6 +299,7 @@ async function main() {
         deceased: Boolean(seed.deathDate),
         relationshipType: seed.relationshipType ?? "FAMILY",
         isCentralUser: seed.isCentralUser ?? false,
+        notes: seed.notes ?? null,
         fatherId: seed.father ? personIds.get(seed.father) : null,
         motherId: seed.mother ? personIds.get(seed.mother) : null,
         locationId: seed.location ? locationIds.get(seed.location) : null,

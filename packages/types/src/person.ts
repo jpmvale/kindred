@@ -30,6 +30,11 @@ export interface Person {
   photoUpdatedAt?: string | null;
   relationshipType: RelationshipType;
   isCentralUser: boolean;
+  /**
+   * Texto livre sobre a pessoa (RN-019). Vem junto na listagem, ao contrário da
+   * foto — o teto de 2000 caracteres é o que torna isso seguro (ADR-011).
+   */
+  notes?: string | null;
   fatherId?: string | null;
   motherId?: string | null;
   locationId?: string | null;
@@ -55,6 +60,7 @@ export interface PersonFormData {
   deceased?: boolean;
   relationshipType: RelationshipType;
   isCentralUser?: boolean;
+  notes?: string | null;
   fatherId?: string | null;
   motherId?: string | null;
   locationId?: string | null;
