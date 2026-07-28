@@ -4,6 +4,7 @@ import type {
   PeopleSortField,
   Person,
   PersonFormData,
+  PhotoUploadData,
   SortDirection,
 } from '@kindred/types';
 
@@ -25,4 +26,9 @@ export const peopleApi = {
   update: (id: string, data: Partial<PersonFormData>) =>
     api.patch<Person>(`/people/${id}`, data).then((r) => r.data),
   remove: (id: string) => api.delete(`/people/${id}`),
+  savePhoto: (id: string, data: PhotoUploadData) =>
+    api
+      .put<{ photoUpdatedAt: string }>(`/people/${id}/photo`, data)
+      .then((r) => r.data),
+  removePhoto: (id: string) => api.delete(`/people/${id}/photo`),
 };

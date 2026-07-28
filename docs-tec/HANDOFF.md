@@ -111,6 +111,29 @@ página buscava sozinha e não havia costura por onde entrar. O detalhe está em
    uniões não tinham nome nenhum — clicar no rótulo não focava o campo e um leitor de tela não sabia
    dizer o que era cada um. Procurar elemento pelo rótulo no teste é o que fez isso aparecer.
 
+## Sessão de 27/07 — foto de perfil de verdade (BL-02)
+
+A foto era uma URL para uma imagem hospedada em outro lugar. Agora é arquivo, e o arquivo fica no
+Postgres — o porquê (backup, tabela à parte, base64 no JSON) está no **ADR-011**.
+
+| Camada | O que entrou |
+| --- | --- |
+| `packages/db` | modelo `PersonPhoto` (`bytes`, `mimeType`, PK = `personId`, cascata); migration `20260728001800_foto_de_perfil`, que derruba `people.profilePhoto` |
+| `packages/types` | `photoUpdatedAt` na `Person`; `PhotoUploadData` e `PhotoMimeType` |
+| `apps/api` | `GET/PUT/DELETE /api/people/:id/photo`; `photo.util.ts` confere a assinatura do arquivo contra o tipo declarado; limite do corpo JSON em 3 MB |
+| `apps/web` | `photo.ts` — reduz no `<canvas>` para 512px, achata em JPEG, e monta a URL versionada; seletor de arquivo com prévia no formulário e no `/setup` |
+
+**O número que justifica reduzir no navegador:** um PNG de 1,8 MB e 1600×1200, escolhido na tela,
+chegou ao banco com **5,5 KB**.
+
+Duas coisas para saber ao mexer aqui:
+
+- A **pessoa nunca carrega os bytes**. O `include` do Prisma pega só o `updatedAt` da foto, que vira
+  `photoUpdatedAt`. Se algum dia a foto voltar a ser coluna de `people`, a lista, a árvore e o
+  calendário passam a baixar o álbum inteiro.
+- A URL da foto não muda quando a foto muda, então ela leva o `photoUpdatedAt` na query. Tirar isso
+  faz o navegador mostrar a foto antiga depois de trocar.
+
 ## Sessão de 26/07 — monorepo
 
 O que estava em dois diretórios soltos (`kindred-api`, `kindred-web`), com um repositório git de um
@@ -148,6 +171,13 @@ não há resposta.
 
 Na sessão de 27/07:
 
+- BL-02 ponta a ponta, com a API no ar: um PNG de 111 KB subido pela API volta **byte a byte igual**,
+  com `Content-Type: image/png` e `ETag`; a listagem das 23 pessoas ocupa 35 KB de JSON **sem
+  nenhum byte de imagem**. As recusas respondem certo — arquivo que mente sobre o tipo, tipo fora da
+  lista, pessoa inexistente, pessoa sem foto. Na tela: um PNG de 1,8 MB e 1600×1200 escolhido no
+  formulário virou 512×384 e 5,5 KB no banco, apareceu na lista e no nó da árvore, e o "Remover foto"
+  apagou a linha. Apagar uma pessoa com foto leva a foto junto pela cascata. O seed ficou intacto
+  (23 pessoas, nenhuma foto).
 - Depois do BL-08, com a API no ar de novo: a busca emendada (`mari` → `maria` antes de a primeira
   voltar) mantém o que foi digitado **e** a URL chega em `?search=maria`; o calendário desenha julho
   de 2026 com o aniversário do dia 19; o rótulo "Busca" está de fato ligado ao campo.
@@ -171,9 +201,8 @@ Na sessão de 27/07:
   19/07/1987" sem parentesco nenhum. A busca continua achando por rótulo social ("amigo" → 2) e por
   grau ("primo" → 1).
 
-- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**98 testes**: 30 na API — 23 de parentesco, 6 da
-  normalização da busca, 1 de health — e 68 no web, entre módulos puros, loaders e páginas) —
-  verdes. O lint passa **sem aviso nenhum**.
+- `pnpm typecheck`, `pnpm lint` e `pnpm test` (**117 testes**: 36 na API e 81 no web, entre módulos
+  puros, loaders e páginas) — verdes. O lint passa **sem aviso nenhum**.
 - Árvore no navegador contra o seed, colapsada e com tudo aberto: **nenhum par mais perto que o
   espaçamento mínimo** (era o defeito que apareceu no meio do caminho — dois cards sobrepostos) e as
   linhas de união todas no vão de um casal encostado. Desligar "Com cônjuges" tira os nós e as

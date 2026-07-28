@@ -240,3 +240,55 @@ apaga o que a pessoa digitou enquanto a busca anterior ia e voltava. Por isso a 
 Preço: navegar agora espera o loader terminar antes de trocar de tela — nada pisca vazio, mas um
 clique numa API lenta parece travado até a página virar. Hoje a API é local e responde em
 milissegundos; se um dia não for, o caminho é `useNavigation()` para uma barra de progresso.
+
+---
+
+## ADR-011 — A foto de perfil mora no Postgres, e o navegador é quem reduz
+
+**Contexto.** A foto era uma **URL** para uma imagem hospedada em outro lugar: o kindred não
+guardava imagem nenhuma, só o endereço. Isso empurra o problema para fora — a foto some quando o
+site de origem sai do ar — e não é o que "upload de foto" quer dizer (BL-02).
+
+Guardar arquivo abre duas perguntas, e elas se respondem juntas: **onde** os bytes ficam e **quem**
+reduz a imagem.
+
+**Decisão 1 — os bytes ficam no banco, numa tabela à parte.** O caminho convencional seria uma pasta
+montada como volume. O que decidiu contra foi o backup: hoje o único jeito de tirar os dados do
+kindred é o `pg_dump` (é o que o BL-06 quer resolver). Com as fotos em disco, o dump deixaria de ser
+backup completo **sem ninguém avisar** — e um backup que parece completo e não é vale menos que
+nenhum. No banco, a foto entra no dump, some junto com a pessoa pela cascata (não há arquivo órfão) e
+o `docker-compose` fica como está, sem volume novo.
+
+A tabela é separada (`person_photos`) e não uma coluna em `people` por um motivo prático: o Prisma
+traz todas as colunas escalares em `findMany`, e a lista, a árvore e o calendário carregam **todo
+mundo** de uma vez. Uma coluna `Bytes` em `people` faria cada uma dessas telas arrastar todas as
+fotos do banco. Assim, o `include` pega só o `updatedAt`, e os bytes só saem pela rota da foto.
+
+A pessoa carrega então um `photoUpdatedAt` — não um booleano. Ele responde duas coisas de uma vez:
+se existe foto, e qual versão é. A URL de uma foto não muda quando a foto muda, então esse carimbo
+vai na query (`?v=…`) e é o que faz o navegador buscar a nova em vez de mostrar a antiga.
+
+**Decisão 2 — quem reduz a imagem é o navegador.** A foto que sai de um celular tem alguns megabytes
+e vira um avatar de 40 pixels. Reduzir no servidor exigiria uma dependência nativa de processamento
+de imagem (`sharp` e parentes) para resolver um problema que o `<canvas>` já resolve do outro lado —
+e ainda subiria o arquivo inteiro pela rede. O web encolhe para 512px no maior lado, achata em JPEG
+e manda. Na prática: um PNG de 1,8 MB e 1600×1200 chegou ao banco com **5,5 KB**.
+
+**Decisão 3 — o upload vai em base64 dentro do JSON.** O caminho usual seria `multipart/form-data`.
+Custaria um segundo jeito de ler corpo de requisição na API, com validação fora do `class-validator`
+que todo o resto usa. Como a imagem já chega pequena, ela cabe num campo de JSON como qualquer outro
+DTO — ao preço de um terço a mais de bytes **na subida** (o download é binário puro). O limite do
+corpo JSON subiu para 3 MB no `main.ts` por causa disso.
+
+**Consequências.** O `Content-Type` que a API devolve é o que o cliente declarou no upload, então a
+declaração é conferida contra a assinatura do arquivo (`photo.util.ts`): não se guarda um arquivo
+dizendo ser outra coisa. SVG fica fora da lista de propósito — é documento com script, não imagem.
+
+A foto é recurso próprio, como as uniões (ADR-008): na edição ela sobe na hora, fora do submit. No
+cadastro não existe id para pendurá-la, então ela espera em memória e sobe logo depois do POST — é a
+única costura entre os dois.
+
+Preço assumido: o `pg_dump` engorda junto com o álbum, e os bytes passam pelo Node em vez de por um
+servidor de arquivos. Para uma base pessoal de centenas de pessoas isso é irrelevante; se um dia
+virar milhares, o caminho é mover a tabela para armazenamento de objetos — e aí o backup precisa de
+uma resposta nova, que é a mesma conversa do BL-06.

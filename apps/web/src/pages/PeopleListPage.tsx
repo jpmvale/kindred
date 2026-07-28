@@ -7,6 +7,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { peopleApi } from '../api/people';
+import { photoUrl } from '../photo';
 import type { PeopleSortField, SortDirection } from '@kindred/types';
 import type { PeopleListData } from '../loaders';
 import {
@@ -178,12 +179,13 @@ export default function PeopleListPage() {
           const ageAtDeath = getAgeInYears(person.birthDate, person.deathDate);
           const yearsSinceDeath = getYearsSinceDate(person.deathDate);
           const ageLabel = isDead ? ageAtDeath : ageNow;
+          const foto = photoUrl(person);
 
           return (
         <div className="card" key={person.id}>
           <div className="avatar">
-            {person.profilePhoto
-              ? <img src={person.profilePhoto} alt={person.name} />
+            {foto
+              ? <img src={foto} alt={person.name} />
               : person.name.charAt(0).toUpperCase()}
           </div>
           <div className="card-body">

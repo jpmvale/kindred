@@ -33,10 +33,6 @@ export class CreatePersonDto {
   @IsBoolean()
   deceased?: boolean;
 
-  @IsOptional()
-  @IsString()
-  profilePhoto?: string;
-
   @IsEnum(RelationshipType)
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,

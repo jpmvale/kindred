@@ -125,8 +125,8 @@ function PersonNode({ data }: NodeProps) {
             overflow: 'hidden',
           }}
         >
-          {d.profilePhoto ? (
-            <img src={d.profilePhoto} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+          {d.photoUrl ? (
+            <img src={d.photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
           ) : (
             d.name.charAt(0).toUpperCase()
           )}

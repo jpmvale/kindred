@@ -10,7 +10,15 @@ vi.mock('../api/people', () => ({
     getOne: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    savePhoto: vi.fn(),
+    removePhoto: vi.fn(),
   },
+}));
+// O redimensionamento usa canvas e `createImageBitmap`, que o jsdom não tem; o
+// que ele faz é testado à parte, na conta pura (`photo.test.ts`).
+vi.mock('../photo', async (original) => ({
+  ...(await original<typeof import('../photo')>()),
+  fileToPhotoUpload: vi.fn(),
 }));
 vi.mock('../api/locations', () => ({ locationsApi: { getAll: vi.fn() } }));
 vi.mock('../api/unions', () => ({
@@ -20,6 +28,7 @@ vi.mock('../api/unions', () => ({
 const { peopleApi } = await import('../api/people');
 const { locationsApi } = await import('../api/locations');
 const { unionsApi } = await import('../api/unions');
+const { fileToPhotoUpload } = await import('../photo');
 const { personFormLoader } = await import('../loaders');
 const { default: PersonFormPage } = await import('./PersonFormPage');
 const { renderRota } = await import('../test-utils');
@@ -106,6 +115,30 @@ describe('PersonFormPage — cadastro', () => {
     );
     await waitFor(() => expect(router.state.location.pathname).toBe('/people'));
   });
+
+  it('a foto escolhida antes de salvar espera a pessoa existir', async () => {
+    // No cadastro não há id para pendurar a imagem: ela sobe logo depois do POST.
+    const user = userEvent.setup();
+    const upload = { data: 'QUJD', mimeType: 'image/jpeg' as const };
+    vi.mocked(fileToPhotoUpload).mockResolvedValue(upload);
+    vi.mocked(peopleApi.create).mockResolvedValue(pessoa('Novo Alguém'));
+    vi.mocked(peopleApi.savePhoto).mockResolvedValue({
+      photoUpdatedAt: '2026-07-28T00:00:00.000Z',
+    });
+    montar('/people/new');
+    await screen.findByLabelText('Nome *');
+
+    await user.upload(
+      screen.getByLabelText('Foto de perfil'),
+      new File(['x'], 'eu.jpg', { type: 'image/jpeg' }),
+    );
+    expect(peopleApi.savePhoto).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText('Nome *'), 'Novo Alguém');
+    await user.click(screen.getByRole('button', { name: 'Criar' }));
+
+    expect(peopleApi.savePhoto).toHaveBeenCalledWith('novoalgum', upload);
+  });
 });
 
 describe('PersonFormPage — edição', () => {
@@ -187,6 +220,65 @@ describe('PersonFormPage — edição', () => {
 
     expect(await screen.findByText(/já tem uma união vigente/)).toBeInTheDocument();
     expect(situacao).toHaveValue('ENDED');
+  });
+
+  it('escolher a foto sobe na hora e recarrega a rota', async () => {
+    const user = userEvent.setup();
+    const upload = { data: 'QUJD', mimeType: 'image/jpeg' as const };
+    vi.mocked(fileToPhotoUpload).mockResolvedValue(upload);
+    vi.mocked(peopleApi.savePhoto).mockResolvedValue({
+      photoUpdatedAt: '2026-07-28T00:00:00.000Z',
+    });
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    await user.upload(
+      screen.getByLabelText('Foto de perfil'),
+      new File(['x'], 'eu.jpg', { type: 'image/jpeg' }),
+    );
+
+    expect(peopleApi.savePhoto).toHaveBeenCalledWith(MIGUEL.id, upload);
+    await waitFor(() => expect(peopleApi.getOne).toHaveBeenCalledTimes(2));
+  });
+
+  it('imagem recusada vira mensagem, sem chamar a API', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fileToPhotoUpload).mockRejectedValue(
+      new Error('A imagem passa de 2 MB.'),
+    );
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    await user.upload(
+      screen.getByLabelText('Foto de perfil'),
+      new File(['x'], 'enorme.jpg', { type: 'image/jpeg' }),
+    );
+
+    expect(await screen.findByText('A imagem passa de 2 MB.')).toBeInTheDocument();
+    expect(peopleApi.savePhoto).not.toHaveBeenCalled();
+  });
+
+  it('quem tem foto pode removê-la; quem não tem não vê o botão', async () => {
+    const user = userEvent.setup();
+    vi.mocked(peopleApi.removePhoto).mockResolvedValue(undefined as never);
+    vi.mocked(peopleApi.getOne).mockResolvedValue({
+      ...MIGUEL,
+      photoUpdatedAt: '2026-07-28T00:00:00.000Z',
+      unions: [],
+    });
+    const { unmount } = editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    await user.click(screen.getByRole('button', { name: 'Remover foto' }));
+    expect(peopleApi.removePhoto).toHaveBeenCalledWith(MIGUEL.id);
+    unmount();
+
+    vi.mocked(peopleApi.getOne).mockResolvedValue({ ...MIGUEL, unions: [] });
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+    expect(
+      screen.queryByRole('button', { name: 'Remover foto' }),
+    ).not.toBeInTheDocument();
   });
 
   it('remover união pede confirmação', async () => {

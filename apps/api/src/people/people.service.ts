@@ -9,6 +9,8 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { computeKinship } from './kinship.util';
 import { normalizeForSearch } from './search.util';
+import { MAX_PHOTO_BYTES, matchesMimeType } from './photo.util';
+import { UploadPhotoDto } from './dto/upload-photo.dto';
 import { FindPeopleQueryDto } from './dto/find-people-query.dto';
 
 const INCLUDE = {
@@ -17,6 +19,9 @@ const INCLUDE = {
   location: true,
   unionsAsA: { include: { partnerB: true } },
   unionsAsB: { include: { partnerA: true } },
+  // Só a data: os bytes moram na mesma tabela e não têm o que fazer numa listagem
+  // de pessoas (ADR-011).
+  photo: { select: { updatedAt: true } },
 } as const;
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
@@ -42,20 +47,26 @@ type UnionFields = {
 type PersonWithUnionSides = {
   unionsAsA: (UnionFields & { partnerBId: string; partnerB: Person })[];
   unionsAsB: (UnionFields & { partnerAId: string; partnerA: Person })[];
+  photo?: { updatedAt: Date } | null;
 };
 
 /**
  * A tabela guarda a união com dois lados (`partnerA`/`partnerB`) porque é assim que
  * o Postgres a representa, mas quem consome quer uma lista só: "as uniões desta
  * pessoa, e quem é o par em cada uma". A conversão acontece aqui, na borda.
+ *
+ * A foto passa pelo mesmo lugar: vira só a data em que foi enviada — que diz se
+ * existe foto e serve de desempate de cache no navegador (ADR-011).
  */
 function withUnions<T extends PersonWithUnionSides>({
   unionsAsA,
   unionsAsB,
+  photo,
   ...person
 }: T) {
   return {
     ...person,
+    photoUpdatedAt: photo?.updatedAt ?? null,
     unions: [
       ...unionsAsA.map(({ partnerBId, partnerB, ...union }) => ({
         ...union,
@@ -93,7 +104,6 @@ export class PeopleService {
         birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
         deathDate: dto.deathDate ? new Date(dto.deathDate) : null,
         deceased: dto.deathDate ? true : (dto.deceased ?? false),
-        profilePhoto: dto.profilePhoto ?? null,
         relationshipType: dto.relationshipType,
         isCentralUser: dto.isCentralUser ?? false,
         fatherId: normalizeNullableUuid(dto.fatherId),
@@ -255,9 +265,6 @@ export class PeopleService {
           deathDate: dto.deathDate ? new Date(dto.deathDate) : null,
         }),
         ...(resolvedDeceased !== undefined && { deceased: resolvedDeceased }),
-        ...(dto.profilePhoto !== undefined && {
-          profilePhoto: dto.profilePhoto ?? null,
-        }),
         ...(dto.relationshipType !== undefined && {
           relationshipType: dto.relationshipType,
         }),
@@ -279,6 +286,62 @@ export class PeopleService {
 
   async remove(id: string) {
     await this.findOne(id);
+    // A foto vai junto pela cascata do banco (ADR-011): não sobra órfão.
     return this.prisma.person.delete({ where: { id } });
+  }
+
+  // ─── Foto de perfil (ADR-011, RN-017) ──────────────────────────────────────
+
+  async savePhoto(id: string, dto: UploadPhotoDto) {
+    await this.ensureExists(id);
+
+    const bytes = Buffer.from(dto.data, 'base64');
+    if (bytes.length === 0)
+      throw new BadRequestException('A imagem enviada está vazia');
+    if (bytes.length > MAX_PHOTO_BYTES)
+      throw new BadRequestException(
+        `A imagem passa de ${Math.round(MAX_PHOTO_BYTES / 1024 / 1024)} MB`,
+      );
+    if (!matchesMimeType(bytes, dto.mimeType))
+      throw new BadRequestException(
+        'O conteúdo do arquivo não corresponde ao tipo declarado',
+      );
+
+    const saved = await this.prisma.personPhoto.upsert({
+      where: { personId: id },
+      create: { personId: id, bytes, mimeType: dto.mimeType },
+      update: { bytes, mimeType: dto.mimeType },
+      select: { updatedAt: true },
+    });
+
+    return { photoUpdatedAt: saved.updatedAt };
+  }
+
+  /** Os bytes em si. Só a rota da foto chama isto. */
+  async findPhoto(id: string) {
+    const photo = await this.prisma.personPhoto.findUnique({
+      where: { personId: id },
+    });
+    if (!photo) throw new NotFoundException(`Pessoa "${id}" não tem foto`);
+    return photo;
+  }
+
+  async removePhoto(id: string) {
+    await this.ensureExists(id);
+    const deleted = await this.prisma.personPhoto.deleteMany({
+      where: { personId: id },
+    });
+    if (deleted.count === 0)
+      throw new NotFoundException(`Pessoa "${id}" não tem foto`);
+    return { photoUpdatedAt: null };
+  }
+
+  /** Existe? — sem arrastar parentesco nem uniões, que a foto não usa. */
+  private async ensureExists(id: string) {
+    const person = await this.prisma.person.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!person) throw new NotFoundException(`Pessoa "${id}" não encontrada`);
   }
 }

@@ -33,6 +33,18 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
 - Apagar uma pessoa apaga as uniões dela — ao contrário de pai/mãe (RN-010), uma união sem um dos
   lados não significa nada.
 
+## Foto de perfil
+
+- **RN-017** — Cada pessoa tem **no máximo uma** foto, enviada como arquivo: JPEG, PNG ou WebP, de
+  até 2 MB. A imagem é **reduzida antes de subir** — 512 pixels no maior lado —, porque o que a tela
+  mostra é um avatar, não um retrato em tamanho real. Enviar de novo substitui a anterior; não há
+  histórico de fotos.
+
+  Um arquivo cujo conteúdo não corresponde ao tipo declarado é recusado. GIF e SVG ficam de fora:
+  SVG é documento que pode carregar script, não imagem.
+
+  Remover a pessoa remove a foto junto.
+
 ## Parentesco
 
 - **RN-004** — O grau de parentesco de cada pessoa é **calculado** em relação à pessoa central,

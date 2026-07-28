@@ -4,7 +4,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-02 | **Upload de foto** (hoje é URL) | O caminho atual depende de a imagem estar hospedada em algum lugar. |
 | BL-04 | **Trocar a pessoa central** sem mexer no banco | RN-001 impede a segunda; falta a operação de transferência. |
 | BL-05 | **Notas por pessoa** (origem da amizade, histórias) | A spec original tinha `friendshipOrigin`; virou texto livre que ainda não existe. |
 | BL-06 | **Exportar / importar** (JSON, e talvez GEDCOM) | Hoje o dado só sai por `pg_dump`. |
@@ -24,6 +23,8 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   (RN-016).
 - **BL-11** — os dados vêm de loaders de rota, não de `useEffect`; a lista de pessoas passou a morar
   na URL, e as regras de lint voltaram a ser erro (ADR-010).
+- **BL-02** — a foto virou arquivo de verdade: sobe reduzida pelo navegador e fica no Postgres, ao
+  lado do resto dos dados (ADR-011, RN-017).
 - **BL-08** — as páginas do front ganharam teste: a rota inteira montada com a API dublada, buscando
   os elementos pelo rótulo. Só a árvore fica na fumaça, porque o reactflow não mede nada no jsdom.
 - **Parentesco só para quem é parente** — amigo e conhecido não aparecem mais como "Parente

@@ -17,7 +17,6 @@ model Person {
   birthDate        DateTime?
   deathDate        DateTime?
   deceased         Boolean          @default(false)
-  profilePhoto     String?
   relationshipType RelationshipType
   isCentralUser    Boolean          @default(false)
 
@@ -38,10 +37,32 @@ model Person {
   unionsAsA        Union[]          @relation("PartnerA")
   unionsAsB        Union[]          @relation("PartnerB")
 
+  photo            PersonPhoto?
+
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
   @@map("people")
+}
+
+/// A foto de perfil, guardada no próprio banco (ADR-011).
+///
+/// Tabela à parte de propósito: o Prisma traz todas as colunas escalares em
+/// `findMany`, e a lista, a árvore e o calendário carregam todo mundo de uma vez.
+/// Com os bytes aqui, eles nunca vêm junto — só quem pede a foto pela rota dela
+/// paga o preço.
+model PersonPhoto {
+  personId  String   @id
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  /// JPEG, PNG ou WebP; o web reduz a imagem antes de enviar (RN-017).
+  bytes     Bytes
+  mimeType  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("person_photos")
 }
 
 /// União conjugal entre duas pessoas. É entidade, e não um campo `spouseId`, porque

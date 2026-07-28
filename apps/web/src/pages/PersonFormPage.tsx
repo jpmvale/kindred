@@ -8,12 +8,14 @@ import {
 import axios from 'axios';
 import { peopleApi } from '../api/people';
 import { unionsApi } from '../api/unions';
+import { ACCEPTED_PHOTO_TYPES, fileToPhotoUpload, photoUrl } from '../photo';
 import type { PersonFormPageData } from '../loaders';
 import { RELATIONSHIP_LABELS, UNION_STATUS_LABELS } from '../labels';
 import type {
   Person,
   PersonFormData,
   PersonUnion,
+  PhotoUploadData,
   RelationshipType,
   Sex,
   UnionStatus,
@@ -46,7 +48,6 @@ const EMPTY: PersonFormData = {
   birthDate: '',
   deathDate: '',
   deceased: false,
-  profilePhoto: '',
   relationshipType: 'FAMILY',
   fatherId: null,
   motherId: null,
@@ -62,7 +63,6 @@ function toFormData(person: Person | null): PersonFormData {
     birthDate: person.birthDate ? person.birthDate.slice(0, 10) : '',
     deathDate: person.deathDate ? person.deathDate.slice(0, 10) : '',
     deceased: person.deceased ?? Boolean(person.deathDate),
-    profilePhoto: person.profilePhoto ?? '',
     relationshipType: person.relationshipType,
     fatherId: person.fatherId ?? null,
     motherId: person.motherId ?? null,
@@ -81,6 +81,60 @@ export default function PersonFormPage() {
   // instante em que a pessoa digita, então nasce do loader e segue por conta.
   const [form, setForm] = useState<PersonFormData>(() => toFormData(person));
   const [submitting, setSubmitting] = useState(false);
+
+  // A foto é recurso próprio, como as uniões: na edição sobe na hora. No
+  // cadastro não há id ainda, então ela fica esperando aqui até o submit.
+  const [pendingPhoto, setPendingPhoto] = useState<PhotoUploadData | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+
+  const savedPhoto = person ? photoUrl(person) : null;
+  const photoPreview = pendingPreview ?? savedPhoto;
+
+  async function handlePickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // deixa escolher o mesmo arquivo de novo
+    if (!file) return;
+
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      const upload = await fileToPhotoUpload(file);
+      if (id) {
+        await peopleApi.savePhoto(id, upload);
+        revalidator.revalidate();
+      } else {
+        setPendingPhoto(upload);
+        setPendingPreview(`data:${upload.mimeType};base64,${upload.data}`);
+      }
+    } catch (error) {
+      setPhotoError(
+        error instanceof Error
+          ? errorMessage(error, error.message)
+          : 'Não foi possível usar esta imagem.',
+      );
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function handleRemovePhoto() {
+    setPhotoError(null);
+    setPendingPhoto(null);
+    setPendingPreview(null);
+    if (!id || !person?.photoUpdatedAt) return;
+
+    setPhotoBusy(true);
+    try {
+      await peopleApi.removePhoto(id);
+      revalidator.revalidate();
+    } catch (error) {
+      setPhotoError(errorMessage(error, 'Não foi possível remover a foto.'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   // As uniões são recurso próprio (`/api/unions`): mudam na hora, fora do submit
   // da pessoa — que é também o único jeito de editá-las sem inventar um formato
@@ -151,7 +205,6 @@ export default function PersonFormPage() {
       ...(form.birthDate ? { birthDate: form.birthDate } : {}),
       ...(form.deathDate ? { deathDate: form.deathDate } : {}),
       deceased: form.deathDate ? true : Boolean(form.deceased),
-      ...(form.profilePhoto ? { profilePhoto: form.profilePhoto } : {}),
       fatherId: form.fatherId || null,
       motherId: form.motherId || null,
       locationId: form.locationId || null,
@@ -161,7 +214,10 @@ export default function PersonFormPage() {
       if (isEdit && id) {
         await peopleApi.update(id, payload);
       } else {
-        await peopleApi.create(payload);
+        // No cadastro a foto espera o submit: só depois de a pessoa existir há
+        // um id para pendurar a imagem (ADR-011).
+        const criada = await peopleApi.create(payload);
+        if (pendingPhoto) await peopleApi.savePhoto(criada.id, pendingPhoto);
       }
       navigate('/people');
     } finally {
@@ -414,14 +470,43 @@ export default function PersonFormPage() {
           </fieldset>
 
           <div className="form-group">
-            <label htmlFor="pessoa-foto">URL da foto de perfil</label>
-            <input
-              id="pessoa-foto"
-              type="url"
-              value={form.profilePhoto ?? ''}
-              onChange={(e) => set('profilePhoto', e.target.value)}
-              placeholder="https://..."
-            />
+            <label htmlFor="pessoa-foto">Foto de perfil</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div className="avatar" style={{ width: 64, height: 64, fontSize: '1.25rem' }}>
+                {photoPreview
+                  ? <img src={photoPreview} alt={`Foto de ${form.name || 'perfil'}`} />
+                  : (form.name.charAt(0).toUpperCase() || '?')}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <input
+                  id="pessoa-foto"
+                  type="file"
+                  accept={ACCEPTED_PHOTO_TYPES.join(',')}
+                  disabled={photoBusy}
+                  onChange={handlePickPhoto}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
+                    JPEG, PNG ou WebP, até 2 MB. A imagem é reduzida antes de subir.
+                  </span>
+                  {photoPreview && (
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      disabled={photoBusy}
+                      onClick={handleRemovePhoto}
+                    >
+                      Remover foto
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            {photoError && (
+              <p style={{ fontSize: '0.85rem', color: '#dc2626', marginBottom: 0 }}>
+                {photoError}
+              </p>
+            )}
           </div>
 
           <div className="form-actions">

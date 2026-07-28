@@ -39,6 +39,9 @@ São duas camadas, e a divisão não é por gosto: cada coisa é testada onde el
   completa e o que fazer com query string torta, já que ela é editável pelo usuário.
 - `loaders.test.ts` — o desvio para o `/setup` sem pessoa central, e a tradução da URL nos parâmetros
   da API (busca vazia vira ausente, não string vazia).
+- `photo.test.ts` — a conta do redimensionamento (ADR-011), o que barra o arquivo antes de decodificar
+  e a versão pendurada na URL da foto. O `<canvas>` em si não é testado: o jsdom não desenha, e o que
+  ele faz é chamar duas APIs do navegador com números que já vêm conferidos aqui.
 
 **Páginas — a rota inteira, com a API dublada.** Como os dados vêm de loaders (ADR-010), montar uma
 página é montar uma **rota**: um `createMemoryRouter` com o loader de verdade e o módulo de API

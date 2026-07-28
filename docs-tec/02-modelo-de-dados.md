@@ -13,7 +13,6 @@ PostgreSQL 16, Prisma 5. Ids são `uuid` gerados pela aplicação; `createdAt`/`
 | `birthDate` | timestamp | sim | |
 | `deathDate` | timestamp | sim | |
 | `deceased` | boolean | não | default `false`; derivado de `deathDate` quando ela existe (RN-006) |
-| `profilePhoto` | text | sim | URL |
 | `relationshipType` | enum `RelationshipType` | não | `FAMILY`, `FRIEND`, `ACQUAINTANCE`, `OTHER` — cônjuge **não** está aqui, virou `unions` (ADR-008) |
 | `isCentralUser` | boolean | não | default `false`; no máximo um `true` (RN-001, garantido na aplicação) |
 | `fatherId` | uuid | sim | FK → `people.id` |
@@ -54,6 +53,21 @@ dela (`Cascade`) — uma união sem um dos lados não significa nada.
 **Não há constraint de "no máximo uma união vigente por pessoa"** (RN-014): como `isCentralUser`, a
 regra vive no serviço. Um índice único parcial daria a garantia no banco, mas o Prisma não o modela.
 
+## `person_photos`
+
+A foto de perfil (ADR-011). Tabela à parte, e não uma coluna em `people`, porque o Prisma traz todas
+as colunas escalares em `findMany` — a lista, a árvore e o calendário carregam todo mundo de uma vez,
+e arrastariam junto todas as imagens.
+
+| Coluna | Tipo | Nulo? | Nota |
+| --- | --- | --- | --- |
+| `personId` | uuid | não | PK **e** FK → `people.id`, `onDelete: Cascade`. Ser a PK é o que garante uma foto por pessoa (RN-017) |
+| `bytes` | bytea | não | a imagem já reduzida; o web encolhe para 512px antes de subir |
+| `mimeType` | text | não | `image/jpeg`, `image/png` ou `image/webp`, conferido contra a assinatura do arquivo |
+
+O `updatedAt` desta tabela é o que a API expõe como `photoUpdatedAt` na pessoa: diz se existe foto e
+serve de versão na URL da imagem, para o navegador não servir a antiga do cache.
+
 ## `locations`
 
 | Coluna | Tipo | Nulo? |
@@ -75,6 +89,10 @@ O histórico começa em `0_init`, o baseline gerado do schema (ADR-006). A segun
 `20260727120000_uniao_conjugal`, cria as uniões e tira o `WIFE` do enum — nela a ordem importa: a
 tabela nova e o backfill (quem era `WIFE` vira `FAMILY` **e** ganha uma união vigente com a pessoa
 central) rodam **antes** do `ALTER TYPE`, senão a informação se perderia.
+
+A terceira, `20260728001800_foto_de_perfil`, cria `person_photos` e **derruba** `people.profilePhoto`.
+Não há backfill: uma URL não vira imagem sem baixá-la, e a coluna estava vazia. A migration traz no
+cabeçalho o `SELECT` para salvar as URLs antes, caso algum banco tenha alguma.
 
 ## Seed
 

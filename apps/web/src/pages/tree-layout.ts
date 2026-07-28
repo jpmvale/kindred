@@ -1,6 +1,7 @@
 import dagre from '@dagrejs/dagre';
 import type { Edge, Node } from 'reactflow';
 import type { Person, UnionStatus } from '@kindred/types';
+import { photoUrl } from '../photo';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export interface NodeData {
   id: string;
   name: string;
   sex?: string | null;
-  profilePhoto?: string | null;
+  photoUrl?: string | null;
   kinshipDegree?: string | null;
   birthDate?: string | null;
   deathDate?: string | null;
@@ -525,7 +526,7 @@ export function computeLayout({
       id: p.id,
       name: p.name,
       sex: p.sex,
-      profilePhoto: p.profilePhoto,
+      photoUrl: photoUrl(p),
       kinshipDegree: p.kinshipDegree,
       birthDate: p.birthDate,
       deathDate: p.deathDate,

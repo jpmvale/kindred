@@ -21,7 +21,13 @@ export interface Person {
   birthDate?: string | null;
   deathDate?: string | null;
   deceased: boolean;
-  profilePhoto?: string | null;
+  /**
+   * Quando a foto foi enviada, ou nulo se não há foto (ADR-011). A imagem em si
+   * fica em `GET /api/people/:id/photo` — nunca no corpo da pessoa. Serve para
+   * duas coisas: saber se existe foto e desempatar o cache do navegador quando
+   * ela é trocada.
+   */
+  photoUpdatedAt?: string | null;
   relationshipType: RelationshipType;
   isCentralUser: boolean;
   fatherId?: string | null;
@@ -47,12 +53,24 @@ export interface PersonFormData {
   birthDate?: string;
   deathDate?: string;
   deceased?: boolean;
-  profilePhoto?: string;
   relationshipType: RelationshipType;
   isCentralUser?: boolean;
   fatherId?: string | null;
   motherId?: string | null;
   locationId?: string | null;
+}
+
+/** Tipos de imagem aceitos no upload da foto de perfil (RN-017). */
+export type PhotoMimeType = "image/jpeg" | "image/png" | "image/webp";
+
+/**
+ * Corpo de `PUT /api/people/:id/photo`. A imagem vai em base64 dentro do JSON —
+ * o porquê de não ser multipart está no ADR-011.
+ */
+export interface PhotoUploadData {
+  /** Só os bytes em base64, sem o prefixo `data:...;base64,`. */
+  data: string;
+  mimeType: PhotoMimeType;
 }
 
 /** Campos aceitos em `GET /api/people?sortBy=` (RN-005). */

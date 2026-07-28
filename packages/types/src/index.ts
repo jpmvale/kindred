@@ -15,6 +15,8 @@ export type {
   PeopleSortField,
   Person,
   PersonFormData,
+  PhotoMimeType,
+  PhotoUploadData,
   RelationshipType,
   Sex,
   SortDirection,
