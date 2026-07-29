@@ -620,5 +620,35 @@ uma conta "dono original" e não escolheu nem uma coisa nem outra.
 
 **O que este ADR não resolve.** Convite/compartilhamento de árvore entre contas (a alternativa que
 foi descartada na decisão de isolamento) continua fora — se algum dia fizer sentido, é modelo de
-permissão novo, não um `userId` a mais. Recuperação de senha (esqueci minha senha) também não existe;
-hoje, perder a senha é perder o acesso, sem caminho de volta pela própria aplicação.
+permissão novo, não um `userId` a mais. Recuperação de senha (esqueci minha senha) também não existia
+quando este ADR foi escrito — ver ADR-019.
+
+## ADR-019 — Recuperar senha esquecida é operação de servidor, não da aplicação
+
+**Contexto.** BL-17: perder a senha era perder o acesso, sem caminho de volta que não fosse editar o
+banco na mão. O fluxo clássico de "esqueci minha senha" manda um link de redefinição por e-mail — mas
+o projeto não tem nenhuma infraestrutura de envio (sem SMTP, sem provedor configurado), e a própria
+conta real usa `dono@kindred.local`: um domínio que não existe, sem caixa de entrada nenhuma por trás.
+Construir a recuperação em cima de e-mail teria significado, primeiro, resolver um problema maior e
+não pedido (deploy de e-mail transacional) só para o único usuário real do app não conseguir usá-lo de
+qualquer forma sem antes trocar de e-mail — o que já é o BL-16, e pressupõe lembrar a senha atual.
+
+**Decisão.** `pnpm db:reset-password <email> [senha-nova]` (`packages/db/src/reset-password.ts`):
+acha a conta pelo e-mail, grava um hash bcrypt novo e derruba **todas** as sessões dela. Sem senha
+informada, uma é gerada e impressa uma vez só — mesmo padrão do `db:backfill-owner` (ADR-018). É
+recuperação por quem tem acesso ao **servidor**, não por quem só usa a aplicação: o mesmo nível de
+acesso que hoje resolveria isso com um `UPDATE` escrito na mão, só que sem risco de errar o hash ou
+deixar a senha em texto puro em algum lugar. Não pede e-mail, não pede pergunta de segurança, não cria
+conta nova se o e-mail não existir — é redefinição de uma conta que já existe, não recuperação
+self-service.
+
+**Por que não é assunto de dentro da aplicação.** Um endpoint de "esqueci minha senha" que não manda
+nada para lugar nenhum verificável (sem e-mail de verdade) só teria duas formas de provar identidade:
+alguma pergunta de segurança (fraca, e mais uma coisa para esquecer) ou nenhuma prova nenhuma (abrir a
+conta de qualquer um que souber o e-mail). Nenhuma das duas é melhor que exigir acesso ao servidor —
+que já é, de fato, o nível de confiança que este projeto pressupõe para quem opera o Postgres.
+
+**Consequência.** Continua não existindo um link de "esqueci minha senha" na tela de login — de
+propósito. Se um dia o kindred ganhar múltiplos usuários reais com e-mail de verdade (não é o caso
+hoje: é a base de uma família, hospedada por uma pessoa), aí sim entra em cena e-mail transacional de
+verdade, e este ADR fica obsoleto.

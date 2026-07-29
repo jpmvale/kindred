@@ -7,13 +7,15 @@ _Atualizado em 29/07/2026._
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro,
 e agora **com conta e login** (BL-10): cada pessoa que usa o kindred tem sua própria árvore, isolada
-das demais. A conta também já pode trocar o próprio e-mail e senha pela tela (BL-16).
+das demais. A conta também já pode trocar o próprio e-mail e senha pela tela (BL-16), e quem tem
+acesso ao servidor consegue redefinir a senha de qualquer conta por linha de comando (BL-17,
+ADR-019) — **o backlog de produto está vazio** pela primeira vez.
 
 **Marco de retomada — 29/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **256 testes** (84 na API, 167 no
-web, 5 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). Para retomar, basta subir o
-Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
-fim deste arquivo — e ler o aviso de credencial logo abaixo **antes** de qualquer outra coisa.
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **258 testes** (84 na API, 167 no
+web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). Para retomar, basta subir o
+Postgres (`docker compose up -d postgres`) — não há item de backlog aberto, então "retomar" aqui é
+escolher um rumo novo, não continuar algo pela metade.
 
 > 🔑 **A conta com os dados reais tem senha gerada por script, e quase ficou perdida.** O
 > `db:backfill-owner` do BL-10 (ver seção própria abaixo) rodou contra o banco de dev sem ninguém
@@ -22,12 +24,12 @@ fim deste arquivo — e ler o aviso de credencial logo abaixo **antes** de qualq
 > público, e a senha foi comunicada direto no chat da sessão em que foi achada, não em arquivo
 > commitado. O e-mail da conta é `dono@kindred.local` — a senha, quem já recebeu, guardou.
 >
-> **Agora existe troca de e-mail/senha pela aplicação** (BL-16, tela `/account`,
-> `PATCH /api/auth/me`) — assim que der, trocar a senha gerada por uma escolhida é o próximo passo.
-> Até lá, perder de novo a senha atual continua sendo perder o acesso pela aplicação (BL-17, recuperar
-> senha esquecida, segue no backlog), sem caminho de volta que não seja mexer no banco na mão
-> (`UPDATE users SET "passwordHash" = ...`, com um hash bcrypt válido — nunca senha em texto puro numa
-> query salva em lugar nenhum).
+> **Agora existem dois caminhos para trocar essa senha.** Pela aplicação, sabendo a atual: tela
+> `/account` (BL-16, `PATCH /api/auth/me`). Sem saber a atual, com acesso ao servidor:
+> `pnpm db:reset-password dono@kindred.local` (BL-17, ADR-019) — deixa uma senha nova ser escolhida
+> na hora, sem precisar da antiga. Qualquer um dos dois fecha o buraco original; nenhum foi usado
+> contra a conta real por uma sessão do Claude Code — trocar a senha gerada é decisão de quem é dono
+> da conta.
 
 > ⚠️ **O banco de dev tem dados reais.** Deixou de ser o seed de 23 pessoas fictícias: são ~150
 > pessoas da família de quem usa o kindred, com fotos e notas — agora todas na conta acima. Antes de
@@ -37,9 +39,19 @@ fim deste arquivo — e ler o aviso de credencial logo abaixo **antes** de qualq
 
 ## Onde a última sessão parou
 
-**BL-16 fechou** (trocar e-mail e senha da própria conta) — o item que o incidente de credencial do
-BL-10 deixou urgente. `PATCH /api/auth/me` sempre exige a senha atual (mesmo só para trocar o
-e-mail) e, ao trocar a senha, derruba as **outras** sessões da conta mas preserva a que fez a troca
+**BL-17 fechou** (recuperar senha esquecida) — o último item do backlog, e o backlog **zerou**. Sem
+infraestrutura de e-mail no projeto, e com a conta real usando um domínio (`kindred.local`) que não é
+entregável, o fluxo clássico de "link por e-mail" não era viável — a decisão foi um comando de CLI
+(`pnpm db:reset-password <email> [senha-nova]`, ADR-019) que redefine a senha de uma conta existente e
+derruba todas as sessões dela. Verificado contra um banco descartável: e-mail sem conta recusa com
+mensagem clara, senha antiga passa a dar `401`, nova passa a dar `200`, sessões anteriores morrem
+todas (sem "sessão de quem pediu" para preservar, diferente do BL-16 — aqui quem redefine está sempre
+fora da conta, agindo pelo servidor). **A conta real não foi tocada.**
+
+Antes do BL-17, na mesma janela: **BL-16 fechou** (trocar e-mail e senha da própria conta) — o item
+que o incidente de credencial do BL-10 deixou urgente. `PATCH /api/auth/me` sempre exige a senha
+atual (mesmo só para trocar o e-mail) e, ao trocar a senha, derruba as **outras** sessões da conta
+mas preserva a que fez a troca
 (RN-025). A tela `/account` chega pelo nome/e-mail no rodapé da sidebar, que virou link. Verificado
 de ponta a ponta contra um **banco descartável** (nunca o real): unit tests, e2e com dois agentes
 logados na mesma conta (um troca a senha, o outro perde a sessão), e pelo navegador de verdade — ver
@@ -79,6 +91,44 @@ em vez de `include`.
   primeiro tropeço da sessão.
 - **Um script que só imprime um segredo uma vez não pode rodar sem ninguém olhando.** É a lição do
   `db:backfill-owner` — ver o aviso de credencial no topo deste arquivo, e a seção "BL-10" abaixo.
+
+## Sessão de 29/07 — recuperar senha esquecida (BL-17, ADR-019)
+
+Continuação direta da sessão do BL-16, ainda na mesma janela: com a troca de senha pela aplicação
+fechada, sobrava o outro lado do mesmo buraco — o que fazer se a senha se perder de vez, sem nem saber
+a atual. Antes de escrever qualquer linha, uma pergunta de design que não tinha resposta óbvia:
+recuperação por e-mail (o padrão do mercado) simplesmente não se sustenta aqui — o projeto não tem
+nenhuma infraestrutura de envio, e a conta real usa `dono@kindred.local`, um domínio que não existe de
+verdade. Construir a recuperação em cima de e-mail teria significado resolver um problema maior e não
+pedido (deploy de e-mail transacional) para uma conta que nem teria como recebê-lo. A pergunta foi
+levada ao usuário antes de decidir: três caminhos possíveis (código de recuperação gerado no cadastro,
+comando de CLI, ou infraestrutura de e-mail de verdade) — a escolha foi **comando de CLI**, formalizar
+o que já seria feito na mão.
+
+**`pnpm db:reset-password <email> [senha-nova]`** (`packages/db/src/reset-password.ts`, ADR-019): acha
+a conta pelo e-mail, grava um hash bcrypt novo, derruba **todas** as sessões da conta. Sem senha no
+segundo argumento, uma é gerada e impressa uma vez só — mesmo padrão do `db:backfill-owner`. Recusa
+com mensagem clara (e sai com código de erro) se o e-mail não corresponder a nenhuma conta — nunca
+cria conta nova por engano. A lógica em si (`resetPassword`, exportada) ficou separada do `main()` da
+CLI, para poder ter teste de unidade com um dublê de Prisma na mesma linha dos demais — sem isso, seria
+mais um script como o `backfill-owner`, sem teste nenhum além de rodar na mão.
+
+**Por que não é assunto de dentro da aplicação, e não só falta de tempo:** um endpoint de "esqueci
+minha senha" sem e-mail de verdade por trás só teria duas formas de provar identidade — pergunta de
+segurança (fraca, mais uma coisa para esquecer) ou nenhuma prova nenhuma. Nenhuma das duas bate o nível
+de confiança que já existe em quem tem acesso ao servidor onde o Postgres roda. A decisão está por
+escrito no ADR-019, incluindo a condição que a torna obsoleta: se um dia o kindred ganhar múltiplos
+usuários reais com e-mail de verdade, aí sim é hora de e-mail transacional.
+
+**Verificado contra um banco descartável** (`kindred_bl17`, criado e derrubado na hora, nunca a base
+real): registro de uma conta de teste pela API, `db:reset-password` com senha explícita — login com a
+antiga passa a dar `401`, com a nova, `200` — depois sem senha explícita, confirmando que uma é gerada
+e impressa; e-mail sem conta correspondente recusa com mensagem e código de saída diferente de zero,
+sem criar nada. Dois testes de unidade cobrem `resetPassword` isolado (e-mail sem conta, e a troca em
+si só derrubando as sessões da conta redefinida, não de outras). **A conta real não foi tocada** —
+nem para ler, desta vez: BL-17 não precisou abrir a base de produção em nenhum momento.
+
+Com o BL-17 fechado, **o backlog de produto zerou** pela primeira vez desde que este arquivo existe.
 
 ## Sessão de 29/07 — trocar e-mail e senha da própria conta (BL-16)
 
@@ -692,6 +742,15 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão do BL-17 (detalhe completo na seção própria, acima) — resumo:
+
+- Contra um banco descartável (`kindred_bl17`, criado e derrubado na hora): conta de teste registrada
+  pela API, `db:reset-password <email> <senha>` — login com a antiga passa a `401`, com a nova, `200`
+  — depois `db:reset-password <email>` sem senha, confirmando a geração e impressão única; e-mail sem
+  conta correspondente recusa com mensagem clara e código de saída ≠ 0, sem criar nada.
+- Dois testes de unidade cobrindo `resetPassword` isolado com um dublê de Prisma.
+- A conta real não foi tocada em nenhum momento.
+
 Na sessão do BL-16 (detalhe completo na seção própria, acima) — resumo:
 
 - Unit e e2e (6 + 2 novos) contra bancos descartáveis, nenhum tocando a base real.
@@ -904,21 +963,26 @@ Na sessão de 26/07 (monorepo):
   quem for testar manualmente e esperar ser deslogado ao trocar a própria senha vai estranhar que não
   foi. É a sessão que fez a troca que sobrevive; qualquer *outro* dispositivo logado na conta é que
   perde acesso e precisa entrar de novo.
+- **`db:reset-password` não pede confirmação nenhuma antes de agir** (BL-17, ADR-019) — diferente do
+  `db:restore --force`, que pelo menos guarda um backup antes de apagar. É de propósito: é uma
+  ferramenta de operador, não de usuário final, e o e-mail já é o único dado que identifica a conta —
+  mas rodar contra o `DATABASE_URL` errado redefine a senha de alguém na base errada sem aviso nenhum.
+  Conferir qual banco o `DATABASE_URL` aponta antes de rodar, sempre.
 
 ## Próximo passo sugerido
 
-Nada travado, nada pela metade — mas **há** uma pendência operacional real, não só técnica: a senha
-da conta com os dados reais ainda é a string gerada por script pelo `db:backfill-owner` (comunicada só
-por chat, nunca escrita em arquivo deste repositório — ver o aviso no topo). Antes de qualquer item
-novo:
+O backlog de produto **zerou** — BL-16 e BL-17 fecharam na mesma janela, e não sobrou item de escolha
+de rumo. Nada travado, nada pela metade. Ainda assim, há uma pendência operacional real, não técnica:
+a senha da conta com os dados reais ainda é a string gerada por script pelo `db:backfill-owner`
+(comunicada só por chat, nunca escrita em arquivo deste repositório — ver o aviso no topo). Agora há
+dois jeitos de resolver isso, e nenhum foi usado contra a conta real por uma sessão do Claude Code —
+quem decide qual usar, e quando, é quem é dono da conta:
 
-1. **Trocar a senha da conta real pela tela `/account`** (BL-16, já fechado) — quem faz isso é o dono
-   da conta, não uma sessão do Claude Code: esta sessão implementou e verificou a feature inteira
-   contra bancos descartáveis, mas nunca a usou contra `dono@kindred.local`.
-2. **BL-17 — recuperar senha esquecida** continua em aberto. Menor urgência agora que a senha pode
-   ser trocada sabendo a atual (BL-16), mas é o mesmo buraco visto de outro ângulo: hoje não há como
-   entrar de novo se a senha se perder de fato.
-3. Depois desses dois, o backlog volta a ter só itens de escolha de rumo — nenhum aberto no momento.
+1. **Tela `/account`, sabendo a senha atual** (BL-16) — `PATCH /api/auth/me`.
+2. **`pnpm db:reset-password dono@kindred.local`, sem precisar da atual** (BL-17, ADR-019) — exige
+   acesso ao servidor, não à aplicação.
+
+Sem item de backlog para puxar, o próximo passo é esperar um pedido novo.
 
 Fora do backlog: **GEDCOM** ficou de fora do BL-06 de propósito (trocar dados com outros programas de
 genealogia é bem mais trabalho que o JSON que já existe), e não tem número — só entra se alguém

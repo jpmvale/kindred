@@ -2,12 +2,15 @@
 
 Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje.
 
-| # | Item | Por quê |
-| --- | --- | --- |
-| BL-17 | **Recuperar senha esquecida** | Não existe hoje. Perder a senha é perder o acesso, sem caminho de volta pela aplicação — só reabrindo o banco na mão. |
+Nenhum item aberto no momento.
 
 **Concluídos.**
 
+- **BL-17** — recuperar senha esquecida, por `pnpm db:reset-password <email> [senha-nova]`
+  (ADR-019), não pela aplicação: sem infraestrutura de e-mail no projeto (e a conta real usa
+  `dono@kindred.local`, que não é entregável), a recuperação exige acesso ao servidor — o mesmo nível
+  de acesso que hoje resolveria isso com um `UPDATE` na mão, só que sem risco de errar o hash. Derruba
+  todas as sessões da conta redefinida.
 - **BL-16** — trocar e-mail e senha da própria conta (`PATCH /api/auth/me`, tela `/account`). A senha
   atual é sempre exigida, mesmo para só trocar o e-mail — mesma defesa do login contra uma sessão
   sequestrada assumir a conta de vez. Trocar a senha derruba as outras sessões, mas mantém a atual (RN-025).
