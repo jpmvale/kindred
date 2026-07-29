@@ -1,17 +1,17 @@
 # HANDOFF — estado atual
 
-_Atualizado em 28/07/2026._
+_Atualizado em 29/07/2026._
 
 ## Onde o projeto está
 
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
 busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro,
 e agora **com conta e login** (BL-10): cada pessoa que usa o kindred tem sua própria árvore, isolada
-das demais.
+das demais. A conta também já pode trocar o próprio e-mail e senha pela tela (BL-16).
 
-**Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **245 testes** (79 na API, 161 no
-web, 5 no `@kindred/db`) mais **13 e2e** (rodam à parte, com banco). Para retomar, basta subir o
+**Marco de retomada — 29/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **256 testes** (84 na API, 167 no
+web, 5 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
 fim deste arquivo — e ler o aviso de credencial logo abaixo **antes** de qualquer outra coisa.
 
@@ -22,10 +22,12 @@ fim deste arquivo — e ler o aviso de credencial logo abaixo **antes** de qualq
 > público, e a senha foi comunicada direto no chat da sessão em que foi achada, não em arquivo
 > commitado. O e-mail da conta é `dono@kindred.local` — a senha, quem já recebeu, guardou.
 >
-> **Não existe troca de e-mail/senha pela aplicação ainda** (BL-16, no backlog) — até isso existir,
-> perder esta senha de novo é perder o acesso pela aplicação, sem caminho de volta que não seja
-> mexer no banco na mão (`UPDATE users SET "passwordHash" = ...`, com um hash bcrypt válido — nunca
-> senha em texto puro numa query salva em lugar nenhum). Trocar assim que der.
+> **Agora existe troca de e-mail/senha pela aplicação** (BL-16, tela `/account`,
+> `PATCH /api/auth/me`) — assim que der, trocar a senha gerada por uma escolhida é o próximo passo.
+> Até lá, perder de novo a senha atual continua sendo perder o acesso pela aplicação (BL-17, recuperar
+> senha esquecida, segue no backlog), sem caminho de volta que não seja mexer no banco na mão
+> (`UPDATE users SET "passwordHash" = ...`, com um hash bcrypt válido — nunca senha em texto puro numa
+> query salva em lugar nenhum).
 
 > ⚠️ **O banco de dev tem dados reais.** Deixou de ser o seed de 23 pessoas fictícias: são ~150
 > pessoas da família de quem usa o kindred, com fotos e notas — agora todas na conta acima. Antes de
@@ -35,15 +37,23 @@ fim deste arquivo — e ler o aviso de credencial logo abaixo **antes** de qualq
 
 ## Onde a última sessão parou
 
-**BL-10 fechou** (multiusuário com login, ADR-018) — o único item do backlog, e o maior deste
-projeto até aqui: conta, sessão por cookie, e toda `Person`/`Location`/`Union` isolada por dono.
-**Esta sessão não implementou o BL-10** — ela **encontrou pronto**, sem commit, um BL-10 inteiro
-(código, migrations já aplicadas no banco real, 245+13 testes passando) deixado por uma sessão
-anterior que encerrou sem fechar: nem commit, nem handoff, nem a documentação (ADR, RN) que o próprio
-`CLAUDE.md` pede para toda decisão de arquitetura. O trabalho desta sessão foi conferir que nada
-estava quebrado ou meio pronto, revisar o código linha a linha, testar de ponta a ponta contra a base
-real (só leitura) e escrever a documentação que faltava — ver a seção própria abaixo, incluindo o
-incidente da senha.
+**BL-16 fechou** (trocar e-mail e senha da própria conta) — o item que o incidente de credencial do
+BL-10 deixou urgente. `PATCH /api/auth/me` sempre exige a senha atual (mesmo só para trocar o
+e-mail) e, ao trocar a senha, derruba as **outras** sessões da conta mas preserva a que fez a troca
+(RN-025). A tela `/account` chega pelo nome/e-mail no rodapé da sidebar, que virou link. Verificado
+de ponta a ponta contra um **banco descartável** (nunca o real): unit tests, e2e com dois agentes
+logados na mesma conta (um troca a senha, o outro perde a sessão), e pelo navegador de verdade — ver
+a seção própria abaixo. **A conta real (`dono@kindred.local`) não foi tocada**: a troca da senha
+gerada por script é do dono da conta, não desta sessão.
+
+Antes do BL-16, na mesma janela: **BL-10 fechou** (multiusuário com login, ADR-018) — conta, sessão
+por cookie, e toda `Person`/`Location`/`Union` isolada por dono. **A sessão que fechou o BL-10 não o
+implementou** — ela **encontrou pronto**, sem commit, um BL-10 inteiro (código, migrations já
+aplicadas no banco real, 245+13 testes passando) deixado por uma sessão anterior que encerrou sem
+fechar: nem commit, nem handoff, nem a documentação (ADR, RN) que o próprio `CLAUDE.md` pede para
+toda decisão de arquitetura. O trabalho daquela sessão foi conferir que nada estava quebrado ou meio
+pronto, revisar o código linha a linha, testar de ponta a ponta contra a base real (só leitura) e
+escrever a documentação que faltava — ver a seção própria abaixo, incluindo o incidente da senha.
 
 Antes do BL-10, na mesma data: **BL-14** fechou — a isenção que o próprio ADR-014 tinha deixado em
 aberto ("não há o que enxugar [na chamada sem paginação] sem mudar o contrato"). Uma conferência
@@ -69,6 +79,48 @@ em vez de `include`.
   primeiro tropeço da sessão.
 - **Um script que só imprime um segredo uma vez não pode rodar sem ninguém olhando.** É a lição do
   `db:backfill-owner` — ver o aviso de credencial no topo deste arquivo, e a seção "BL-10" abaixo.
+
+## Sessão de 29/07 — trocar e-mail e senha da própria conta (BL-16)
+
+Continuação direta da sessão do BL-10: o incidente da senha quase perdida (seção abaixo) deixou claro
+que não dava para fechar a janela sem um jeito de trocá-la pela aplicação. O pedido foi explícito —
+"implementa o BL-16 primeiro, depois eu troco a senha" — ou seja, construir e verificar a feature, mas
+**nunca usá-la contra a conta real**: quem troca a senha de `dono@kindred.local` é o dono dela.
+
+**Backend:** `UpdateMeDto` (e-mail e/ou senha nova, ambos opcionais, mas `currentPassword` sempre
+obrigatória) e `AuthService.updateMe`, exposto em `PATCH /api/auth/me`. Duas decisões de segurança,
+as duas já antecipadas pelo ADR-018 como lacuna:
+
+- **A senha atual é conferida sempre**, mesmo trocando só o e-mail — a mesma defesa do `login`,
+  reaplicada aqui: uma sessão sequestrada (XSS, computador compartilhado) não deveria conseguir
+  assumir a conta de vez sem saber a senha.
+- **Trocar a senha derruba as outras sessões, mas mantém a atual.** `session.deleteMany` com
+  `{ userId, id: { not: hashToken(currentToken) } }` — o próprio token da sessão que pediu a troca é
+  quem decide qual sessão sobrevive. Sem isso, trocar a própria senha se auto-deslogaria, o que não
+  faz sentido nenhum para quem acabou de provar que sabe a senha nova.
+
+**Testado em três camadas, nenhuma contra o banco real:**
+
+- Unit (`auth.service.spec.ts`): senha atual errada (`401`), nem e-mail nem senha nova (`400`),
+  e-mail já usado por outra conta (`409`), troca só de e-mail sem derrubar sessão, troca de senha
+  mantendo a atual e derrubando as outras.
+- E2e (`auth.e2e-spec.ts`), contra um banco descartável criado e derrubado na hora
+  (`kindred_bl16`/`kindred_bl16_ui`): dois agentes logados na mesma conta, um troca a senha, o outro
+  perde a sessão (`401` na próxima chamada) enquanto quem trocou continua autenticado; a senha antiga
+  para de logar e a nova passa a logar.
+- Navegador de verdade, API e web apontando para um terceiro banco descartável (nunca a porta 3000,
+  que na máquina de dev já está ocupada por outro processo alheio a este projeto): cadastro → `/setup`
+  → `/account` pelo link que virou o nome/e-mail no rodapé da sidebar → confirmação visual de cada
+  validação (confirmação de senha que não bate, senha atual errada, sucesso) → confirmado por `curl`
+  que a senha antiga passou a dar `401` no login e a nova, `200`.
+
+**Frontend:** `UpdateMeData` em `@kindred/types` (faltava reexportar `auth.ts` inteiro em
+`index.ts` — só `AuthUser`/`LoginData`/`RegisterData` estavam saindo, um esquecimento de quando o
+BL-10 foi documentado), `authApi.updateMe`, `accountLoader` (mesmo padrão dos demais: independente,
+busca `/auth/me` de novo em vez de reaproveitar o que o `layoutLoader` já buscou — nenhuma outra
+página do app reaproveita loader de outra), rota `/account` dentro do `AppLayout`, e a página em si:
+nome fixo, e-mail editável, senha nova opcional com campo de confirmação que só aparece quando há algo
+para confirmar, senha atual sempre obrigatória.
 
 ## Sessão de 28/07 — multiusuário com login (BL-10, ADR-018), retomado de uma sessão que sumiu
 
@@ -640,6 +692,16 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão do BL-16 (detalhe completo na seção própria, acima) — resumo:
+
+- Unit e e2e (6 + 2 novos) contra bancos descartáveis, nenhum tocando a base real.
+- Pelo **navegador de verdade**, mas com API e web apontando para um banco descartável à parte
+  (nunca a base real): cadastro → `/account` → confirmação visual de cada validação (senha atual
+  errada, confirmação que não bate, e-mail duplicado) → troca de senha bem-sucedida, com a sessão do
+  navegador continuando autenticada → confirmado por `curl` que a senha antiga passa a dar `401` no
+  login e a nova, `200`.
+- A conta real (`dono@kindred.local`) não foi tocada em nenhum momento — nem para ler, desta vez.
+
 Na sessão do BL-10 (detalhe completo na seção própria, acima) — resumo:
 
 - Migrations do BL-10 conferidas como **já aplicadas** no banco real (`_prisma_migrations`, só
@@ -838,21 +900,24 @@ Na sessão de 26/07 (monorepo):
 - **Um script que só imprime uma senha uma vez pede um operador olhando.** `db:backfill-owner` é
   interativo por natureza — rodar em background ou sem supervisão é como a senha quase se perdeu
   nesta sessão. Ver o aviso fixo no topo deste arquivo.
+- **Trocar a senha (BL-16) derruba as outras sessões, não a atual.** É de propósito (RN-025) — mas
+  quem for testar manualmente e esperar ser deslogado ao trocar a própria senha vai estranhar que não
+  foi. É a sessão que fez a troca que sobrevive; qualquer *outro* dispositivo logado na conta é que
+  perde acesso e precisa entrar de novo.
 
 ## Próximo passo sugerido
 
-Nada travado, nada pela metade — mas **há**, pela primeira vez em muitas sessões, uma pendência
-operacional real e urgente, não só técnica: a senha da conta com os dados reais é uma string gerada
-por script, guardada só neste arquivo. Antes de qualquer item novo:
+Nada travado, nada pela metade — mas **há** uma pendência operacional real, não só técnica: a senha
+da conta com os dados reais ainda é a string gerada por script pelo `db:backfill-owner` (comunicada só
+por chat, nunca escrita em arquivo deste repositório — ver o aviso no topo). Antes de qualquer item
+novo:
 
-1. **BL-16 — trocar e-mail e senha da própria conta.** Sem uma tela para isso, a única forma de sair
-   da senha gerada é mexer no banco na mão (`UPDATE users SET "passwordHash" = ...`, com um hash
-   bcrypt válido) — o que este handoff não deveria estar recomendando como caminho normal. É pequeno
-   (uma rota `PATCH /auth/me`, reautenticar com a senha atual antes de trocar) e destrava o usuário
-   real de uma vez.
-2. **BL-17 — recuperar senha esquecida.** Menor urgência que o BL-16 (ainda dá para trocar sabendo a
-   senha atual), mas é o mesmo buraco visto de outro ângulo: hoje não há como entrar de novo se a
-   senha se perder.
+1. **Trocar a senha da conta real pela tela `/account`** (BL-16, já fechado) — quem faz isso é o dono
+   da conta, não uma sessão do Claude Code: esta sessão implementou e verificou a feature inteira
+   contra bancos descartáveis, mas nunca a usou contra `dono@kindred.local`.
+2. **BL-17 — recuperar senha esquecida** continua em aberto. Menor urgência agora que a senha pode
+   ser trocada sabendo a atual (BL-16), mas é o mesmo buraco visto de outro ângulo: hoje não há como
+   entrar de novo se a senha se perder de fato.
 3. Depois desses dois, o backlog volta a ter só itens de escolha de rumo — nenhum aberto no momento.
 
 Fora do backlog: **GEDCOM** ficou de fora do BL-06 de propósito (trocar dados com outros programas de

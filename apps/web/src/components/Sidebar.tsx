@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import type { AuthUser } from '@kindred/types';
 import { authApi } from '../api/auth';
 import ThemeToggle from './ThemeToggle';
@@ -136,9 +136,9 @@ export default function Sidebar({ user, collapsed, onToggle }: Props) {
 
       <div className="sidebar-footer">
         {!collapsed && (
-          <span className="sidebar-user" title={user.email}>
+          <Link to="/account" className="sidebar-user" title={user.email}>
             {user.name}
-          </span>
+          </Link>
         )}
         <div className="sidebar-footer-actions">
           <button

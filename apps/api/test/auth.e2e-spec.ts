@@ -163,4 +163,65 @@ describe('Auth (e2e)', () => {
     // denuncia se o id existe em outra conta).
     await agentB.get(`/api/people/${idPessoaA}`).expect(404);
   });
+
+  it('trocar a senha (BL-16) mantém a sessão atual e derruba as outras', async () => {
+    const email = emailUnico('trocar-senha');
+    const senha = 'senha-forte-123';
+
+    // Dois agentes (dois "dispositivos") logados na mesma conta.
+    const agentQueTroca = request.agent(app.getHttpServer());
+    const registro = await agentQueTroca
+      .post('/api/auth/register')
+      .send({ name: 'Multi-sessão', email, password: senha })
+      .expect(201);
+    criados.push((registro.body as { id: string }).id);
+
+    const agentQueFica = request.agent(app.getHttpServer());
+    await agentQueFica
+      .post('/api/auth/login')
+      .send({ email, password: senha })
+      .expect(200);
+    await agentQueFica.get('/api/auth/me').expect(200);
+
+    await agentQueTroca
+      .patch('/api/auth/me')
+      .send({ currentPassword: senha, newPassword: 'senha-nova-456' })
+      .expect(200);
+
+    // Quem trocou continua autenticado no mesmo cookie...
+    await agentQueTroca.get('/api/auth/me').expect(200);
+    // ...o outro dispositivo perde a sessão.
+    await agentQueFica.get('/api/auth/me').expect(401);
+
+    // A senha nova já vale, a antiga não vale mais.
+    await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email, password: senha })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email, password: 'senha-nova-456' })
+      .expect(200);
+  });
+
+  it('trocar a senha com a senha atual errada não muda nada', async () => {
+    const email = emailUnico('senha-errada');
+    const senha = 'senha-forte-123';
+    const agent = request.agent(app.getHttpServer());
+    const registro = await agent
+      .post('/api/auth/register')
+      .send({ name: 'Guardada', email, password: senha })
+      .expect(201);
+    criados.push((registro.body as { id: string }).id);
+
+    await agent
+      .patch('/api/auth/me')
+      .send({ currentPassword: 'chuta', newPassword: 'outra-coisa-123' })
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email, password: senha })
+      .expect(200);
+  });
 });

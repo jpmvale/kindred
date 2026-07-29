@@ -14,6 +14,10 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
 - **RN-024** — A sessão vive num cookie `httpOnly`, sem renovação deslizante: expira 30 dias após o
   login, independente de uso. Toda rota exige sessão válida por padrão; as exceções (`/auth/*`,
   `/health`) são explícitas, não o contrário.
+- **RN-025** — Trocar e-mail e/ou senha da própria conta (BL-16) exige sempre a **senha atual**,
+  mesmo quando só o e-mail muda — sem isso, uma sessão sequestrada (XSS, computador compartilhado)
+  poderia assumir a conta de vez. Trocar a senha derruba todas as **outras** sessões da conta, mas
+  preserva a que fez a troca: quem está trocando a própria senha não pode se deslogar no processo.
 
 ## Pessoa central
 

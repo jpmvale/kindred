@@ -4,11 +4,13 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-16 | **Trocar e-mail e senha da própria conta** | Não existe hoje (ADR-018). Quem herdou a conta "dono original" do backfill do BL-10 está com uma senha gerada por script — sem isto, não tem como escolher a própria. |
-| BL-17 | **Recuperar senha esquecida** | Também não existe. Hoje perder a senha é perder o acesso, sem caminho de volta pela aplicação — só reabrindo o banco na mão. |
+| BL-17 | **Recuperar senha esquecida** | Não existe hoje. Perder a senha é perder o acesso, sem caminho de volta pela aplicação — só reabrindo o banco na mão. |
 
 **Concluídos.**
 
+- **BL-16** — trocar e-mail e senha da própria conta (`PATCH /api/auth/me`, tela `/account`). A senha
+  atual é sempre exigida, mesmo para só trocar o e-mail — mesma defesa do login contra uma sessão
+  sequestrada assumir a conta de vez. Trocar a senha derruba as outras sessões, mas mantém a atual (RN-025).
 - **BL-10** — multiusuário com login: cada conta tem sua própria árvore, isolada — nenhuma pessoa,
   local ou união é visível fora de quem a criou (RN-022 a RN-024, ADR-018). Sessão por cookie
   `httpOnly`, guard global (toda rota exige login por padrão, `@Public()` é a exceção), 404 — nunca

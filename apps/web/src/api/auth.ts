@@ -1,4 +1,9 @@
-import type { AuthUser, LoginData, RegisterData } from '@kindred/types';
+import type {
+  AuthUser,
+  LoginData,
+  RegisterData,
+  UpdateMeData,
+} from '@kindred/types';
 import { client as api } from './client';
 
 export const authApi = {
@@ -9,4 +14,6 @@ export const authApi = {
   login: (data: LoginData) =>
     api.post<AuthUser>('/auth/login', data).then((r) => r.data),
   logout: () => api.post('/auth/logout').then(() => undefined),
+  updateMe: (data: UpdateMeData) =>
+    api.patch<AuthUser>('/auth/me', data).then((r) => r.data),
 };

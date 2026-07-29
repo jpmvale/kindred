@@ -38,6 +38,7 @@ ADR-018) — sem sessão, qualquer outra rota devolve `401`.
 | `POST` | `/api/auth/login` | Autentica e seta o cookie. **Pública.** |
 | `POST` | `/api/auth/logout` | Apaga a sessão e o cookie. **Pública** (idempotente, funciona sem cookie). |
 | `GET` | `/api/auth/me` | A conta logada, ou `401`. |
+| `PATCH` | `/api/auth/me` | Troca e-mail e/ou senha (RN-025); exige `currentPassword`. |
 | `GET` | `/api/people` | Lista com parentesco calculado, **da conta logada**; paginada se vier `page`/`limit`/`search`/`sortBy`/`sortDirection` (RN-005). |
 | `GET` | `/api/people/central` | A pessoa central da conta, ou `null`. |
 | `GET` | `/api/people/:id` | Uma pessoa da conta, com pai, mãe, local, uniões e parentesco. |

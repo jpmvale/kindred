@@ -23,4 +23,9 @@ export type {
 } from "./person";
 export type { PersonUnion, UnionFormData, UnionStatus } from "./union";
 export type { BackupCounts } from "./backup";
-export type { AuthUser, LoginData, RegisterData } from "./auth";
+export type {
+  AuthUser,
+  LoginData,
+  RegisterData,
+  UpdateMeData,
+} from "./auth";

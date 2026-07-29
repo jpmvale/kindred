@@ -1,5 +1,9 @@
 import bcrypt from 'bcryptjs';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma } from '@kindred/db';
 import { AuthService } from './auth.service';
 import type { PrismaService } from '../prisma/prisma.service';
@@ -51,6 +55,37 @@ function prismaFake() {
           });
         },
       ),
+      findUniqueOrThrow: jest.fn(({ where }: { where: { id: string } }) => {
+        const user = users.get(where.id);
+        if (!user) return Promise.reject(new Error('not found'));
+        return Promise.resolve(user);
+      }),
+      update: jest.fn(
+        ({
+          where,
+          data,
+        }: {
+          where: { id: string };
+          data: { email?: string; passwordHash?: string };
+        }) => {
+          const user = users.get(where.id)!;
+          if (
+            data.email &&
+            [...users.values()].some(
+              (u) => u.id !== user.id && u.email === data.email,
+            )
+          ) {
+            return Promise.reject(uniqueConstraintError());
+          }
+          const updated = { ...user, ...data };
+          users.set(user.id, updated);
+          return Promise.resolve({
+            id: updated.id,
+            name: updated.name,
+            email: updated.email,
+          });
+        },
+      ),
     },
     session: {
       create: jest.fn(
@@ -76,10 +111,26 @@ function prismaFake() {
         sessions.delete(where.id);
         return Promise.resolve();
       }),
-      deleteMany: jest.fn(({ where }: { where: { id: string } }) => {
-        const existed = sessions.delete(where.id);
-        return Promise.resolve({ count: existed ? 1 : 0 });
-      }),
+      deleteMany: jest.fn(
+        ({
+          where,
+        }: {
+          where: { id: string } | { userId: string; id: { not: string } };
+        }) => {
+          let count = 0;
+          if ('userId' in where) {
+            for (const [id, session] of sessions) {
+              if (session.userId === where.userId && id !== where.id.not) {
+                sessions.delete(id);
+                count++;
+              }
+            }
+          } else if (sessions.delete(where.id)) {
+            count = 1;
+          }
+          return Promise.resolve({ count });
+        },
+      ),
     },
   };
 
@@ -238,6 +289,95 @@ describe('AuthService', () => {
       const { prisma, service } = prismaFake();
       await new AuthService(prisma).logout(undefined);
       expect(service.session.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateMe', () => {
+    async function setup() {
+      const helpers = prismaFake();
+      const service = new AuthService(helpers.prisma);
+      const { user, token } = await service.register({
+        name: 'Ana',
+        email: 'ana@x.com',
+        password: 'senha1234',
+      });
+      return { ...helpers, service, user, token };
+    }
+
+    it('recusa senha atual errada', async () => {
+      const { service, token } = await setup();
+      await expect(
+        service.updateMe(
+          'u1',
+          { currentPassword: 'errada', email: 'nova@x.com' },
+          token,
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it('recusa se não vier nem e-mail nem senha nova', async () => {
+      const { service, token } = await setup();
+      await expect(
+        service.updateMe('u1', { currentPassword: 'senha1234' }, token),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('recusa e-mail já usado por outra conta', async () => {
+      const { service, token } = await setup();
+      await service.register({
+        name: 'Bia',
+        email: 'bia@x.com',
+        password: 'outrasenha',
+      });
+
+      await expect(
+        service.updateMe(
+          'u1',
+          { currentPassword: 'senha1234', email: 'bia@x.com' },
+          token,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('troca só o e-mail sem derrubar nenhuma sessão', async () => {
+      const { service, token, sessions } = await setup();
+      const outraSessao = await service.login({
+        email: 'ana@x.com',
+        password: 'senha1234',
+      });
+      expect(sessions.size).toBe(2);
+
+      const updated = await service.updateMe(
+        'u1',
+        { currentPassword: 'senha1234', email: 'nova@x.com' },
+        token,
+      );
+
+      expect(updated.email).toBe('nova@x.com');
+      expect(sessions.size).toBe(2);
+      expect(await service.validateSession(outraSessao.token)).not.toBeNull();
+    });
+
+    it('troca a senha, mantém a sessão atual e derruba as outras', async () => {
+      const { service, token, users } = await setup();
+      const outraSessao = await service.login({
+        email: 'ana@x.com',
+        password: 'senha1234',
+      });
+
+      await service.updateMe(
+        'u1',
+        { currentPassword: 'senha1234', newPassword: 'senhanova123' },
+        token,
+      );
+
+      expect(await service.validateSession(token)).not.toBeNull();
+      expect(await service.validateSession(outraSessao.token)).toBeNull();
+
+      const salva = users.get('u1')!;
+      expect(await bcrypt.compare('senhanova123', salva.passwordHash)).toBe(
+        true,
+      );
     });
   });
 });

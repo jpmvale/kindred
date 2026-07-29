@@ -114,6 +114,12 @@ export async function locationsLoader(): Promise<Location[]> {
   return locationsApi.getAll();
 }
 
+/** `/account` já é uma rota protegida pelo `layoutLoader` — este loader só
+ * pega o e-mail atual para pré-preencher o formulário (BL-16). */
+export async function accountLoader(): Promise<AuthUser> {
+  return authApi.me();
+}
+
 export async function peopleLoader(): Promise<Person[]> {
   return peopleApi.getAll();
 }

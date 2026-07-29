@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -9,6 +10,7 @@ import { Prisma } from '@kindred/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 import type { AuthenticatedUser } from './auth.types';
 
 const BCRYPT_COST = 12;
@@ -86,6 +88,69 @@ export class AuthService {
       name: user.name,
       email: user.email,
     });
+  }
+
+  /**
+   * Troca e-mail e/ou senha (BL-16). A senha atual é conferida sempre, mesmo
+   * para só trocar o e-mail — é a mesma defesa do `login`, reaplicada aqui:
+   * uma sessão sequestrada não deveria conseguir assumir a conta de vez sem
+   * saber a senha.
+   *
+   * Trocar a senha derruba as **outras** sessões (qualquer outro dispositivo
+   * logado perde acesso), mas mantém a atual — trocar a própria senha não
+   * pode deslogar quem acabou de fazer isso.
+   */
+  async updateMe(
+    userId: string,
+    dto: UpdateMeDto,
+    currentToken: string,
+  ): Promise<AuthenticatedUser> {
+    if (!dto.email && !dto.newPassword) {
+      throw new BadRequestException('Informe um novo e-mail ou uma nova senha');
+    }
+
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+
+    const senhaCorreta = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+    if (!senhaCorreta) throw new UnauthorizedException('Senha atual incorreta');
+
+    const data: { email?: string; passwordHash?: string } = {};
+    if (dto.email && dto.email !== user.email) data.email = dto.email;
+    if (dto.newPassword) {
+      data.passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_COST);
+    }
+
+    let updated: AuthenticatedUser;
+    try {
+      updated = await this.prisma.user.update({
+        where: { id: userId },
+        data,
+        select: USER_SELECT,
+      });
+    } catch (error) {
+      // Mesma corrida do `register`: outra conta ficou com este e-mail entre
+      // o `!==` acima e este `update`.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Este e-mail já tem conta');
+      }
+      throw error;
+    }
+
+    if (dto.newPassword) {
+      await this.prisma.session.deleteMany({
+        where: { userId, id: { not: hashToken(currentToken) } },
+      });
+    }
+
+    return updated;
   }
 
   async logout(rawToken: string | undefined): Promise<void> {

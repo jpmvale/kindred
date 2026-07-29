@@ -3,14 +3,17 @@ import {
   Controller,
   Get,
   HttpCode,
+  Patch,
   Post,
   Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
 import { Public } from './public.decorator';
 import { CurrentUser } from './current-user.decorator';
 import {
@@ -60,5 +63,24 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return user;
+  }
+
+  /**
+   * Trocar e-mail e/ou senha (BL-16). Não é `@Public()` — exige a sessão
+   * comum, e o token dela é o que decide quais **outras** sessões somem
+   * quando a senha muda (`AuthService.updateMe`).
+   */
+  @Patch('me')
+  updateMe(
+    @Body() dto: UpdateMeDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    const token = sessionToken(req);
+    // Inalcançável: esta rota não é `@Public()`, então o guard já exigiu um
+    // cookie válido para `user` existir. Checado mesmo assim — nunca um `!`
+    // solto onde o compilador ainda consegue avisar.
+    if (!token) throw new UnauthorizedException();
+    return this.authService.updateMe(user.id, dto, token);
   }
 }

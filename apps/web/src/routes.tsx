@@ -9,7 +9,9 @@ import CalendarPage from './pages/CalendarPage';
 import BackupPage from './pages/BackupPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import AccountPage from './pages/AccountPage';
 import {
+  accountLoader,
   guestOnlyLoader,
   layoutLoader,
   locationsLoader,
@@ -41,6 +43,7 @@ export const router = createBrowserRouter([
       { path: 'calendar', element: <CalendarPage />, loader: peopleLoader },
       { path: 'tree', element: <TreePage />, loader: peopleLoader },
       { path: 'backup', element: <BackupPage /> },
+      { path: 'account', element: <AccountPage />, loader: accountLoader },
     ],
   },
 ]);
