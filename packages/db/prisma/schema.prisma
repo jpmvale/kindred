@@ -10,6 +10,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Uma conta (BL-10). Cada `User` tem sua própria árvore, isolada — nenhuma
+/// `Person`/`Location` é visível entre contas.
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  people    Person[]
+  locations Location[]
+  sessions  Session[]
+
+  @@map("users")
+}
+
+/// Sessão de login (BL-10). `id` é o hash SHA-256 (hex) do token opaco que vai
+/// no cookie httpOnly — não um id à parte. Login calcula o hash uma vez; toda
+/// leitura/logout recalcula o hash do cookie recebido e busca pela PK. Guardar
+/// o hash, e não o token cru, é defesa em profundidade: um backup ou dump do
+/// banco não dá sessão de graça, só quem tem o cookie original loga como alguém.
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
 model Person {
   id               String           @id @default(uuid())
   name             String
@@ -19,6 +52,9 @@ model Person {
   deceased         Boolean          @default(false)
   relationshipType RelationshipType
   isCentralUser    Boolean          @default(false)
+
+  userId           String
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Texto livre sobre a pessoa: de onde veio a amizade, histórias, o que for.
   /// Fica em `people` (e não em tabela à parte, como a foto) porque é limitado a
@@ -47,6 +83,7 @@ model Person {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  @@index([userId])
   @@map("people")
 }
 
@@ -97,6 +134,10 @@ model Location {
   updatedAt DateTime @updatedAt
   people    Person[]
 
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
   @@map("locations")
 }
 

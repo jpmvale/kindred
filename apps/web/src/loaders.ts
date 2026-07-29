@@ -12,33 +12,66 @@
 
 import { redirect, type LoaderFunctionArgs } from 'react-router-dom';
 import type {
+  AuthUser,
   Location,
   PaginatedPeopleResponse,
   Person,
 } from '@kindred/types';
 import { peopleApi } from './api/people';
 import { locationsApi } from './api/locations';
+import { authApi } from './api/auth';
 import {
   PEOPLE_PAGE_SIZE,
   parsePeopleListQuery,
   type PeopleListQuery,
 } from './pages/people-list-query';
 
+/** `GET /auth/me` dá 401 sem sessão — isso não é exceção, é a resposta normal
+ * de "ninguém logado", então vira `null` em vez de propagar o erro. */
+async function currentUser(): Promise<AuthUser | null> {
+  try {
+    return await authApi.me();
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Porta de entrada: sem pessoa central não há parentesco para calcular, então o
- * app inteiro desvia para o cadastro dela (RN-001). O `/setup` fica fora deste
- * layout justamente para não cair no próprio desvio.
+ * Porta de entrada: sem sessão, não há de quem ser a árvore — desvia para
+ * `/login` antes mesmo de perguntar sobre pessoa central (BL-10). Só depois
+ * de logado é que a checagem de sempre entra: sem pessoa central não há
+ * parentesco para calcular, então o app desvia para o cadastro dela (RN-001).
+ * O `/setup` fica fora deste layout justamente para não cair no próprio desvio.
  *
  * O `/backup` é a **exceção** dentro do layout: é para lá que se vai depois de
  * perder a base (o cenário que motiva restaurar um backup, para começo de
- * conversa), então ele não pode ficar atrás do mesmo desvio que ele existe
- * para resolver.
+ * conversa) — precisa de sessão como qualquer outra tela, mas não precisa de
+ * pessoa central, que é justamente o que ele existe para repor.
  */
 export async function layoutLoader({ request }: LoaderFunctionArgs) {
   const indoParaBackup = new URL(request.url).pathname === '/backup';
-  const central = await peopleApi.getCentral();
+
+  const user = await currentUser();
+  if (!user) return redirect('/login');
+
+  const central = indoParaBackup ? null : await peopleApi.getCentral();
   if (!central && !indoParaBackup) return redirect('/setup');
-  return { central };
+  return { user, central };
+}
+
+/** `/setup` fica fora do layout (ver acima), então precisa da própria checagem
+ * de sessão — sem ela, o formulário apareceria para quem nem está logado. */
+export async function setupLoader() {
+  const user = await currentUser();
+  if (!user) return redirect('/login');
+  return null;
+}
+
+/** `/login` e `/register` são para quem **não** está logado — chegar neles já
+ * autenticado (aba antiga, voltar do navegador) manda direto para a árvore. */
+export async function guestOnlyLoader() {
+  const user = await currentUser();
+  return user ? redirect('/people') : null;
 }
 
 export type PeopleListData = {

@@ -33,9 +33,10 @@ Com isso, três leituras da mesma base:
 - **Ausência de dado é normal.** Quase todo campo é opcional: dá para cadastrar alguém com só o nome
   e completar depois.
 - **Português.** A interface, os rótulos e os graus de parentesco são em pt-BR.
-- **Uso pessoal, sem conta.** Não há login nem multiusuário — é uma base por instalação.
+- **Uma árvore por conta, sem compartilhar.** Há login (BL-10) — mas cada conta enxerga só a própria
+  base; não existe convite nem família compartilhando a mesma árvore.
 
 ## Não-objetivos (por enquanto)
 
-Rede social, compartilhamento, importação de GEDCOM/FamilySearch, fotos hospedadas (hoje a foto é
-uma URL), múltiplos usuários. Ver [`04-backlog.md`](04-backlog.md).
+Rede social, compartilhamento de uma árvore entre contas, importação de GEDCOM/FamilySearch. Ver
+[`04-backlog.md`](04-backlog.md).

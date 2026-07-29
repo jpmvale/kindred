@@ -7,18 +7,28 @@ import SetupPage from './pages/SetupPage';
 import TreePage from './pages/TreePage';
 import CalendarPage from './pages/CalendarPage';
 import BackupPage from './pages/BackupPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import {
+  guestOnlyLoader,
   layoutLoader,
   locationsLoader,
   peopleListLoader,
   peopleLoader,
   personFormLoader,
+  setupLoader,
 } from './loaders';
 
 export const router = createBrowserRouter([
+  // Fora do layout, e sem exigir sessão — são a porta de entrada de quem
+  // ainda não tem conta ou perdeu a sessão (BL-10).
+  { path: '/login', element: <LoginPage />, loader: guestOnlyLoader },
+  { path: '/register', element: <RegisterPage />, loader: guestOnlyLoader },
   // Fora do layout: é a tela que se vê quando ainda não há pessoa central, e o
-  // `layoutLoader` manda para cá justamente quando não há.
-  { path: '/setup', element: <SetupPage /> },
+  // `layoutLoader` manda para cá justamente quando não há. Exige sessão por
+  // conta própria (`setupLoader`), já que fica fora do grupo que normalmente
+  // garante isso.
+  { path: '/setup', element: <SetupPage />, loader: setupLoader },
   {
     element: <AppLayout />,
     loader: layoutLoader,

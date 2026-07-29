@@ -164,7 +164,14 @@ export default function PersonFormPage() {
   // da pessoa — que é também o único jeito de editá-las sem inventar um formato
   // de payload aninhado só para o formulário. Como cada ação recarrega a rota,
   // elas vêm direto do loader, sem cópia em estado.
-  const unions: PersonUnion[] = person?.unions ?? [];
+  //
+  // `partner` é opcional no tipo porque a lista sem paginação (árvore, calendário)
+  // não o manda (BL-14, ADR-017) — mas `person` aqui vem sempre de `GET /people/:id`,
+  // que continua trazendo o parceiro por extenso. Daí o cast: é seguro **nesta
+  // página**, não uma garantia do tipo em geral.
+  const unions = (person?.unions ?? []) as (PersonUnion & {
+    partner: Person;
+  })[];
   const [newPartnerId, setNewPartnerId] = useState('');
   const [newStatus, setNewStatus] = useState<UnionStatus>('CURRENT');
   const [newStartDate, setNewStartDate] = useState('');

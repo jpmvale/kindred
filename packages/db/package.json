@@ -20,6 +20,7 @@
     "db:reset": "tsx src/cli.ts migrate reset",
     "db:studio": "tsx src/cli.ts studio",
     "db:seed": "tsx src/seed.ts",
+    "db:backfill-owner": "tsx src/backfill-owner.ts",
     "db:backup": "tsx src/backup.ts",
     "db:restore": "tsx src/restore.ts",
     "db:anonymize": "tsx src/anonymize.ts",
@@ -30,6 +31,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.7"
   },
   "devDependencies": {

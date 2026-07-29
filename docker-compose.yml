@@ -48,6 +48,9 @@ services:
     environment:
       DATABASE_URL: postgresql://kindred:kindred123@postgres:5432/kindred?schema=public
       PORT: "3000"
+      # O cookie de sessão só sai com `Secure` quando isto é "production" (BL-10)
+      # — sem ele, o cookie funcionaria em dev mas não numa publicação de verdade.
+      NODE_ENV: production
     ports:
       - "3000:3000"
     healthcheck:

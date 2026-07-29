@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import cookieParser from 'cookie-parser';
 import { loadRootEnv } from '@kindred/db';
 import { AppModule } from './app.module';
 
@@ -10,14 +11,17 @@ async function bootstrap() {
   loadRootEnv();
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.enableCors();
+  // `credentials: true` é o que deixa o cookie httpOnly de sessão (BL-10)
+  // viajar em requisições cross-origin; em dev o proxy do Vite já torna a
+  // chamada same-origin, mas fica correto para topologias futuras.
+  app.enableCors({ origin: true, credentials: true });
+  app.use(cookieParser());
 
   // A foto de perfil sobe em base64 dentro do JSON (ADR-011), e o limite padrão
   // do express (100 KB) barra qualquer imagem. Restaurar um backup (BL-06)
   // manda a base inteira, fotos incluídas, no mesmo corpo — uma base real de
   // ~140 pessoas com 4 fotos já mede ~200 KB; 10 MB dá margem de sobra para uma
-  // base pessoal bem maior sem abrir de fato uma porta de negação de serviço
-  // (o app não tem autenticação, então esse limite não é a linha de defesa).
+  // base pessoal bem maior sem abrir de fato uma porta de negação de serviço.
   app.useBodyParser('json', { limit: '10mb' });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.setGlobalPrefix('api');

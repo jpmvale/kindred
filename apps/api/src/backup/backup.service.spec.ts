@@ -82,12 +82,14 @@ function prismaFake(existentes = 0) {
   return { prisma: service as unknown as PrismaService, chamadas, service };
 }
 
+const DONO = 'u1';
+
 describe('BackupService.restore', () => {
   it('recusa sem tocar o banco quando o arquivo não é um backup válido', async () => {
     const { prisma, service } = prismaFake(0);
 
     await expect(
-      new BackupService(prisma).restore({ nada: 'a ver' }, false),
+      new BackupService(prisma).restore({ nada: 'a ver' }, false, DONO),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(service.person.count).not.toHaveBeenCalled();
@@ -98,7 +100,7 @@ describe('BackupService.restore', () => {
     const { prisma, service } = prismaFake(5);
 
     await expect(
-      new BackupService(prisma).restore(BACKUP_VALIDO, false),
+      new BackupService(prisma).restore(BACKUP_VALIDO, false, DONO),
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(service.$transaction).not.toHaveBeenCalled();
@@ -111,6 +113,7 @@ describe('BackupService.restore', () => {
     const contagem = await new BackupService(prisma).restore(
       BACKUP_VALIDO,
       false,
+      DONO,
     );
 
     expect(chamadas).toEqual(['person.create']);
@@ -125,7 +128,7 @@ describe('BackupService.restore', () => {
   it('com force e banco ocupado, apaga e recria na mesma transação', async () => {
     const { prisma, chamadas, service } = prismaFake(5);
 
-    await new BackupService(prisma).restore(BACKUP_VALIDO, true);
+    await new BackupService(prisma).restore(BACKUP_VALIDO, true, DONO);
 
     // A ordem importa: união antes de pessoa antes de local (chaves
     // estrangeiras), e tudo isso antes de recriar — é um array só, uma
@@ -138,18 +141,53 @@ describe('BackupService.restore', () => {
     ]);
     expect(service.$transaction).toHaveBeenCalledTimes(1);
   });
+
+  it('a contagem e os deletes são escopados à conta, não ao banco inteiro (BL-10)', async () => {
+    const { prisma, service } = prismaFake(5);
+
+    await new BackupService(prisma).restore(BACKUP_VALIDO, true, DONO);
+
+    expect(service.person.count).toHaveBeenCalledWith({
+      where: { userId: DONO },
+    });
+    expect(service.person.deleteMany).toHaveBeenCalledWith({
+      where: { userId: DONO },
+    });
+    expect(service.location.deleteMany).toHaveBeenCalledWith({
+      where: { userId: DONO },
+    });
+    expect(service.union.deleteMany).toHaveBeenCalledWith({
+      where: { partnerA: { userId: DONO } },
+    });
+  });
 });
 
 describe('BackupService.export', () => {
   it('devolve o mesmo formato que o restore aceita de volta', async () => {
     const { prisma } = prismaFake(0);
 
-    const payload = await new BackupService(prisma).export();
+    const payload = await new BackupService(prisma).export(DONO);
 
     expect(payload.formato).toBe(1);
     expect(payload.dados).toHaveProperty('Person');
     expect(payload.dados).toHaveProperty('Union');
     expect(payload.dados).toHaveProperty('Location');
     expect(payload.dados).toHaveProperty('PersonPhoto');
+  });
+
+  it('varre a base filtrando por userId, não o banco inteiro', async () => {
+    const { prisma, service } = prismaFake(0);
+
+    await new BackupService(prisma).export(DONO);
+
+    expect(service.person.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: DONO } }),
+    );
+    expect(service.location.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: DONO } }),
+    );
+    expect(service.union.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { partnerA: { userId: DONO } } }),
+    );
   });
 });

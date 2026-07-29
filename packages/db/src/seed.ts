@@ -17,6 +17,7 @@ import {
   type Sex,
   type UnionStatus,
 } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { loadRootEnv } from "./env";
 
 loadRootEnv();
@@ -282,9 +283,23 @@ async function main() {
     await prisma.location.deleteMany();
   }
 
+  // O seed é bootstrap de um banco vazio: a conta é criada aqui também, não
+  // recebida de fora — não há login ainda no fluxo de `pnpm db:seed` (BL-10).
+  const owner = await prisma.user.upsert({
+    where: { email: "seed@kindred.local" },
+    create: {
+      name: "Seed",
+      email: "seed@kindred.local",
+      passwordHash: await bcrypt.hash("seed-account", 12),
+    },
+    update: {},
+  });
+
   const locationIds = new Map<string, string>();
   for (const name of LOCATIONS) {
-    const location = await prisma.location.create({ data: { name } });
+    const location = await prisma.location.create({
+      data: { name, userId: owner.id },
+    });
     locationIds.set(name, location.id);
   }
 
@@ -300,9 +315,10 @@ async function main() {
         relationshipType: seed.relationshipType ?? "FAMILY",
         isCentralUser: seed.isCentralUser ?? false,
         notes: seed.notes ?? null,
-        fatherId: seed.father ? personIds.get(seed.father) : null,
-        motherId: seed.mother ? personIds.get(seed.mother) : null,
-        locationId: seed.location ? locationIds.get(seed.location) : null,
+        userId: owner.id,
+        fatherId: seed.father ? (personIds.get(seed.father) ?? null) : null,
+        motherId: seed.mother ? (personIds.get(seed.mother) ?? null) : null,
+        locationId: seed.location ? (locationIds.get(seed.location) ?? null) : null,
       },
     });
     personIds.set(seed.name, person.id);

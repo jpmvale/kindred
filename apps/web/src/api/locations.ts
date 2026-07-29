@@ -1,7 +1,5 @@
-import axios from 'axios';
 import type { Location, LocationFormData } from '@kindred/types';
-
-const api = axios.create({ baseURL: '/api' });
+import { client as api } from './client';
 
 export const locationsApi = {
   getAll: () => api.get<Location[]>('/locations').then((r) => r.data),

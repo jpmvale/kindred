@@ -1,7 +1,14 @@
 # 02 — Modelo de domínio
 
-Três entidades: **Pessoa**, **União** e **Local**. O schema que as implementa está em
+Quatro entidades: **Conta**, **Pessoa**, **União** e **Local**. O schema que as implementa está em
 [`docs-tec/02-modelo-de-dados.md`](../docs-tec/02-modelo-de-dados.md).
+
+## Conta
+
+Uma conta (`User`) é dona de uma árvore inteira: toda Pessoa, Local e União pertence a exatamente uma
+conta, e nenhuma delas é visível fora dela (RN-022, ADR-018). Não existe convite nem compartilhamento
+— duas pessoas que queiram registrar a mesma família hoje têm duas árvores separadas, cada uma
+cadastrando o que quiser da mesma gente.
 
 ## Pessoa
 
@@ -19,8 +26,8 @@ Três entidades: **Pessoa**, **União** e **Local**. O schema que as implementa 
 
 ### Pessoa central
 
-É a origem do sistema de coordenadas. Existe no máximo uma; a interface obriga a cadastrá-la antes de
-qualquer outra coisa (tela de setup). Para ela, o grau de parentesco é "Você".
+É a origem do sistema de coordenadas. Existe no máximo uma **por conta**; a interface obriga a
+cadastrá-la antes de qualquer outra coisa (tela de setup). Para ela, o grau de parentesco é "Você".
 
 ### Grau de parentesco
 

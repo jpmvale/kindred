@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { BACKUP_FORMAT, createBackup } from "./backup";
+import { BACKUP_FORMAT, createBackup, type BackupScope } from "./backup";
 import { loadRootEnv } from "./env";
 
 loadRootEnv();
@@ -40,6 +40,15 @@ export type BackupFile = {
     Person: Record<string, unknown>[];
     Union: Record<string, unknown>[];
     PersonPhoto: Record<string, unknown>[];
+    /**
+     * Ausente num backup de verdade (`db:backup`/`GET /api/backup`) — conta já
+     * existe em ambos os lados de um backup real, então `User` nunca precisa
+     * viajar. Só o fixture anônimo (`db:anonymize`) embute um dono sintético
+     * aqui, porque o destino dele é um banco **vazio**, sem conta nenhuma
+     * ainda, e `Person.userId`/`Location.userId` exigem uma linha em `users`
+     * para a FK fechar.
+     */
+    User?: Record<string, unknown>[];
   };
 };
 
@@ -81,9 +90,33 @@ export function readBackupFile(caminho: string): BackupFile {
 export function buildRestoreOperations(
   prisma: PrismaClient,
   arquivo: BackupFile,
+  scope: BackupScope,
 ): Prisma.PrismaPromise<unknown>[] {
   const { Location, Person, Union, PersonPhoto } = arquivo.dados;
   const ops: Prisma.PrismaPromise<unknown>[] = [];
+
+  // O dono de cada linha recriada é sempre quem está restaurando — nunca o
+  // `userId` do arquivo (se houver: arquivos de antes do BL-10 não têm). Isso
+  // não é um bug a "corrigir": é o que impede um arquivo de outra conta de
+  // vazar para a conta errada, mesmo que alguém tente restaurá-lo aqui. Para
+  // `{kind:'all'}` (só o CLI), o próprio arquivo já tem o `userId` de cada
+  // linha, então não há o que forçar.
+  const ownerId = scope.kind === "user" ? scope.userId : undefined;
+
+  for (const usuario of arquivo.dados.User ?? []) {
+    ops.push(
+      prisma.user.create({
+        data: {
+          id: usuario.id as string,
+          name: usuario.name as string,
+          email: usuario.email as string,
+          passwordHash: usuario.passwordHash as string,
+          createdAt: data(usuario.createdAt)!,
+          updatedAt: data(usuario.updatedAt)!,
+        },
+      }),
+    );
+  }
 
   for (const local of Location) {
     ops.push(
@@ -91,6 +124,7 @@ export function buildRestoreOperations(
         data: {
           id: local.id as string,
           name: local.name as string,
+          userId: ownerId ?? (local.userId as string),
           createdAt: data(local.createdAt)!,
           updatedAt: data(local.updatedAt)!,
         },
@@ -105,6 +139,7 @@ export function buildRestoreOperations(
         data: {
           id: pessoa.id as string,
           name: pessoa.name as string,
+          userId: ownerId ?? (pessoa.userId as string),
           sex: pessoa.sex as never,
           birthDate: data(pessoa.birthDate),
           deathDate: data(pessoa.deathDate),
@@ -186,7 +221,7 @@ function countsOf(arquivo: BackupFile) {
  * aqui — generoso o bastante para uma base pessoal (centenas de linhas).
  */
 export async function restoreInto(prisma: PrismaClient, arquivo: BackupFile) {
-  const ops = buildRestoreOperations(prisma, arquivo);
+  const ops = buildRestoreOperations(prisma, arquivo, { kind: "all" });
   if (ops.length) await prisma.$transaction(ops);
   return countsOf(arquivo);
 }

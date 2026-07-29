@@ -514,3 +514,111 @@ pessoa central** — é a tela que resolve exatamente o cenário de "perdi minha
 `layoutLoader` (ADR-010), que desvia todo mundo para `/setup` quando não há central, ganhou uma
 exceção de uma linha para esse caminho; sem ela, restaurar um backup ficaria atrás do próprio muro
 que existe para forçar o cadastro do zero.
+
+---
+
+## ADR-017 — A lista sem paginação também enxugou, sem virar rota nova
+
+**Contexto.** O ADR-014 tinha deixado uma isenção explícita: "a chamada sem paginação continua como
+era... não há o que enxugar ali sem mudar o contrato". Era verdade na hora — mas ninguém tinha
+conferido, consumidor por consumidor, o que a árvore, o calendário e os candidatos de um formulário
+liam de fato da resposta. Feita essa conferência (BL-14), a resposta virou "há sim, e não muda nada
+que alguém use": os três leem `fatherId`/`motherId` (escalares) e resolvem pai, mãe e irmãos na
+própria lista que já têm — nenhum lê os objetos aninhados `father`, `mother` ou `location` que o
+`include` do Prisma vinha trazendo para cada uma das ~150 pessoas. O mesmo vale para união: os três
+leem `partnerId` para achar o cônjuge na lista; só quem edita **uma** pessoa específica
+(`PersonFormPage`, via `GET /people/:id`) precisa do nome do parceiro, para mostrar na tela de uniões.
+
+**Decisão.** A chamada sem paginação trocou `include: INCLUDE` (pai, mãe, local e o parceiro de cada
+união, todos por extenso) por um `select` mais magro (`LIST_SELECT`): os mesmos campos escalares da
+varredura enxuta do ADR-014, mais notas, foto e uniões — mas as uniões vêm com `select` também, só
+`partnerBId`/`partnerAId`, sem o objeto do parceiro. Uma segunda função de normalização,
+`withUnionRefs`, faz a mesma troca de lado do par que `withUnions` (RN-011), sem montar `partner`.
+
+**Por que não uma rota nova.** Cortar campo por campo dentro do mesmo `GET /api/people` — em vez de,
+por exemplo, um `GET /api/people/tree` dedicado — mantém um único lugar onde "o que a árvore precisa"
+é decidido, e os três consumidores (árvore, calendário, candidatos) continuam chamando o mesmo
+`peopleApi.getAll()`; nenhum loader mudou. O preço é o inverso do ADR-014: ali a rota **paginada**
+ganhou uma segunda consulta para não perder o que a tela mostra; aqui a rota **sem paginação**
+perdeu campo sem ninguém pedir de volta, porque a conferência mostrou que ninguém os lia.
+
+**O contrato mudou, e por isso o tipo mudou com ele.** `PersonUnion.partner` virou opcional
+(`partner?: Person`) em vez de obrigatório — mentir que ele sempre vem seria pior que marcar a
+ausência. O único lugar que lê `union.partner.name` é o `PersonFormPage`, e ele só recebe uniões de
+`GET /people/:id` (nunca da lista sem paginação), então um cast local e comentado resolve — não um
+`!` solto, que apagaria o aviso do compilador se algum dia esse componente passasse a ler uniões de
+outro lugar.
+
+**Verificado rodando**, contra a base real (143 pessoas, sem nenhuma união): a resposta sem paginação
+caiu de 56,7 KB carregando pai/mãe/local vazios de cada pessoa para o mesmo tanto sem eles — o ganho
+cresce com o quanto cada pessoa tem preenchido, não com a contagem de linhas. Criada uma união
+temporária entre duas pessoas de teste para conferir os dois formatos lado a lado: a lista sem
+paginação devolveu `{id, status, startDate, endDate, partnerId}`; o `GET /people/:id` da mesma pessoa
+devolveu o parceiro por extenso, como antes. Árvore, calendário e o card de detalhe (que lê
+`fatherId`/`motherId` da lista inteira, não de quem está desenhado) seguiram funcionando sem
+mudança nenhuma de código — a prova de que o corte não tirou nada que alguém usasse.
+
+---
+
+## ADR-018 — Multiusuário: conta isola árvore inteira, sessão por cookie httpOnly
+
+**Contexto.** O BL-10 mudava o produto de "base pessoal" para "serviço" — a pergunta que o handoff
+anterior tinha deixado em aberto para alinhar antes de escrever qualquer linha era: cada conta tem a
+própria árvore, isolada, ou é uma família convidando parentes para a mesma base compartilhada? A
+resposta muda o schema inteiro, não só a tela de login. Decisão: **isolada**. Convite para editar a
+mesma árvore fica para outra hora — o kindred continua sendo "a base de uma pessoa", só que agora com
+senha, e várias pessoas podem ter a própria.
+
+**Decisão — dono de linha.** `Person` e `Location` ganharam `userId` obrigatório, com
+`onDelete: Cascade` a partir de `User`: apagar a conta apaga a árvore inteira, sem órfão. `Union` não
+tem `userId` próprio — as duas pontas (`partnerA`/`partnerB`) já são `Person` da mesma conta (garantido
+na escrita, nunca na leitura), então toda consulta de união filtra por `partnerA: { userId }`.
+
+**Decisão — sessão por cookie, não JWT.** Um token opaco (32 bytes aleatórios, base64url) vai num
+cookie `httpOnly` + `sameSite: lax`; o banco guarda só o **hash SHA-256** do token, nunca o valor cru
+— um dump ou backup do banco não dá sessão de graça a quem o ler, só quem tiver o cookie original
+consegue logar como alguém. Sem renovação deslizante: 30 dias fixos a partir do login. `secure` só em
+produção (`NODE_ENV`), porque em dev a API fala com o web por HTTP simples atrás do proxy do Vite —
+`Secure` bloquearia o cookie de sair daí.
+
+**Decisão — guard global, `@Public()` é a exceção.** `SessionGuard` está registrado como `APP_GUARD`:
+um controller novo nasce **protegido por padrão**. As exceções (`/auth/register`, `/auth/login`,
+`/auth/logout`, `/health`) usam `@Public()` explicitamente — inverter isso (todo controller decorado
+na mão com `@UseGuards`) é o desenho onde esquecer de proteger uma rota nova é o caminho fácil, e este
+ADR escolhe o oposto: esquecer o `@Public()` deixa a rota **protegida demais**, nunca aberta demais.
+
+**Decisão — 404, nunca 403, para dado de outra conta.** Toda busca por id (`findOne`, `setCentral`,
+`findPhoto`, uma união) filtra por `{ id, userId }` na mesma consulta, e devolve `NotFoundException`
+tanto para "não existe" quanto para "existe, mas é de outra conta" — a mesma resposta não denuncia
+qual dos dois é. `fatherId`/`motherId`/`locationId`/`partnerId` recebidos num corpo de requisição
+passam por `assertPersonIdsOwnedBy`/`assertLocationOwnedBy` antes de qualquer escrita: sem isso, o
+Postgres aceitaria de bom grado o UUID de alguém de outra conta como pai, e o `include` da resposta
+devolveria essa pessoa inteira.
+
+**A migração dos dados existentes foi em três passos, nesta ordem — e a ordem é a decisão:**
+
+1. `20260728203000_usuarios_e_donos` — cria `users`/`sessions` e `userId` **nullable** em
+   `people`/`locations`. Nullable de propósito: aplicar isto não pode falhar por causa de linhas que
+   já existem.
+2. `pnpm db:backfill-owner` (script, não migration) — cria (ou reaproveita) uma conta "dono
+   original" e atribui a ela toda `Person`/`Location` órfã. Idempotente: numa base já migrada, não
+   faz nada. As credenciais vêm de env (`LEGACY_OWNER_EMAIL`/`LEGACY_OWNER_PASSWORD`), com um e-mail
+   default de dev e senha **gerada aleatoriamente e impressa uma vez só** quando nenhuma das duas é
+   passada — pensado para rodar interativamente, onde alguém copia a senha na hora.
+3. `20260728204500_dono_obrigatorio` — só agora `userId` vira `NOT NULL`. Se o passo 2 não tiver
+   rodado (ou tiver deixado alguma linha órfã), o próprio Postgres recusa a migration — é a rede de
+   segurança que faz "esqueceu o backfill" virar erro na hora, não corrupção silenciosa.
+
+**Consequência que mordeu nesta sessão, e é o motivo de este ADR existir por escrito agora.** O
+backfill rodou de forma não-interativa contra o banco de desenvolvimento — a senha gerada foi
+impressa no terminal de um processo que encerrou antes de a sessão ser fechada com cuidado, e por
+pouco ficou irrecuperável (só foi achada de volta vasculhando o transcript bruto da conversa). A
+lição: **um passo que só imprime o segredo uma vez precisa de um operador olhando na hora**, ou de
+`LEGACY_OWNER_PASSWORD` setado com um valor escolhido de propósito — nunca rodar no escuro. Ainda não
+existe tela de trocar e-mail ou senha; é o próximo buraco a fechar, principalmente para quem herdou
+uma conta "dono original" e não escolheu nem uma coisa nem outra.
+
+**O que este ADR não resolve.** Convite/compartilhamento de árvore entre contas (a alternativa que
+foi descartada na decisão de isolamento) continua fora — se algum dia fizer sentido, é modelo de
+permissão novo, não um `userId` a mais. Recuperação de senha (esqueci minha senha) também não existe;
+hoje, perder a senha é perder o acesso, sem caminho de volta pela própria aplicação.

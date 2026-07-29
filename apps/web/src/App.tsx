@@ -1,17 +1,24 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLoaderData } from 'react-router-dom';
+import type { AuthUser } from '@kindred/types';
 import Sidebar from './components/Sidebar';
 
 /**
- * A moldura de todas as telas menos o `/setup`. Não busca nada: quem garante que
- * existe pessoa central é o `layoutLoader`, que roda antes daqui (ADR-010).
+ * A moldura de todas as telas menos `/setup`/`/login`/`/register`. Só busca o
+ * usuário logado (via `layoutLoader`, que roda antes daqui, ADR-010) para
+ * repassar à sidebar — quem garante que a sessão existe é o próprio loader.
  */
 export default function AppLayout() {
+  const { user } = useLoaderData() as { user: AuthUser };
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="app-layout">
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((c) => !c)} />
+      <Sidebar
+        user={user}
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((c) => !c)}
+      />
       <main className="app-main">
         <Outlet />
       </main>

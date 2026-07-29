@@ -15,3 +15,8 @@ export function errorMessage(error: unknown, fallback: string): string {
 export function isConflict(error: unknown): boolean {
   return axios.isAxiosError(error) && error.response?.status === 409;
 }
+
+/** 401: sem sessão válida, ou credenciais erradas no login (BL-10). */
+export function isUnauthorized(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 401;
+}

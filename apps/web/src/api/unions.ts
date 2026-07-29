@@ -1,7 +1,5 @@
-import axios from 'axios';
 import type { PersonUnion, UnionFormData, UnionStatus } from '@kindred/types';
-
-const api = axios.create({ baseURL: '/api' });
+import { client as api } from './client';
 
 export const unionsApi = {
   create: (data: UnionFormData) =>

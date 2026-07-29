@@ -3,18 +3,45 @@
 Fonte da verdade: [`packages/db/prisma/schema.prisma`](../packages/db/prisma/schema.prisma).
 PostgreSQL 16, Prisma 5. Ids são `uuid` gerados pela aplicação; `createdAt`/`updatedAt` em toda tabela.
 
+## `users`
+
+Uma conta (BL-10, ADR-018).
+
+| Coluna | Tipo | Nulo? | Nota |
+| --- | --- | --- | --- |
+| `id` | uuid | não | PK |
+| `name` | text | não | |
+| `email` | text | não | único |
+| `passwordHash` | text | não | bcrypt, custo 12 — nunca sai da API |
+
+`onDelete: Cascade` a partir daqui para `people`, `locations` e `sessions`: apagar a conta apaga a
+árvore inteira, sem deixar órfão.
+
+## `sessions`
+
+| Coluna | Tipo | Nulo? | Nota |
+| --- | --- | --- | --- |
+| `id` | text | não | PK — é o **hash SHA-256** (hex) do token que vai no cookie, não um id à parte |
+| `userId` | uuid | não | FK → `users.id`, `onDelete: Cascade` |
+| `expiresAt` | timestamp | não | 30 dias após o login, fixo — sem renovação deslizante |
+
+Guardar o hash, e não o token cru, é defesa em profundidade: um backup ou dump do banco não dá sessão
+de graça — só quem tem o cookie original consegue logar como alguém (RN-024). Sem cron de limpeza:
+sessão vencida é apagada na próxima vez que alguém tenta usá-la (`AuthService.validateSession`).
+
 ## `people`
 
 | Coluna | Tipo | Nulo? | Nota |
 | --- | --- | --- | --- |
 | `id` | uuid | não | PK |
+| `userId` | uuid | não | FK → `users.id`, `onDelete: Cascade` — dona da linha (RN-022) |
 | `name` | text | não | |
 | `sex` | enum `Sex` | sim | `MALE`, `FEMALE` |
 | `birthDate` | timestamp | sim | |
 | `deathDate` | timestamp | sim | |
 | `deceased` | boolean | não | default `false`; derivado de `deathDate` quando ela existe (RN-006) |
 | `relationshipType` | enum `RelationshipType` | não | `FAMILY`, `FRIEND`, `ACQUAINTANCE`, `OTHER` — cônjuge **não** está aqui, virou `unions` (ADR-008) |
-| `isCentralUser` | boolean | não | default `false`; no máximo um `true` (RN-001, garantido na aplicação) |
+| `isCentralUser` | boolean | não | default `false`; no máximo um `true` **por conta** (RN-001, garantido na aplicação) |
 | `notes` | text | sim | Texto livre, até 2000 caracteres — o teto é do DTO, não do banco (RN-019) |
 | `fatherId` | uuid | sim | FK → `people.id` |
 | `motherId` | uuid | sim | FK → `people.id` |
@@ -26,7 +53,13 @@ Duas auto-relações nomeadas (`Father`, `Mother`) dão os lados inversos `child
 
 **Não há constraint de unicidade em `isCentralUser`.** A regra é validada no serviço. Um índice único
 parcial (`where isCentralUser`) seria mais forte, mas o Prisma não o modela nativamente — ficaria como
-SQL solto na migration. Está no radar, não no schema.
+SQL solto na migration. Está no radar, não no schema. O mesmo vale para "no máximo um `true` por
+conta" — não há `@@unique([userId, isCentralUser])` porque isso exigiria permitir várias linhas com
+`isCentralUser = false`, e um índice único comum não distingue esse caso do violado.
+
+**`fatherId`/`motherId`/`locationId` não referenciam `userId` — a API garante isso na escrita.**
+Nada no schema impede um UUID de pessoa de outra conta ali; é `assertPersonIdsOwnedBy`/
+`assertLocationOwnedBy` (`people.service.ts`) que recusa antes de gravar (RN-022).
 
 ## `unions`
 
@@ -71,12 +104,14 @@ serve de versão na URL da imagem, para o navegador não servir a antiga do cach
 
 ## `locations`
 
-| Coluna | Tipo | Nulo? |
-| --- | --- | --- |
-| `id` | uuid | não |
-| `name` | text | não |
+| Coluna | Tipo | Nulo? | Nota |
+| --- | --- | --- | --- |
+| `id` | uuid | não | |
+| `userId` | uuid | não | FK → `users.id`, `onDelete: Cascade` — dona da linha (RN-022) |
+| `name` | text | não | |
 
-Sem unicidade em `name` — nada impede hoje "Curitiba" e "Curitiba, PR" coexistirem.
+Sem unicidade em `name` — nada impede hoje "Curitiba" e "Curitiba, PR" coexistirem **dentro da mesma
+conta**. Contas diferentes nem chegam a colidir: cada uma tem a própria lista.
 
 ## Migrations
 
@@ -98,11 +133,28 @@ cabeçalho o `SELECT` para salvar as URLs antes, caso algum banco tenha alguma.
 A quarta, `20260728120000_notas_por_pessoa`, só acrescenta `people.notes` — aditiva e anulável, sem
 backfill: quem já estava cadastrado fica sem nota.
 
+A quinta e a sexta são o BL-10 (multiusuário, ADR-018), e a ordem entre elas — com um passo manual no
+meio — é a parte que importa:
+
+1. `20260728203000_usuarios_e_donos` cria `users`/`sessions` e `userId` **nullable** em
+   `people`/`locations`. Nullable de propósito: não pode falhar por causa de linha existente.
+2. `pnpm db:backfill-owner` roda **entre** as duas migrations — dá dono a quem foi cadastrado antes
+   de existir conta, criando (ou reaproveitando) um usuário "dono original". Não é migration porque
+   grava dado, não schema; é idempotente (base já migrada, não faz nada).
+3. `20260728204500_dono_obrigatorio` torna `userId` `NOT NULL`. Se o passo 2 não tiver rodado, o
+   próprio Postgres recusa — a rede de segurança que transforma "esqueceu o backfill" em erro na
+   hora, não corrupção silenciosa.
+
+```bash
+pnpm db:backfill-owner   # entre as duas migrations acima, num banco que já tinha dado antes do BL-10
+```
+
 ## Seed
 
-[`packages/db/src/seed.ts`](../packages/db/src/seed.ts) cria 4 locais, 23 pessoas fictícias em quatro
-gerações e 7 uniões — avós, pais, um tio, a pessoa central (Miguel Souza), irmãos, um primo, esposa,
-sogros, um cunhado de cada lado, filhos, amigos e conhecidos, com dois falecidos e datas de
+[`packages/db/src/seed.ts`](../packages/db/src/seed.ts) cria uma conta (`seed@kindred.local`, senha
+`seed-account` — fictícia, sem risco, é só para desenvolvimento), 4 locais, 23 pessoas fictícias em
+quatro gerações e 7 uniões — avós, pais, um tio, a pessoa central (Miguel Souza), irmãos, um primo,
+esposa, sogros, um cunhado de cada lado, filhos, amigos e conhecidos, com dois falecidos e datas de
 nascimento espalhadas pelo ano. Entre as uniões há uma **desfeita** (a ex-esposa da pessoa central),
 para que "Ex-esposa" e o corte da afinidade (RN-013) apareçam sem ninguém precisar montar o caso à
 mão. Três pessoas vêm com **nota** (RN-019) — um avô, um amigo e um conhecido —, para o campo não
@@ -118,6 +170,13 @@ pnpm db:seed --force     # apaga pessoas, uniões e locais antes
 
 O banco de desenvolvimento deixou de ser descartável quando passou a ter uma família de verdade
 dentro. O porquê da forma escolhida está no **ADR-013**; o que se usa no dia a dia é isto:
+
+**O CLI é sempre o banco inteiro, todas as contas — é ferramenta de administração, não algo que uma
+conta comum roda.** Desde o BL-10 (ADR-018), `buildBackupPayload`/`buildRestoreOperations` recebem um
+`BackupScope` (`{kind: 'all'}` ou `{kind: 'user', userId}`) sem valor default — uma chamada que
+esqueça de escolher não compila. O CLI sempre passa `'all'`; é a API (`GET /api/backup`,
+`POST /api/backup/restore`) quem passa `'user'`, escopado a quem está logado — ver
+[`00-visao-tecnica.md`](00-visao-tecnica.md).
 
 ```bash
 pnpm db:backup                        # copia a base para ../kindred-backups (fora do repo)

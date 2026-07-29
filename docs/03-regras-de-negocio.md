@@ -2,10 +2,23 @@
 
 Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os commits citam.
 
+## Contas
+
+- **RN-022** — Cada conta (`User`) tem sua **própria árvore, isolada**: nenhuma `Person`, `Location`
+  ou `Union` é visível, editável ou referenciável por outra conta (BL-10, ADR-018). Pai, mãe, local e
+  parceiro de união informados numa escrita precisam pertencer à mesma conta de quem está pedindo —
+  senão a API recusa (`400`), em vez de aceitar o vínculo com o dado de outra conta.
+- **RN-023** — Buscar um id que existe, mas é de outra conta, devolve **404**, a mesma resposta de "não
+  existe" — nunca `403`. A diferença entre as duas coisas não pode ser observável por quem não tem a
+  sessão certa.
+- **RN-024** — A sessão vive num cookie `httpOnly`, sem renovação deslizante: expira 30 dias após o
+  login, independente de uso. Toda rota exige sessão válida por padrão; as exceções (`/auth/*`,
+  `/health`) são explícitas, não o contrário.
+
 ## Pessoa central
 
-- **RN-001** — Existe **no máximo uma** pessoa central. A API rejeita a criação de uma segunda
-  (`400`, "Já existe uma pessoa central cadastrada").
+- **RN-001** — Existe **no máximo uma** pessoa central **por conta**. A API rejeita a criação de uma
+  segunda dentro da mesma conta (`400`, "Já existe uma pessoa central cadastrada").
 - **RN-002** — Enquanto não houver pessoa central, o web redireciona para a tela de setup; a pessoa
   cadastrada ali nasce com `relationshipType = FAMILY` e `isCentralUser = true`.
 - **RN-018** — O posto de pessoa central pode ser **transferido** para outra pessoa já cadastrada

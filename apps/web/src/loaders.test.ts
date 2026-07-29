@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LoaderFunctionArgs } from 'react-router-dom';
-import type { Person } from '@kindred/types';
+import type { AuthUser, Person } from '@kindred/types';
 
 vi.mock('./api/people', () => ({
   peopleApi: {
@@ -15,11 +15,20 @@ vi.mock('./api/locations', () => ({
   locationsApi: { getAll: vi.fn() },
 }));
 
+vi.mock('./api/auth', () => ({
+  authApi: { me: vi.fn() },
+}));
+
 const { peopleApi } = await import('./api/people');
 const { locationsApi } = await import('./api/locations');
-const { layoutLoader, peopleListLoader, personFormLoader } = await import(
-  './loaders'
-);
+const { authApi } = await import('./api/auth');
+const {
+  guestOnlyLoader,
+  layoutLoader,
+  peopleListLoader,
+  personFormLoader,
+  setupLoader,
+} = await import('./loaders');
 
 const pessoa = (over: Partial<Person> = {}) =>
   ({
@@ -30,11 +39,22 @@ const pessoa = (over: Partial<Person> = {}) =>
     ...over,
   }) as Person;
 
+const usuario = (over: Partial<AuthUser> = {}): AuthUser => ({
+  id: 'u1',
+  name: 'Miguel Souza',
+  email: 'miguel@teste.local',
+  ...over,
+});
+
+/** `authApi.me()` dá 401 sem sessão — o dublê rejeita, como o axios faria. */
+const semSessao = () => Promise.reject(new Error('401'));
+
 /** O router passa um `Request`; só a URL interessa aos loaders. */
 const args = (url: string, params: Record<string, string> = {}) =>
   ({ request: new Request(url), params }) as unknown as LoaderFunctionArgs;
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(peopleApi.getAll).mockResolvedValue([]);
   vi.mocked(locationsApi.getAll).mockResolvedValue([]);
   vi.mocked(peopleApi.getPage).mockResolvedValue({
@@ -44,10 +64,23 @@ beforeEach(() => {
     limit: 10,
     totalPages: 1,
   });
+  // Logado por padrão — os testes de "sem sessão" sobrescrevem isto.
+  vi.mocked(authApi.me).mockResolvedValue(usuario());
 });
 
 describe('layoutLoader', () => {
-  it('desvia para o /setup quando não há pessoa central', async () => {
+  it('desvia para o /login quando não há sessão — antes mesmo de checar pessoa central', async () => {
+    vi.mocked(authApi.me).mockImplementation(semSessao);
+
+    const resposta = (await layoutLoader(args('http://x/people'))) as Response;
+
+    expect(resposta.status).toBe(302);
+    expect(resposta.headers.get('Location')).toBe('/login');
+    // Nem chegou a perguntar sobre pessoa central.
+    expect(peopleApi.getCentral).not.toHaveBeenCalled();
+  });
+
+  it('com sessão, desvia para o /setup quando não há pessoa central', async () => {
     vi.mocked(peopleApi.getCentral).mockResolvedValue(null);
 
     const resposta = (await layoutLoader(args('http://x/people'))) as Response;
@@ -56,28 +89,66 @@ describe('layoutLoader', () => {
     expect(resposta.headers.get('Location')).toBe('/setup');
   });
 
-  it('deixa passar quando há', async () => {
+  it('deixa passar quando há sessão e pessoa central', async () => {
     vi.mocked(peopleApi.getCentral).mockResolvedValue(pessoa());
 
     expect(await layoutLoader(args('http://x/people'))).toEqual({
+      user: usuario(),
       central: pessoa(),
     });
   });
 
-  it('não desvia quando o destino já é o /backup — é para lá que se vai sem central', async () => {
+  it('não desvia para /setup quando o destino já é o /backup — é para lá que se vai sem central', async () => {
     vi.mocked(peopleApi.getCentral).mockResolvedValue(null);
 
     const resultado = await layoutLoader(args('http://x/backup'));
 
-    expect(resultado).toEqual({ central: null });
+    expect(resultado).toEqual({ user: usuario(), central: null });
   });
 
-  it('deixa passar o /backup normalmente quando há pessoa central', async () => {
-    vi.mocked(peopleApi.getCentral).mockResolvedValue(pessoa());
+  it('o /backup continua exigindo sessão, mesmo sendo a exceção de pessoa central', async () => {
+    vi.mocked(authApi.me).mockImplementation(semSessao);
 
-    expect(await layoutLoader(args('http://x/backup'))).toEqual({
-      central: pessoa(),
-    });
+    const resposta = (await layoutLoader(args('http://x/backup'))) as Response;
+
+    expect(resposta.status).toBe(302);
+    expect(resposta.headers.get('Location')).toBe('/login');
+  });
+
+  it('no /backup, nem chega a perguntar sobre pessoa central — a checagem é pulada, não só o desvio', async () => {
+    await layoutLoader(args('http://x/backup'));
+
+    expect(peopleApi.getCentral).not.toHaveBeenCalled();
+  });
+});
+
+describe('setupLoader', () => {
+  it('sem sessão, desvia para /login', async () => {
+    vi.mocked(authApi.me).mockImplementation(semSessao);
+
+    const resposta = (await setupLoader()) as Response;
+
+    expect(resposta.status).toBe(302);
+    expect(resposta.headers.get('Location')).toBe('/login');
+  });
+
+  it('com sessão, deixa passar', async () => {
+    expect(await setupLoader()).toBeNull();
+  });
+});
+
+describe('guestOnlyLoader', () => {
+  it('sem sessão, deixa ver a tela de login/registro', async () => {
+    vi.mocked(authApi.me).mockImplementation(semSessao);
+
+    expect(await guestOnlyLoader()).toBeNull();
+  });
+
+  it('já logado, manda direto para /people em vez de mostrar o formulário de novo', async () => {
+    const resposta = (await guestOnlyLoader()) as Response;
+
+    expect(resposta.status).toBe(302);
+    expect(resposta.headers.get('Location')).toBe('/people');
   });
 });
 

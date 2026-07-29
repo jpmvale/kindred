@@ -1,7 +1,5 @@
-import axios from 'axios';
 import type { BackupCounts } from '@kindred/types';
-
-const api = axios.create({ baseURL: '/api' });
+import { client as api } from './client';
 
 /** O nome vem do `Content-Disposition` que a API manda; sem ele, um genérico. */
 function filenameFrom(disposition: unknown): string {

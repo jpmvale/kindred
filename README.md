@@ -18,7 +18,8 @@ a última sessão parou, ver [`docs-tec/HANDOFF.md`](docs-tec/HANDOFF.md).
 
 | Área | O que faz |
 | --- | --- |
-| **Setup** | Na primeira execução a app pede a **pessoa central** — a referência de todo o cálculo de parentesco. |
+| **Conta** | Cadastro e login por e-mail/senha; cada conta tem sua própria árvore, isolada das demais — nenhuma pessoa, local ou união é visível fora da conta que a criou (RN-022, ADR-018). |
+| **Setup** | No primeiro acesso de cada conta, a app pede a **pessoa central** — a referência de todo o cálculo de parentesco. |
 | **Pessoas** | Cadastro, edição e remoção: nome, sexo, nascimento, falecimento, foto (URL), tipo de relacionamento (família, amigo, conhecido, outro), pai, mãe e local. |
 | **Uniões** | Vínculo conjugal entre duas pessoas, com situação (vigente ou desfeita) e datas de início e fim — no formulário da pessoa (RN-011, ADR-008). |
 | **Listagem** | Busca por nome, parentesco ou tipo de relacionamento; ordenação por nome, nascimento ou idade; paginação; pessoas falecidas vão para o fim da lista. |
@@ -42,7 +43,7 @@ docker compose up -d postgres
 
 # 3. Schema + dados de exemplo
 pnpm db:migrate                 # aplica as migrations
-pnpm db:seed                    # família fictícia de 18 pessoas e 4 locais
+pnpm db:seed                    # família fictícia de 18 pessoas e 4 locais, numa conta de teste
 
 # 4. API e web em watch (Turborepo sobe os dois)
 pnpm dev
@@ -50,6 +51,8 @@ pnpm dev
 
 - **Web:** http://localhost:5173
 - **API:** http://localhost:3000/api — health em http://localhost:3000/api/health
+- **Login:** o app pede sessão em toda tela (BL-10). Depois do `db:seed`, entre com
+  `seed@kindred.local` / `seed-account` — ou crie uma conta nova em `/register`, que nasce vazia.
 - **Variáveis de ambiente:** opcionais. Copie [`.env.example`](.env.example) para `.env` se quiser
   mudar `DATABASE_URL` ou `PORT`; sem `.env`, os defaults de dev (o Postgres do compose na 5432 e a
   API na 3000) já funcionam.
@@ -70,6 +73,13 @@ pnpm db:seed                    # seed; --force apaga o que existe antes
 pnpm db:studio                  # Prisma Studio
 pnpm --filter @kindred/db db:reset   # dropa, remigra e reaplica o seed
 ```
+
+> **Banco que já tinha dados antes do BL-10** (multiusuário, ADR-018): depois de
+> `20260728203000_usuarios_e_donos` e **antes** de `20260728204500_dono_obrigatorio`, rode
+> `pnpm db:backfill-owner` — sem isso, a segunda migration falha de propósito (Postgres recusa
+> `NOT NULL` com linha órfã). Ele cria uma conta "dono original" e atribui a ela todo mundo que
+> não tinha `userId`; a senha sai só uma vez no terminal (ou vem de `LEGACY_OWNER_PASSWORD`) —
+> **rode isso interativamente, com alguém olhando**, nunca em background.
 
 **Backup (ADR-013):** a base de desenvolvimento vira a base de verdade de quem usa o kindred, e ela
 mora num volume do Docker — que some com um `docker compose down -v`.

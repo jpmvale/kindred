@@ -5,34 +5,55 @@ _Atualizado em 28/07/2026._
 ## Onde o projeto está
 
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
-busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro.
+busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro,
+e agora **com conta e login** (BL-10): cada pessoa que usa o kindred tem sua própria árvore, isolada
+das demais.
 
 **Marco de retomada — 28/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **205 testes**, 51 na API, 149 no
-web e 5 no `@kindred/db`. Os 6 e2e rodam à parte e precisam de banco. Para retomar, basta subir o
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **245 testes** (79 na API, 161 no
+web, 5 no `@kindred/db`) mais **13 e2e** (rodam à parte, com banco). Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) e escolher um item da seção **Próximo passo sugerido**, no
-fim deste arquivo.
+fim deste arquivo — e ler o aviso de credencial logo abaixo **antes** de qualquer outra coisa.
 
-> ⚠️ **O banco de dev tem dados reais.** Deixou de ser o seed de 23 pessoas fictícias: são ~140
-> pessoas da família de quem usa o kindred, com fotos e notas. Antes de qualquer coisa destrutiva
-> (`db:seed --force`, `db:reset`, `docker compose down -v`), rode **`pnpm db:backup`**. Precisa de
-> dados de teste? Use um banco descartável (`createdb` + `DATABASE_URL=...`) ou o fixture anônimo —
-> ver a sessão de backup abaixo.
+> 🔑 **A conta com os dados reais tem senha gerada por script, e quase ficou perdida.** O
+> `db:backfill-owner` do BL-10 (ver seção própria abaixo) rodou contra o banco de dev sem ninguém
+> olhando o terminal na hora, e a senha só é impressa **uma vez**. Foi recuperada vasculhando o
+> transcript bruto da sessão — mas por pouco, e **não fica registrada aqui**: este repositório é
+> público, e a senha foi comunicada direto no chat da sessão em que foi achada, não em arquivo
+> commitado. O e-mail da conta é `dono@kindred.local` — a senha, quem já recebeu, guardou.
+>
+> **Não existe troca de e-mail/senha pela aplicação ainda** (BL-16, no backlog) — até isso existir,
+> perder esta senha de novo é perder o acesso pela aplicação, sem caminho de volta que não seja
+> mexer no banco na mão (`UPDATE users SET "passwordHash" = ...`, com um hash bcrypt válido — nunca
+> senha em texto puro numa query salva em lugar nenhum). Trocar assim que der.
+
+> ⚠️ **O banco de dev tem dados reais.** Deixou de ser o seed de 23 pessoas fictícias: são ~150
+> pessoas da família de quem usa o kindred, com fotos e notas — agora todas na conta acima. Antes de
+> qualquer coisa destrutiva (`db:seed --force`, `db:reset`, `docker compose down -v`), rode
+> **`pnpm db:backup`**. Precisa de dados de teste? Use um banco descartável (`createdb` +
+> `DATABASE_URL=...`) ou o fixture anônimo — ver a sessão de backup mais abaixo.
 
 ## Onde a última sessão parou
 
-Entrou o **card de detalhe na árvore** — pedido do usuário, fora do backlog: clicar num nó abre um
-painel à direita com nome, notas, nascimento, pai, mãe, filhos e irmãos, e um botão para editar.
-Antes dele, na mesma data: **BL-06** (exportar/importar pela própria tela, ADR-016) — o último item
-do backlog que tinha um dono claro —, **tema escuro** (ADR-015), **BL-15** (a árvore vazia ao abrir
-tudo), **BL-09** (a listagem parou de arrastar a base inteira, ADR-014), o **backup** com o fixture
-anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendário).
+**BL-10 fechou** (multiusuário com login, ADR-018) — o único item do backlog, e o maior deste
+projeto até aqui: conta, sessão por cookie, e toda `Person`/`Location`/`Union` isolada por dono.
+**Esta sessão não implementou o BL-10** — ela **encontrou pronto**, sem commit, um BL-10 inteiro
+(código, migrations já aplicadas no banco real, 245+13 testes passando) deixado por uma sessão
+anterior que encerrou sem fechar: nem commit, nem handoff, nem a documentação (ADR, RN) que o próprio
+`CLAUDE.md` pede para toda decisão de arquitetura. O trabalho desta sessão foi conferir que nada
+estava quebrado ou meio pronto, revisar o código linha a linha, testar de ponta a ponta contra a base
+real (só leitura) e escrever a documentação que faltava — ver a seção própria abaixo, incluindo o
+incidente da senha.
 
-`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**205 testes**: 51 na API, 149 no web e 5 no
-`@kindred/db`), mais os 6 e2e que rodam à parte, com banco.
+Antes do BL-10, na mesma data: **BL-14** fechou — a isenção que o próprio ADR-014 tinha deixado em
+aberto ("não há o que enxugar [na chamada sem paginação] sem mudar o contrato"). Uma conferência
+campo a campo mostrou que árvore, calendário e os candidatos de um formulário nunca liam os objetos
+aninhados de pai/mãe/local nem o parceiro por extenso de cada união — só os ids. O contrato mudou
+(ADR-017): `PersonUnion.partner` virou opcional, e a chamada sem paginação passou a mandar `select`
+em vez de `include`.
 
-**O backlog está vazio de itens com dono óbvio.** Sobram BL-14 (enxugar árvore/calendário) e BL-10
-(multiusuário) — os dois são escolha de rumo, não continuação natural. Ver "Próximo passo sugerido".
+`pnpm typecheck`, `pnpm lint` e `pnpm test` verdes (**245 testes**: 79 na API, 161 no web e 5 no
+`@kindred/db`), mais os **13 e2e** que rodam à parte, com banco.
 
 ### Coisas do ambiente que custaram tempo
 
@@ -46,6 +67,103 @@ anônimo (ADR-013), o BL-05 (notas) e o BL-07 (falecimento no calendário).
   `pkill -f "kindred/apps/web"` e `pkill -f "kindred/apps/api"`.
 - O `pnpm` tem de ser chamado **direto**, nunca por `corepack` — já está no `CLAUDE.md`, mas foi o
   primeiro tropeço da sessão.
+- **Um script que só imprime um segredo uma vez não pode rodar sem ninguém olhando.** É a lição do
+  `db:backfill-owner` — ver o aviso de credencial no topo deste arquivo, e a seção "BL-10" abaixo.
+
+## Sessão de 28/07 — multiusuário com login (BL-10, ADR-018), retomado de uma sessão que sumiu
+
+Esta sessão começou com `git status` mostrando **27 arquivos modificados e 17 novos, nada staged** —
+sem nenhuma lembrança de como chegaram lá. A notificação de tarefas em segundo plano dizia que 3
+processos de shell da sessão anterior "podem ter sido encerrados quando o processo do Claude Code
+anterior saiu" — ou seja, uma sessão (não commitada aqui, então sem transcript nesta conversa) tinha
+implementado o BL-10 inteiro e morreu no meio, antes de fechar com cuidado.
+
+**O primeiro trabalho não foi escrever código — foi descobrir o que já existia, com cautela.** Regra
+de ouro deste tipo de situação: não presumir, não sobrescrever, investigar antes de agir. Nesta
+ordem:
+
+1. `git log`/`git status`/`git diff` para entender o tamanho e a forma da mudança.
+2. Ler `_prisma_migrations` do banco **real** (só leitura) para saber se as migrations novas —
+   `usuarios_e_donos` e `dono_obrigatorio` — já tinham sido **aplicadas de verdade**, não só
+   escritas em arquivo. Tinham: `userId` já `NOT NULL` em `people`/`locations`, uma linha em `users`.
+3. Ler o `backfill-owner.ts` para entender o que ele faz antes de assumir qualquer coisa sobre o
+   estado dos dados.
+4. Confirmar que a conta "dono original" (`dono@kindred.local`) existia de fato no banco real, e só
+   então ir atrás da senha — que o script imprime **uma vez**, em texto puro, e nunca mais.
+
+**A senha não estava em nenhum log de processo desta sessão** (todos vazios ou de outros comandos).
+Foi achada com `grep` no **transcript bruto** das duas sessões anteriores
+(`~/.claude/projects/.../*.jsonl`), na linha que o script imprime uma vez só: `senha gerada (guarde
+agora, não é mostrada de novo): ...`. Sem esse grep, a conta "dono original" — com as ~150 pessoas
+reais dentro — ficaria inacessível pela aplicação, porque **não existe recuperação de senha nem troca
+de credencial ainda** (viraram BL-16 e BL-17 no backlog). A senha em si **não foi escrita neste
+arquivo** — este repositório é público; foi passada direto no chat de quem estava na sessão. Ficou só
+o aviso, no topo deste arquivo.
+
+**Depois de recuperar a senha, a verificação do código em si — e ele estava sólido.** Revisão
+linha a linha de `auth.service.ts`/`auth.controller.ts`/`session.guard.ts` e do escopo por `userId`
+em `people.service.ts`/`unions.service.ts`/`locations.service.ts`, mais:
+
+- `pnpm typecheck` e `pnpm test` limpos de primeira: 245 testes (79 API, 161 web, 5 `@kindred/db`).
+- `pnpm lint`: só 3 avisos, todos `req.cookies` (tipado `Record<string, any>` pelo
+  `@types/cookie-parser` — não tem como saber o formato de um cookie sem parsear) e um `let user`
+  sem anotação. Corrigidos: um `sessionToken(req)` central em `cookie.ts` no lugar do cast repetido
+  três vezes, e `let user: AuthenticatedUser`. Lint voltou a zero.
+- **13 e2e**, rodados contra um banco descartável (nunca o real): o ciclo
+  registro→`/me`→logout→`/me` com cookie `httpOnly` de verdade, `/api/health` público mesmo com o
+  guard global, e principalmente **"duas contas nunca enxergam a pessoa uma da outra"** — cria pessoa
+  na conta A, confere que a conta B não a lista **nem consegue acessá-la pelo id** (`404`, não
+  `403`). Reaplicados depois da correção do lint, para confirmar que o refactor do cookie não mudou
+  comportamento.
+- Round-trip completo **contra a base real**, só leitura: login via `curl` com a senha recuperada →
+  `200` e cookie de sessão → `GET /api/people` com esse cookie devolve as ~150 pessoas, com
+  parentesco calculado certo. Depois, o mesmo pelo **navegador de verdade**: tela de login, e-mail e
+  senha recuperados, `/people` carrega a lista inteira, sidebar mostra "Dono original" e o botão de
+  sair.
+
+**O que a sessão anterior tinha deixado pronto e testado, mas não documentado, nem commitado — nada
+disso.** Nenhum ADR, nenhuma RN, `docs-tec/00-visao-tecnica.md` ainda dizia "não há autenticação",
+`docs/01-visao-do-produto.md` listava "múltiplos usuários" como não-objetivo. Escrito nesta sessão:
+**ADR-018** (o modelo de isolamento, sessão por cookie, o porquê de guard global com `@Public()` como
+exceção, e a migração em três passos — nullable → backfill → `NOT NULL`), **RN-022 a RN-024**
+(isolamento por conta, 404 nunca 403, sessão de 30 dias fixos), e a atualização de
+`00-visao-tecnica.md` (rotas `/api/auth/*`, toda rota exige sessão por padrão),
+`02-modelo-de-dados.md` (`users`/`sessions`, `userId` em `people`/`locations`, os três passos da
+migração), `01-visao-do-produto.md` e `README.md`.
+
+## Sessão de 28/07 — enxugar a chamada sem paginação (BL-14, ADR-017)
+
+O ADR-014 já tinha resolvido a listagem paginada (varredura enxuta + includes só da página) e deixado
+escrito que a chamada **sem paginação** (`GET /api/people` sem query params) continuava trazendo pai,
+mãe, local e o parceiro de cada união por extenso, "sem o que enxugar ali sem mudar o contrato". BL-14
+era essa conferência: será que os três consumidores dessa chamada — `TreePage`, `CalendarPage` e os
+candidatos a pai/mãe/cônjuge do `PersonFormPage` — realmente leem esses campos?
+
+**Não liam.** `tree-layout.ts` e `person-relations.ts` (o card de detalhe) resolvem pai/mãe/irmãos
+pelo `fatherId`/`motherId` na própria lista, e o cônjuge pelo `partnerId` de cada união — nunca pelos
+objetos aninhados que o `include` do Prisma vinha trazendo. `PersonFormPage` usa a lista só para
+`id`/`name` dos candidatos. O único lugar que lê `union.partner.name` por extenso é o próprio
+`PersonFormPage`, mas para a pessoa que está **editando** — e essa vem de `GET /people/:id`
+(`findOne`), uma chamada diferente, que ficou como estava.
+
+A troca: `include: INCLUDE` virou `select: LIST_SELECT` (os mesmos campos da varredura do ADR-014,
+mais notas, foto e uniões — mas as uniões com `select`, só o id do parceiro). Uma segunda função,
+`withUnionRefs`, faz a mesma normalização de lado do par que `withUnions` (RN-011), sem montar
+`partner`.
+
+**O contrato mudou de propósito, sem rota nova.** `PersonUnion.partner` virou opcional no
+`@kindred/types` — marcar a ausência é mais honesto que continuar prometendo um campo que a metade
+das chamadas não manda mais. Isso quebrou o typecheck em exatamente um lugar
+(`PersonFormPage.tsx`, que lê `union.partner.name` na tela de uniões), corrigido com um cast local
+comentado — não um `!`, que apagaria o aviso se esse componente um dia passasse a ler uniões de outra
+fonte.
+
+**Verificado rodando:** criada uma união temporária entre duas pessoas de teste para comparar os dois
+formatos lado a lado — a lista sem paginação devolveu `{id, status, startDate, endDate, partnerId}`;
+o `GET /people/:id` da mesma pessoa devolveu o parceiro por extenso, como sempre devolveu. Árvore,
+calendário e o card de detalhe seguiram funcionando sem nenhuma mudança de código no lado do web — a
+prova de que o corte não tirou nada que alguém usasse. A base real (143 pessoas, sem nenhuma união
+cadastrada ainda) voltou exatamente como estava depois do teste.
 
 ## Sessão de 28/07 — card de detalhe ao clicar num nó da árvore
 
@@ -522,6 +640,17 @@ não há resposta.
 
 ## O que foi verificado rodando
 
+Na sessão do BL-10 (detalhe completo na seção própria, acima) — resumo:
+
+- Migrations do BL-10 conferidas como **já aplicadas** no banco real (`_prisma_migrations`, só
+  leitura), nunca reaplicadas.
+- 245 testes de unidade + **13 e2e** (banco descartável, criado e derrubado na hora) — o e2e de
+  isolamento entre contas (404, não 403, para pessoa de outra conta) é o que mais importa aqui.
+- Login com a senha recuperada, via `curl` e depois pelo **navegador de verdade** contra a base
+  real: cookie de sessão, `GET /api/people` devolvendo as ~150 pessoas com parentesco calculado,
+  sidebar mostrando "Dono original".
+- A base real não foi alterada em nenhum momento desta sessão — só lida.
+
 Na sessão do card de detalhe, direto contra a **base real** (só leitura, nada escrito), pelo
 navegador de verdade:
 
@@ -698,24 +827,45 @@ Na sessão de 26/07 (monorepo):
   antes — aceitável porque quem roda o CLI é quem escreveu o arquivo minutos antes. Se um dia o CLI
   também precisar dessa garantia, `buildRestoreOperations` já monta as operações prontas para
   `$transaction`, só falta trocar o laço em `restore.ts`.
+- **Toda rota nasce protegida — `@Public()` é a exceção, e precisa ser lembrada.** Um controller novo
+  sem pensar em auth já funciona certo (exige sessão, escopo por si só não existe ainda). Uma rota que
+  *deveria* ser pública e esquece o `@Public()` falha alto (401 sempre) — o oposto de vazar dado. Mas
+  um `Person`/`Location` novo que esqueça o `userId` no `where` de alguma consulta **compila e roda**,
+  só vaza entre contas — não há teste de tipo que pegue isso, só revisão e os e2e de isolamento.
+- **Mexeu no schema, de novo: o backup também precisa saber — e agora tem escopo.** `BackupScope`
+  (`{kind:'all'}` para o CLI, `{kind:'user', userId}` para a API) não tem default de propósito: uma
+  chamada nova que esqueça de escolher não compila (ADR-018).
+- **Um script que só imprime uma senha uma vez pede um operador olhando.** `db:backfill-owner` é
+  interativo por natureza — rodar em background ou sem supervisão é como a senha quase se perdeu
+  nesta sessão. Ver o aviso fixo no topo deste arquivo.
 
 ## Próximo passo sugerido
 
-Nada travado, nada pela metade e **nenhum defeito conhecido em aberto**. O backlog só tem dois itens,
-e os dois são **escolha de rumo** — vale decidir com o usuário, não emendar:
+Nada travado, nada pela metade — mas **há**, pela primeira vez em muitas sessões, uma pendência
+operacional real e urgente, não só técnica: a senha da conta com os dados reais é uma string gerada
+por script, guardada só neste arquivo. Antes de qualquer item novo:
 
-1. **BL-14** — enxugar a resposta da árvore e do calendário, que ainda recebem a base inteira com
-   pai, mãe e local aninhados (7,5 MB com 5000 pessoas). Diferente do BL-09, isto **mexe no contrato
-   da API**: precisa decidir o que cada tela realmente consome antes de cortar.
-2. **BL-10** — multiusuário com login. Muda o produto de "base pessoal" para serviço.
+1. **BL-16 — trocar e-mail e senha da própria conta.** Sem uma tela para isso, a única forma de sair
+   da senha gerada é mexer no banco na mão (`UPDATE users SET "passwordHash" = ...`, com um hash
+   bcrypt válido) — o que este handoff não deveria estar recomendando como caminho normal. É pequeno
+   (uma rota `PATCH /auth/me`, reautenticar com a senha atual antes de trocar) e destrava o usuário
+   real de uma vez.
+2. **BL-17 — recuperar senha esquecida.** Menor urgência que o BL-16 (ainda dá para trocar sabendo a
+   senha atual), mas é o mesmo buraco visto de outro ângulo: hoje não há como entrar de novo se a
+   senha se perder.
+3. Depois desses dois, o backlog volta a ter só itens de escolha de rumo — nenhum aberto no momento.
 
 Fora do backlog: **GEDCOM** ficou de fora do BL-06 de propósito (trocar dados com outros programas de
 genealogia é bem mais trabalho que o JSON que já existe), e não tem número — só entra se alguém
-pedir.
+pedir. **Compartilhar uma árvore entre contas** (a alternativa ao isolamento total do BL-10) também
+ficou de fora de propósito — ver ADR-018 — e também não tem número: é modelo de permissão novo, não
+uma extensão pequena.
 
-**Uma lição que já se repetiu três vezes:** medir antes de mexer. Na primeira metade do BL-09 o
-backlog culpava a consulta, e o gargalo era o cálculo — 14× maior do que o apontado. Na segunda, o
-ganho real só apareceu porque havia uma base de 5000 pessoas para medir: na base de 143, a diferença
-entre 202 ms e 35 ms não aparece. No BL-15 a suspeita escrita era o `minZoom`, e bastou rodar o
-layout fora do navegador para ver que o zoom pedido estava o dobro acima do piso — o problema era
-outro, e sem medir teria virado uma tarde mexendo no número errado.
+**Uma lição que já se repetiu quatro vezes:** medir/investigar antes de agir. Na primeira metade do
+BL-09 o backlog culpava a consulta, e o gargalo era o cálculo — 14× maior do que o apontado. Na
+segunda, o ganho real só apareceu porque havia uma base de 5000 pessoas para medir. No BL-15 a
+suspeita escrita era o `minZoom`, e bastou rodar o layout fora do navegador para ver que o problema
+era outro. Nesta sessão, "27 arquivos modificados do nada" pedia a mesma disciplina, só que sobre o
+próprio estado do repositório: ler `_prisma_migrations` do banco real antes de presumir se uma
+migration tinha rodado, e vasculhar transcript antes de assumir que uma senha estava perdida — em vez
+de, por exemplo, resetá-la sem necessidade.

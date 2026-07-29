@@ -25,6 +25,15 @@ export const BACKUP_FORMAT = 1;
 /** Modelos que compõem um backup completo, na ordem em que precisam ser gravados. */
 const MODELS = ["Location", "Person", "Union", "PersonPhoto"] as const;
 
+/**
+ * Escopo de um backup (BL-10). `'all'` é o banco inteiro — só o CLI usa, para
+ * administração; é o que `db:backup`/`db:restore` sempre fizeram. `'user'` é
+ * uma conta só — é o que a API expõe por HTTP, já que cada conta só pode
+ * exportar/restaurar a própria árvore. Tipo discriminado e sem default: uma
+ * chamada nova que esqueça de escolher não compila.
+ */
+export type BackupScope = { kind: "all" } | { kind: "user"; userId: string };
+
 export function backupDir(): string {
   if (process.env.KINDRED_BACKUP_DIR) return process.env.KINDRED_BACKUP_DIR;
   // Irmão do repositório, nunca dentro: um `git clean -xfd` não leva junto.
@@ -75,12 +84,21 @@ export function assertCoverage(dados: Record<string, unknown[]>): void {
   }
 }
 
-export async function collect(prisma: PrismaClient) {
+export async function collect(prisma: PrismaClient, scope: BackupScope) {
+  const owner =
+    scope.kind === "user" ? { userId: scope.userId } : undefined;
+
   const [locations, people, unions, photos] = await Promise.all([
-    prisma.location.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.person.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.union.findMany({ orderBy: { createdAt: "asc" } }),
-    prisma.personPhoto.findMany({ orderBy: { createdAt: "asc" } }),
+    prisma.location.findMany({ where: owner, orderBy: { createdAt: "asc" } }),
+    prisma.person.findMany({ where: owner, orderBy: { createdAt: "asc" } }),
+    prisma.union.findMany({
+      where: owner && { partnerA: owner },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.personPhoto.findMany({
+      where: owner && { person: owner },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
 
   return {
@@ -101,8 +119,8 @@ export async function collect(prisma: PrismaClient) {
  * as duas pontas compartilham exatamente o mesmo formato, então uma nunca lê o
  * que a outra não sabe escrever.
  */
-export async function buildBackupPayload(prisma: PrismaClient) {
-  const dados = await collect(prisma);
+export async function buildBackupPayload(prisma: PrismaClient, scope: BackupScope) {
+  const dados = await collect(prisma, scope);
   assertCoverage(dados as unknown as Record<string, unknown[]>);
 
   return {
@@ -115,8 +133,9 @@ export async function buildBackupPayload(prisma: PrismaClient) {
   };
 }
 
+/** Só o CLI usa — backup/restore de administração é sempre o banco inteiro. */
 export async function createBackup(prisma: PrismaClient, destino?: string) {
-  const conteudo = await buildBackupPayload(prisma);
+  const conteudo = await buildBackupPayload(prisma, { kind: "all" });
 
   const dir = destino ?? backupDir();
   mkdirSync(dir, { recursive: true });

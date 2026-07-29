@@ -47,6 +47,37 @@ const LEAN_SELECT = {
   motherId: true,
 } as const;
 
+/**
+ * O que a árvore, o calendário e os candidatos a pai/mãe/cônjuge realmente usam
+ * da chamada **sem paginação** (BL-14): tudo da varredura enxuta, mais notas,
+ * foto e uniões — mas sem os objetos aninhados de pai, mãe, local nem parceiro,
+ * que nenhum dos três lê (eles olham `fatherId`/`motherId`/`partnerId` e resolvem
+ * na própria lista que já têm). Ver ADR-017.
+ */
+const LIST_SELECT = {
+  ...LEAN_SELECT,
+  notes: true,
+  photo: { select: { updatedAt: true } },
+  unionsAsA: {
+    select: {
+      id: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      partnerBId: true,
+    },
+  },
+  unionsAsB: {
+    select: {
+      id: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      partnerAId: true,
+    },
+  },
+} as const;
+
 const RELATIONSHIP_LABELS: Record<string, string> = {
   FAMILY: 'Família',
   FRIEND: 'Amigo',
@@ -71,6 +102,7 @@ type PersonWithUnionSides = {
   unionsAsA: (UnionFields & { partnerBId: string; partnerB: Person })[];
   unionsAsB: (UnionFields & { partnerAId: string; partnerA: Person })[];
   photo?: { updatedAt: Date } | null;
+  userId?: string;
 };
 
 /**
@@ -79,27 +111,65 @@ type PersonWithUnionSides = {
  * pessoa, e quem é o par em cada uma". A conversão acontece aqui, na borda.
  *
  * A foto passa pelo mesmo lugar: vira só a data em que foi enviada — que diz se
- * existe foto e serve de desempate de cache no navegador (ADR-011).
+ * existe foto e serve de desempate de cache no navegador (ADR-011). `userId`
+ * também sai aqui — é dono de linha, não algo que o web precisa ver (BL-10).
  */
 function withUnions<T extends PersonWithUnionSides>({
   unionsAsA,
   unionsAsB,
   photo,
+  userId: _userId,
   ...person
 }: T) {
   return {
     ...person,
     photoUpdatedAt: photo?.updatedAt ?? null,
     unions: [
-      ...unionsAsA.map(({ partnerBId, partnerB, ...union }) => ({
+      ...unionsAsA.map(({ partnerBId, partnerB, ...union }) => {
+        const { userId: _partnerUserId, ...partner } = partnerB;
+        return { ...union, partnerId: partnerBId, partner };
+      }),
+      ...unionsAsB.map(({ partnerAId, partnerA, ...union }) => {
+        const { userId: _partnerUserId, ...partner } = partnerA;
+        return { ...union, partnerId: partnerAId, partner };
+      }),
+    ],
+  };
+}
+
+type PersonWithUnionRefSides = {
+  unionsAsA: (UnionFields & { partnerBId: string })[];
+  unionsAsB: (UnionFields & { partnerAId: string })[];
+  photo?: { updatedAt: Date } | null;
+  userId?: string;
+};
+
+/**
+ * Mesma normalização de lado do par que `withUnions` (RN-011), mas sem buscar o
+ * parceiro por extenso — só `partnerId`. É o que alimenta a chamada sem
+ * paginação (`LIST_SELECT`): quem edita uma pessoa específica precisa do nome do
+ * parceiro na tela de uniões e passa por `withUnions`; quem só desenha a árvore,
+ * o calendário ou os candidatos de um formulário já tem esse nome na própria
+ * lista, pelo `partnerId` (ADR-017).
+ */
+function withUnionRefs<T extends PersonWithUnionRefSides>({
+  unionsAsA,
+  unionsAsB,
+  photo,
+  userId: _userId,
+  ...person
+}: T) {
+  return {
+    ...person,
+    photoUpdatedAt: photo?.updatedAt ?? null,
+    unions: [
+      ...unionsAsA.map(({ partnerBId, ...union }) => ({
         ...union,
         partnerId: partnerBId,
-        partner: partnerB,
       })),
-      ...unionsAsB.map(({ partnerAId, partnerA, ...union }) => ({
+      ...unionsAsB.map(({ partnerAId, ...union }) => ({
         ...union,
         partnerId: partnerAId,
-        partner: partnerA,
       })),
     ],
   };
@@ -109,16 +179,22 @@ function withUnions<T extends PersonWithUnionSides>({
 export class PeopleService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreatePersonDto) {
+  async create(dto: CreatePersonDto, userId: string) {
     if (dto.isCentralUser) {
       const existing = await this.prisma.person.findFirst({
-        where: { isCentralUser: true },
+        where: { isCentralUser: true, userId },
       });
       if (existing)
         throw new BadRequestException(
           'Já existe uma pessoa central cadastrada',
         );
     }
+
+    const fatherId = normalizeNullableUuid(dto.fatherId);
+    const motherId = normalizeNullableUuid(dto.motherId);
+    const locationId = normalizeNullableUuid(dto.locationId);
+    await this.assertPersonIdsOwnedBy(userId, [fatherId, motherId]);
+    await this.assertLocationOwnedBy(userId, locationId);
 
     const created = await this.prisma.person.create({
       data: {
@@ -130,9 +206,10 @@ export class PeopleService {
         relationshipType: dto.relationshipType,
         isCentralUser: dto.isCentralUser ?? false,
         notes: dto.notes ?? null,
-        fatherId: normalizeNullableUuid(dto.fatherId),
-        motherId: normalizeNullableUuid(dto.motherId),
-        locationId: normalizeNullableUuid(dto.locationId),
+        userId,
+        fatherId,
+        motherId,
+        locationId,
       },
       include: INCLUDE,
     });
@@ -140,7 +217,7 @@ export class PeopleService {
     return withUnions(created);
   }
 
-  async findAll(query?: FindPeopleQueryDto) {
+  async findAll(userId: string, query?: FindPeopleQueryDto) {
     const hasPaginationRequest = Boolean(
       query?.page ||
       query?.limit ||
@@ -149,35 +226,42 @@ export class PeopleService {
       query?.sortDirection,
     );
 
-    // Sem paginação, quem chama é a árvore ou o calendário: os dois querem a base
-    // inteira, com uniões e foto. Não há o que enxugar aqui.
+    // Sem paginação, quem chama é a árvore, o calendário ou os candidatos de um
+    // formulário — os três querem a base inteira (da conta autenticada), mas
+    // nenhum lê pai/mãe/local aninhados nem o parceiro por extenso (BL-14,
+    // ADR-017).
     if (!hasPaginationRequest) {
       const [people, unions] = await Promise.all([
         this.prisma.person.findMany({
+          where: { userId },
           orderBy: { name: 'asc' },
-          include: INCLUDE,
+          select: LIST_SELECT,
         }),
         this.prisma.union.findMany({
+          where: { partnerA: { userId } },
           select: { partnerAId: true, partnerBId: true, status: true },
         }),
       ]);
 
       const kinshipOf = this.kinshipResolverFor(people, unions);
       return people.map((p) => ({
-        ...withUnions(p),
+        ...withUnionRefs(p),
         kinshipDegree: kinshipOf(p.id),
       }));
     }
 
-    // Paginado: varre a base **enxuta** (ADR-014). Parentesco precisa do grafo
-    // inteiro e a busca casa o grau calculado, então não há como filtrar no SQL —
-    // mas dá para não arrastar pai, mãe, local, uniões e foto de todo mundo.
+    // Paginado: varre a base **enxuta** da conta (ADR-014). Parentesco precisa
+    // do grafo inteiro e a busca casa o grau calculado, então não há como
+    // filtrar no SQL — mas dá para não arrastar pai, mãe, local, uniões e foto
+    // de todo mundo.
     const [people, unions] = await Promise.all([
       this.prisma.person.findMany({
+        where: { userId },
         orderBy: { name: 'asc' },
         select: LEAN_SELECT,
       }),
       this.prisma.union.findMany({
+        where: { partnerA: { userId } },
         select: { partnerAId: true, partnerBId: true, status: true },
       }),
     ]);
@@ -249,7 +333,7 @@ export class PeopleService {
     const pageRows = sorted.slice(start, start + limit);
 
     // Só agora os includes, e só para as linhas que a página mostra.
-    const data = await this.withIncludes(pageRows);
+    const data = await this.withIncludes(pageRows, userId);
 
     return {
       data,
@@ -278,15 +362,16 @@ export class PeopleService {
   /**
    * Busca pai, mãe, local, uniões e foto das pessoas de uma página e devolve na
    * **mesma ordem** que entrou — o `where: { id: { in } }` não promete ordem, e a
-   * ordenação já foi decidida sobre a lista enxuta.
+   * ordenação já foi decidida sobre a lista enxuta. `userId` aqui é defesa
+   * extra: os ids já vieram de uma varredura escopada, mas custa nada reforçar.
    */
   private async withIncludes<
     T extends { id: string; kinshipDegree: string | null },
-  >(rows: T[]) {
+  >(rows: T[], userId: string) {
     if (!rows.length) return [];
 
     const full = await this.prisma.person.findMany({
-      where: { id: { in: rows.map((r) => r.id) } },
+      where: { id: { in: rows.map((r) => r.id) }, userId },
       include: INCLUDE,
     });
 
@@ -300,26 +385,32 @@ export class PeopleService {
     });
   }
 
-  async findCentral() {
-    return this.prisma.person.findFirst({ where: { isCentralUser: true } });
+  async findCentral(userId: string) {
+    return this.prisma.person.findFirst({
+      where: { isCentralUser: true, userId },
+    });
   }
 
-  async findOne(id: string) {
-    const person = await this.prisma.person.findUnique({
-      where: { id },
+  async findOne(id: string, userId: string) {
+    const person = await this.prisma.person.findFirst({
+      where: { id, userId },
       include: INCLUDE,
     });
+    // 404 tanto para "não existe" quanto para "é de outra conta" — a mesma
+    // resposta não denuncia qual dos dois é (BL-10).
     if (!person) throw new NotFoundException(`Pessoa "${id}" não encontrada`);
 
     if (person.isCentralUser)
       return { ...withUnions(person), kinshipDegree: 'Você' };
 
     const [central, all, unions] = await Promise.all([
-      this.prisma.person.findFirst({ where: { isCentralUser: true } }),
+      this.prisma.person.findFirst({ where: { isCentralUser: true, userId } }),
       this.prisma.person.findMany({
+        where: { userId },
         select: { id: true, fatherId: true, motherId: true, sex: true },
       }),
       this.prisma.union.findMany({
+        where: { partnerA: { userId } },
         select: { partnerAId: true, partnerBId: true, status: true },
       }),
     ]);
@@ -332,10 +423,25 @@ export class PeopleService {
     };
   }
 
-  async update(id: string, dto: UpdatePersonDto) {
-    await this.findOne(id);
+  async update(id: string, dto: UpdatePersonDto, userId: string) {
+    await this.findOne(id, userId);
     const resolvedDeceased =
       dto.deathDate !== undefined ? Boolean(dto.deathDate) : dto.deceased;
+
+    const fatherId =
+      dto.fatherId !== undefined
+        ? normalizeNullableUuid(dto.fatherId)
+        : undefined;
+    const motherId =
+      dto.motherId !== undefined
+        ? normalizeNullableUuid(dto.motherId)
+        : undefined;
+    const locationId =
+      dto.locationId !== undefined
+        ? normalizeNullableUuid(dto.locationId)
+        : undefined;
+    await this.assertPersonIdsOwnedBy(userId, [fatherId, motherId]);
+    await this.assertLocationOwnedBy(userId, locationId);
 
     const updated = await this.prisma.person.update({
       where: { id },
@@ -353,15 +459,9 @@ export class PeopleService {
           relationshipType: dto.relationshipType,
         }),
         ...(dto.notes !== undefined && { notes: dto.notes ?? null }),
-        ...(dto.fatherId !== undefined && {
-          fatherId: normalizeNullableUuid(dto.fatherId),
-        }),
-        ...(dto.motherId !== undefined && {
-          motherId: normalizeNullableUuid(dto.motherId),
-        }),
-        ...(dto.locationId !== undefined && {
-          locationId: normalizeNullableUuid(dto.locationId),
-        }),
+        ...(fatherId !== undefined && { fatherId }),
+        ...(motherId !== undefined && { motherId }),
+        ...(locationId !== undefined && { locationId }),
       },
       include: INCLUDE,
     });
@@ -369,8 +469,8 @@ export class PeopleService {
     return withUnions(updated);
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, userId: string) {
+    await this.findOne(id, userId);
     // A foto vai junto pela cascata do banco (ADR-011): não sobra órfão.
     return this.prisma.person.delete({ where: { id } });
   }
@@ -383,17 +483,19 @@ export class PeopleService {
    * e nesta ordem: tirar de quem tem antes de dar a quem vai receber. Um instante
    * com dois centrais quebraria o cálculo de parentesco, que procura um só.
    */
-  async setCentral(id: string) {
-    const alvo = await this.prisma.person.findUnique({
-      where: { id },
+  async setCentral(id: string, userId: string) {
+    const alvo = await this.prisma.person.findFirst({
+      where: { id, userId },
       select: { isCentralUser: true },
     });
     if (!alvo) throw new NotFoundException(`Pessoa "${id}" não encontrada`);
-    if (alvo.isCentralUser) return this.findOne(id);
+    if (alvo.isCentralUser) return this.findOne(id, userId);
 
     await this.prisma.$transaction([
+      // Escopado à conta — sem o `userId` aqui, isto apagaria o `isCentralUser`
+      // de todas as outras contas do banco, não só a de quem está pedindo.
       this.prisma.person.updateMany({
-        where: { isCentralUser: true },
+        where: { isCentralUser: true, userId },
         data: { isCentralUser: false },
       }),
       this.prisma.person.update({
@@ -402,13 +504,13 @@ export class PeopleService {
       }),
     ]);
 
-    return this.findOne(id);
+    return this.findOne(id, userId);
   }
 
   // ─── Foto de perfil (ADR-011, RN-017) ──────────────────────────────────────
 
-  async savePhoto(id: string, dto: UploadPhotoDto) {
-    await this.ensureExists(id);
+  async savePhoto(id: string, dto: UploadPhotoDto, userId: string) {
+    await this.ensureOwnedBy(userId, id);
 
     const bytes = Buffer.from(dto.data, 'base64');
     if (bytes.length === 0)
@@ -433,16 +535,16 @@ export class PeopleService {
   }
 
   /** Os bytes em si. Só a rota da foto chama isto. */
-  async findPhoto(id: string) {
-    const photo = await this.prisma.personPhoto.findUnique({
-      where: { personId: id },
+  async findPhoto(id: string, userId: string) {
+    const photo = await this.prisma.personPhoto.findFirst({
+      where: { personId: id, person: { userId } },
     });
     if (!photo) throw new NotFoundException(`Pessoa "${id}" não tem foto`);
     return photo;
   }
 
-  async removePhoto(id: string) {
-    await this.ensureExists(id);
+  async removePhoto(id: string, userId: string) {
+    await this.ensureOwnedBy(userId, id);
     const deleted = await this.prisma.personPhoto.deleteMany({
       where: { personId: id },
     });
@@ -451,12 +553,46 @@ export class PeopleService {
     return { photoUpdatedAt: null };
   }
 
-  /** Existe? — sem arrastar parentesco nem uniões, que a foto não usa. */
-  private async ensureExists(id: string) {
-    const person = await this.prisma.person.findUnique({
-      where: { id },
+  /** Existe **e é desta conta**? — sem arrastar parentesco nem uniões. */
+  private async ensureOwnedBy(userId: string, id: string) {
+    const person = await this.prisma.person.findFirst({
+      where: { id, userId },
       select: { id: true },
     });
     if (!person) throw new NotFoundException(`Pessoa "${id}" não encontrada`);
+  }
+
+  /**
+   * `fatherId`/`motherId` (ou qualquer outro id de pessoa vindo de um DTO)
+   * precisam pertencer à mesma conta — sem isso, o Postgres aceitaria de bom
+   * grado o UUID de alguém de outra conta, e a resposta devolveria essa pessoa
+   * inteira via `include` (BL-10).
+   */
+  private async assertPersonIdsOwnedBy(
+    userId: string,
+    ids: (string | null | undefined)[],
+  ) {
+    const unique = [...new Set(ids.filter((x): x is string => Boolean(x)))];
+    if (!unique.length) return;
+    const count = await this.prisma.person.count({
+      where: { id: { in: unique }, userId },
+    });
+    if (count !== unique.length)
+      throw new BadRequestException(
+        'Pai, mãe ou pessoa informada não existe nesta conta',
+      );
+  }
+
+  private async assertLocationOwnedBy(
+    userId: string,
+    locationId?: string | null,
+  ) {
+    if (!locationId) return;
+    const found = await this.prisma.location.findFirst({
+      where: { id: locationId, userId },
+      select: { id: true },
+    });
+    if (!found)
+      throw new BadRequestException('Local informado não existe nesta conta');
   }
 }

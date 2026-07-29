@@ -11,14 +11,18 @@ export {
   Sex,
   UnionStatus,
 } from "@prisma/client";
-export type { Location, Person, Union } from "@prisma/client";
+export type { Location, Person, Union, User } from "@prisma/client";
 export { DEFAULT_DATABASE_URL, loadRootEnv } from "./env";
 
 /**
  * Backup, restauração e exportação (BL-06, ADR-013/016) — a API expõe pela
  * aplicação o que o CLI (`db:backup`/`db:restore`) já fazia por arquivo.
  */
-export { backupFilename, buildBackupPayload } from "./backup";
+export {
+  backupFilename,
+  buildBackupPayload,
+  type BackupScope,
+} from "./backup";
 export {
   buildRestoreOperations,
   parseBackupFile,

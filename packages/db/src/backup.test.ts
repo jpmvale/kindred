@@ -21,6 +21,7 @@ describe("assertCoverage", () => {
     fatherId: null,
     motherId: null,
     locationId: null,
+    userId: "u1",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };
@@ -28,6 +29,7 @@ describe("assertCoverage", () => {
   const localCompleto = {
     id: "l1",
     name: "Curitiba, PR",
+    userId: "u1",
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };

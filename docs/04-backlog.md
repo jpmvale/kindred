@@ -4,10 +4,16 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
 
 | # | Item | Por quê |
 | --- | --- | --- |
-| BL-14 | **Enxugar a resposta da árvore e do calendário** | A chamada sem paginação ainda traz a base inteira com pai, mãe e local aninhados — 7,5 MB com 5000 pessoas. A árvore usa `fatherId`/`motherId`, uniões e foto; o calendário, menos ainda. Mexe no contrato da API, por isso ficou fora do BL-09 (ADR-014). |
-| BL-10 | **Multiusuário com login** | Mudaria o produto de "base pessoal" para serviço; fora do escopo atual. |
+| BL-16 | **Trocar e-mail e senha da própria conta** | Não existe hoje (ADR-018). Quem herdou a conta "dono original" do backfill do BL-10 está com uma senha gerada por script — sem isto, não tem como escolher a própria. |
+| BL-17 | **Recuperar senha esquecida** | Também não existe. Hoje perder a senha é perder o acesso, sem caminho de volta pela aplicação — só reabrindo o banco na mão. |
 
 **Concluídos.**
+
+- **BL-10** — multiusuário com login: cada conta tem sua própria árvore, isolada — nenhuma pessoa,
+  local ou união é visível fora de quem a criou (RN-022 a RN-024, ADR-018). Sessão por cookie
+  `httpOnly`, guard global (toda rota exige login por padrão, `@Public()` é a exceção), 404 — nunca
+  403 — para dado de outra conta. Quem já tinha base antes do login existir ganhou dono pelo
+  `db:backfill-owner`, entre duas migrations (`userId` nasce opcional, só depois vira obrigatório).
 
 - **BL-01** — cônjuge como vínculo: virou a entidade `Union` (ADR-008), com o parentesco por
   afinidade (RN-011 a RN-014).
@@ -49,3 +55,6 @@ Ideias em aberto, sem compromisso de data. Ordenadas por quanto acrescentam hoje
   pai, mãe, filhos e irmãos, e um botão para editar. Clicar num parente listado troca o card para ele
   — a família mostrada é a de verdade (`person-relations.ts`), não só quem está desenhado na árvore
   naquele momento.
+- **BL-14** — a chamada sem paginação (árvore, calendário, candidatos de um formulário) parou de
+  trazer pai, mãe e local aninhados e o parceiro por extenso de cada união — nenhum dos três lia
+  esses campos (ADR-017). O que sobrou do BL-09 fechou.

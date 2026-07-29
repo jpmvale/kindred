@@ -29,6 +29,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
+import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { BACKUP_FORMAT, collect } from "./backup";
 import { loadRootEnv } from "./env";
@@ -86,12 +87,32 @@ function nome(indice: number, sexo: string | null): string {
 
 type Linha = Record<string, unknown>;
 
+/**
+ * O dono sintético de toda a árvore anônima. `Person.userId`/`Location.userId`
+ * são obrigatórios (BL-10) — e o destino deste fixture é um banco **vazio**,
+ * sem conta nenhuma ainda, então a conta precisa vir dentro do próprio arquivo
+ * (`dados.User`, restaurado antes do resto). Senha fixa e conhecida: é um
+ * fixture de teste, não um dado de ninguém — dá para logar como
+ * `fixture@kindred.local` / `fixture-account` depois de restaurar.
+ */
+const DONO_ID = "user-fixture";
+const DONO_SENHA = "fixture-account";
+
 export function anonymize(dados: {
   Location: Linha[];
   Person: Linha[];
   Union: Linha[];
   PersonPhoto: Linha[];
 }) {
+  const dono = {
+    id: DONO_ID,
+    name: "Conta de teste",
+    email: "fixture@kindred.local",
+    passwordHash: bcrypt.hashSync(DONO_SENHA, 12),
+    createdAt: CARIMBO,
+    updatedAt: CARIMBO,
+  };
+
   const idLocal = new Map<string, string>();
   const locations = dados.Location.map((local, i) => {
     const id = `location-${String(i + 1).padStart(2, "0")}`;
@@ -99,6 +120,7 @@ export function anonymize(dados: {
     return {
       id,
       name: CIDADES[i % CIDADES.length],
+      userId: DONO_ID,
       createdAt: CARIMBO,
       updatedAt: CARIMBO,
     };
@@ -118,6 +140,7 @@ export function anonymize(dados: {
     deceased: pessoa.deceased ?? false,
     relationshipType: pessoa.relationshipType,
     isCentralUser: pessoa.isCentralUser ?? false,
+    userId: DONO_ID,
     notes: null,
     // A filiação é o que dá sentido ao fixture: some com o nome, fica o grafo.
     fatherId: pessoa.fatherId ? (idPessoa.get(pessoa.fatherId as string) ?? null) : null,
@@ -148,7 +171,13 @@ export function anonymize(dados: {
       // Foto de rosto não tem versão anônima: sai fora.
       PersonPhoto: 0,
     },
-    dados: { Location: locations, Person: people, Union: unions, PersonPhoto: [] },
+    dados: {
+      Location: locations,
+      Person: people,
+      Union: unions,
+      PersonPhoto: [],
+      User: [dono],
+    },
   };
 }
 
@@ -169,7 +198,7 @@ async function main() {
   } else {
     const prisma = new PrismaClient();
     try {
-      dados = await collect(prisma);
+      dados = await collect(prisma, { kind: "all" });
     } finally {
       await prisma.$disconnect();
     }

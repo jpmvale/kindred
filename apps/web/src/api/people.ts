@@ -1,4 +1,3 @@
-import axios from 'axios';
 import type {
   PaginatedPeopleResponse,
   PeopleSortField,
@@ -7,8 +6,7 @@ import type {
   PhotoUploadData,
   SortDirection,
 } from '@kindred/types';
-
-const api = axios.create({ baseURL: '/api' });
+import { client as api } from './client';
 
 export const peopleApi = {
   getAll: () => api.get<Person[]>('/people').then((r) => r.data),

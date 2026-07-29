@@ -10,6 +10,19 @@ import { UpdateUnionDto } from './dto/update-union.dto';
 
 const INCLUDE = { partnerA: true, partnerB: true } as const;
 
+/** Tira `userId` de dentro da união e dos dois parceiros aninhados — dono de
+ * linha não é algo que o web precisa ver (BL-10). */
+function withoutOwner<
+  T extends {
+    partnerA: { userId: string };
+    partnerB: { userId: string };
+  },
+>({ partnerA, partnerB, ...uniao }: T) {
+  const { userId: _a, ...restA } = partnerA;
+  const { userId: _b, ...restB } = partnerB;
+  return { ...uniao, partnerA: restA, partnerB: restB };
+}
+
 /**
  * A união é simétrica, mas a tabela tem dois lados. Gravar sempre o menor id em
  * `partnerAId` faz (A,B) e (B,A) caírem na mesma linha, e é o que dá sentido ao
@@ -23,7 +36,7 @@ function normalizePair(first: string, second: string): [string, string] {
 export class UnionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateUnionDto) {
+  async create(dto: CreateUnionDto, userId: string) {
     const [partnerAId, partnerBId] = normalizePair(
       dto.partnerAId,
       dto.partnerBId,
@@ -32,11 +45,12 @@ export class UnionsService {
     if (partnerAId === partnerBId)
       throw new BadRequestException('Uma pessoa não pode se unir a si mesma');
 
-    const people = await this.prisma.person.findMany({
-      where: { id: { in: [partnerAId, partnerBId] } },
-      select: { id: true },
+    // Cobre "não existe" e "é de outra conta" na mesma checagem: as duas
+    // pessoas precisam pertencer a quem está pedindo (BL-10).
+    const people = await this.prisma.person.count({
+      where: { id: { in: [partnerAId, partnerBId] }, userId },
     });
-    if (people.length !== 2)
+    if (people !== 2)
       throw new NotFoundException('Uma das pessoas da união não existe');
 
     const duplicate = await this.prisma.union.findUnique({
@@ -47,10 +61,10 @@ export class UnionsService {
 
     const status = dto.status ?? UnionStatus.CURRENT;
     if (status === UnionStatus.CURRENT) {
-      await this.assertNoCurrentUnion([partnerAId, partnerBId]);
+      await this.assertNoCurrentUnion([partnerAId, partnerBId], userId);
     }
 
-    return this.prisma.union.create({
+    const created = await this.prisma.union.create({
       data: {
         partnerAId,
         partnerBId,
@@ -60,32 +74,38 @@ export class UnionsService {
       },
       include: INCLUDE,
     });
+    return withoutOwner(created);
   }
 
-  findAll() {
-    return this.prisma.union.findMany({ include: INCLUDE });
+  async findAll(userId: string) {
+    const unions = await this.prisma.union.findMany({
+      where: { partnerA: { userId } },
+      include: INCLUDE,
+    });
+    return unions.map(withoutOwner);
   }
 
-  async findOne(id: string) {
-    const union = await this.prisma.union.findUnique({
-      where: { id },
+  async findOne(id: string, userId: string) {
+    const union = await this.prisma.union.findFirst({
+      where: { id, partnerA: { userId } },
       include: INCLUDE,
     });
     if (!union) throw new NotFoundException(`União "${id}" não encontrada`);
     return union;
   }
 
-  async update(id: string, dto: UpdateUnionDto) {
-    const union = await this.findOne(id);
+  async update(id: string, dto: UpdateUnionDto, userId: string) {
+    const union = await this.findOne(id, userId);
 
     if (dto.status === UnionStatus.CURRENT && union.status !== dto.status) {
       await this.assertNoCurrentUnion(
         [union.partnerAId, union.partnerBId],
+        userId,
         union.id,
       );
     }
 
-    return this.prisma.union.update({
+    const updated = await this.prisma.union.update({
       where: { id },
       data: {
         ...(dto.status !== undefined && { status: dto.status }),
@@ -98,18 +118,24 @@ export class UnionsService {
       },
       include: INCLUDE,
     });
+    return withoutOwner(updated);
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, userId: string) {
+    await this.findOne(id, userId);
     return this.prisma.union.delete({ where: { id } });
   }
 
-  /** RN-014: no máximo uma união vigente por pessoa. */
-  private async assertNoCurrentUnion(personIds: string[], exceptId?: string) {
+  /** RN-014: no máximo uma união vigente por pessoa (dentro da mesma conta). */
+  private async assertNoCurrentUnion(
+    personIds: string[],
+    userId: string,
+    exceptId?: string,
+  ) {
     const current = await this.prisma.union.findFirst({
       where: {
         status: UnionStatus.CURRENT,
+        partnerA: { userId },
         ...(exceptId && { id: { not: exceptId } }),
         OR: [
           { partnerAId: { in: personIds } },

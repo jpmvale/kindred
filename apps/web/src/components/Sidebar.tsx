@@ -1,7 +1,10 @@
 import { NavLink } from 'react-router-dom';
+import type { AuthUser } from '@kindred/types';
+import { authApi } from '../api/auth';
 import ThemeToggle from './ThemeToggle';
 
 interface Props {
+  user: AuthUser;
   collapsed: boolean;
   onToggle: () => void;
 }
@@ -78,6 +81,16 @@ function ChevronRight() {
   );
 }
 
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+      <polyline points="16 17 21 12 16 7"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+  );
+}
+
 const NAV_ITEMS = [
   { to: '/people',    label: 'Pessoas', Icon: PeopleIcon },
   { to: '/calendar',  label: 'Calendário', Icon: CalendarIcon },
@@ -86,7 +99,14 @@ const NAV_ITEMS = [
   { to: '/backup',    label: 'Backup',  Icon: BackupIcon },
 ];
 
-export default function Sidebar({ collapsed, onToggle }: Props) {
+export default function Sidebar({ user, collapsed, onToggle }: Props) {
+  async function handleLogout() {
+    await authApi.logout();
+    // Recarga completa, não navegação do router: descarta qualquer dado em
+    // memória de forma garantida, sem depender de revalidar cada loader.
+    window.location.href = '/login';
+  }
+
   return (
     <aside className={`sidebar${collapsed ? ' is-collapsed' : ''}`}>
       <div className="sidebar-header">
@@ -115,7 +135,21 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
       </nav>
 
       <div className="sidebar-footer">
-        <ThemeToggle collapsed={collapsed} />
+        {!collapsed && (
+          <span className="sidebar-user" title={user.email}>
+            {user.name}
+          </span>
+        )}
+        <div className="sidebar-footer-actions">
+          <button
+            className="sidebar-toggle"
+            onClick={() => void handleLogout()}
+            title="Sair"
+          >
+            <LogoutIcon />
+          </button>
+          <ThemeToggle collapsed={collapsed} />
+        </div>
       </div>
     </aside>
   );
