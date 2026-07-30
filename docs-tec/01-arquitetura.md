@@ -652,3 +652,80 @@ que já é, de fato, o nível de confiança que este projeto pressupõe para que
 propósito. Se um dia o kindred ganhar múltiplos usuários reais com e-mail de verdade (não é o caso
 hoje: é a base de uma família, hospedada por uma pessoa), aí sim entra em cena e-mail transacional de
 verdade, e este ADR fica obsoleto.
+
+---
+
+## ADR-020 — A árvore agrupa famílias nucleares, com gap maior entre elas
+
+**Contexto.** A árvore (ADR-009) já separava os dois ramos de sangue da pessoa central (paterno à
+direita, materno à esquerda) e mantinha irmãos próximos entre si, mas o passo de espaçamento
+(`spreadRanks`) tratava qualquer par de vizinhos no mesmo rank do jeito igual: `MIN_GAP` fixo, sem
+saber se os dois eram irmãos ou primos de ramos diferentes. Pedido direto do usuário: agrupar
+visualmente cada família nuclear (casal + filhos), com uma distância maior e **equidistante** entre
+uma família e a próxima, em qualquer geração — não só entre tios, o nível do exemplo que ele trouxe —
+e parentes de grau mais próximo (primo de primeiro grau) mais perto do centro do desenho que os de
+grau maior.
+
+**Decisão — extensão do algoritmo existente, não reescrita.** Três peças novas em
+[`tree-layout.ts`](../apps/web/src/pages/tree-layout.ts):
+
+- **`personalFamilyKey(pessoa)`** — a chave `fatherId|motherId` (a mesma noção que `siblingGroups` já
+  usava por dentro, promovida a função). Sem pai nem mãe conhecidos, a chave cai no próprio id: duas
+  pessoas "sem família" não viram uma família só por terem a mesma chave vazia.
+- **`sameFamily(blocoA, blocoB)`**, dentro de `spreadRanks` — dois blocos são a mesma família se
+  **alguém** de um lado é irmão de sangue (mesma `personalFamilyKey`) ou cônjuge de **alguém** do
+  outro, comparado par a par. Não dá para resolver isso com uma chave única por bloco: sogro e sogra
+  (ADR-009, "grupo de afinidade") nunca ganham a mesma `personalFamilyKey` — a união dos dois nunca
+  passa pelo laço âncora/convidado de `placeCouples`, que só resolve pares onde um lado é sangue e o
+  outro veio por casamento — mas continuam sendo a mesma família nuclear para efeito de espaçamento.
+  Contando com o casamento como sinal à parte (`marriedWith`, direto das uniões), o par continua
+  próximo mesmo sem essa chave batendo.
+- **Gap condicional**: `MIN_GAP` de sempre dentro da família, `FAMILY_GAP = MIN_GAP × 1,5` na
+  fronteira entre famílias diferentes — decisão de produto, confirmada com o usuário, não
+  arredondamento técnico.
+- **Ordenação por distância estrutural** (`buildStructuralDistances`, BFS a partir da pessoa central
+  sobre filiação **e** união) — dentro de cada lado (paterno/materno, decidido antes por
+  `collectBranch`), os blocos passam a ser posicionados por proximidade: quem está a menos saltos do
+  centro fica mais perto dele, sem depender do rótulo `kinshipDegree` do backend (RN-004) — o layout
+  só precisa da noção estrutural de "quantos passos", não do texto.
+- **Cascata para descendentes** (`collectDependents`, mesmo padrão de `collectBranch`: pilha + DFS,
+  mas só descendo, nunca subindo) — `spreadRanks` passou a varrer os ranks em ordem ascendente de
+  geração; quando um bloco é deslocado para abrir `FAMILY_GAP`, o subtree visível dele já herda o
+  mesmo deslocamento antes do rank dos filhos ser processado. Sem isso, a família ficaria coesa numa
+  geração e torta na próxima.
+- **`buildFamilyGroups`** — a bounding box de cada família nuclear (casal-âncora + filhos), calculada
+  depois do espaçamento. Vira um campo novo (`familyGroups`) no retorno de `computeLayout`, ao lado de
+  `nodes`/`edges` — não dentro de `nodes`, para não quebrar nenhum teste que espera só pessoas ali.
+
+**Uma pessoa só recebe a cascata uma vez** (`cascaded`, um `Set` vivo durante toda a chamada de
+`spreadRanks`): sem essa trava, alguém com pai e mãe em blocos diferentes que se movem no mesmo rank
+levaria os dois deslocamentos somados, e o espaçamento estouraria por acúmulo. Perde-se precisão num
+caso raro (dois ancestrais distintos empurrando a mesma pessoa, sem união entre eles para ligá-los);
+ganha-se nunca sobrepor ninguém.
+
+**O indicador visual é decorativo, não um node de verdade.** `TreePage.tsx` converte cada
+`FamilyGroup` num node reactflow à parte (`type: 'familyGroup'`, `zIndex: -1`,
+`selectable/draggable/connectable: false`), sem `NodeData` nenhum. Os handlers de hover/clique
+(`onNodeMouseEnter/Leave`, `onNodeClick`, e o `setNodes` de `applyHoverStyling`) ganharam uma guarda
+`node.type === 'person'` — sem ela, passar o mouse ou clicar no contorno vazaria um id `group-*`
+inexistente em `people` para `hoveredPersonId`/`selectedPersonId`, quebrando o card de detalhe em
+silêncio.
+
+**O que foi encontrado no caminho, corrigindo o próprio rascunho.** A primeira tentativa também juntou
+sogro/sogra/cunhado no mesmo `blockOf` do casal (achando que precisava disso para a cascata) — e
+quebrou exatamente o teste que garante que ninguém se sobrepõe: sem o cunhado como bloco independente
+em `spreadRanks`, o deslocamento em bloco da família do cônjuge (ADR-009) podia pousar um irmão do
+cônjuge em cima da própria pessoa central, porque o offset de irmãos (sempre um `MIN_GAP` exato,
+via `siblingGroups`) e o deslocamento do casal (também em múltiplos de `MIN_GAP`) coincidiam com
+frequência. A correção foi reverter `blockOf` ao que já era (só o par cônjuge-âncora) e resolver
+"mesma família" por comparação par a par (`sameFamily`) em vez de confiar numa chave de bloco única —
+é o que garante que `spreadRanks` continua enxergando cada um deles como um bloco a ser verificado,
+mesmo sabendo que são a mesma família para efeito de gap.
+
+**Verificado** com os 20 testes antigos de `tree-layout.test.ts` inalterados (nenhum mudou de
+expectativa), mais 6 novos cobrindo fronteira de família, gap intra-família, cascata sem distorção,
+ordenação por distância (com um caso construído a propósito: primo de sangue via ramo do pai fica mais
+perto que um primo alcançado só por união, mais distante em saltos), a bounding box de `familyGroups`,
+e o caso do casal sem pais conhecidos (regressão do `sameFamily`). Rodando contra a base real (~150
+pessoas, só leitura, pela tela) com "Abrir todos relacionamentos": tios e primos aparecem agrupados em
+caixas distintas, com gap visivelmente maior entre famílias que dentro delas, em tema claro e escuro.

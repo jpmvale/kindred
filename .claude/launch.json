@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kindred-web",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "API_URL=http://localhost:3005",
+        "pnpm",
+        "--filter",
+        "@kindred/web",
+        "dev",
+        "--port",
+        "5174"
+      ],
+      "port": 5174
+    }
+  ]
+}

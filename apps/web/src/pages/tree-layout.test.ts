@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Node, Edge } from 'reactflow';
 import type { Person, PersonUnion, UnionStatus } from '@kindred/types';
-import { computeLayout, NODE_H, NODE_W, type NodeData } from './tree-layout';
+import { computeLayout, FAMILY_GAP, NODE_H, NODE_W, type NodeData } from './tree-layout';
 
 // ─── Cenário ──────────────────────────────────────────────────────────────────
 
@@ -296,5 +296,127 @@ describe('computeLayout — a família do cônjuge (BL-13)', () => {
         expect(ordenados[i] - ordenados[i - 1]).toBeGreaterThanOrEqual(PASSO);
       }
     }
+  });
+});
+
+describe('computeLayout — agrupamento de famílias', () => {
+  /** Avô com dois filhos (tio1, tio2), cada um com dois filhos — dois grupos de primos. */
+  function tios() {
+    const avô = pessoa('avô');
+    const pai = pessoa('pai', { fatherId: 'avô' });
+    const tio1 = pessoa('tio1', { fatherId: 'avô' });
+    const tio2 = pessoa('tio2', { fatherId: 'avô' });
+    const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai' });
+    const primo1a = pessoa('primo1a', { fatherId: 'tio1' });
+    const primo1b = pessoa('primo1b', { fatherId: 'tio1' });
+    const primo2a = pessoa('primo2a', { fatherId: 'tio2' });
+    const primo2b = pessoa('primo2b', { fatherId: 'tio2' });
+    return { todos: [avô, pai, tio1, tio2, eu, primo1a, primo1b, primo2a, primo2b] };
+  }
+
+  it('afasta famílias diferentes por FAMILY_GAP, mantendo PASSO dentro da mesma família', () => {
+    const { todos } = tios();
+    const { nodes } = layout(todos, { paisAbertos: ['eu', 'pai'], ladosAbertos: ['eu'] });
+
+    const x = (id: string) => nó(nodes, id).position.x;
+
+    // Primos filhos do mesmo tio: mesma família, PASSO entre si.
+    expect(Math.abs(x('primo1b') - x('primo1a'))).toBe(PASSO);
+    expect(Math.abs(x('primo2b') - x('primo2a'))).toBe(PASSO);
+
+    // Fronteira entre a família do tio1 e a do tio2: FAMILY_GAP, maior que PASSO.
+    const fronteira = Math.min(
+      Math.abs(x('primo2a') - x('primo1a')),
+      Math.abs(x('primo2a') - x('primo1b')),
+      Math.abs(x('primo2b') - x('primo1a')),
+      Math.abs(x('primo2b') - x('primo1b')),
+    );
+    expect(fronteira).toBe(FAMILY_GAP);
+    expect(FAMILY_GAP).toBeGreaterThan(PASSO);
+  });
+
+  it('a cascata desloca a família inteira sem distorcer a forma interna do ramo', () => {
+    const avô = pessoa('avô');
+    const pai = pessoa('pai', { fatherId: 'avô' });
+    const tio1 = pessoa('tio1', { fatherId: 'avô' });
+    const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai' });
+    const primo1 = pessoa('primo1', { fatherId: 'tio1' });
+    const primo1filho = pessoa('primo1filho', { fatherId: 'primo1' });
+    const sozinho = [avô, pai, tio1, eu, primo1, primo1filho];
+
+    const tio2 = pessoa('tio2', { fatherId: 'avô' });
+    const primo2 = pessoa('primo2', { fatherId: 'tio2' });
+    const comVizinho = [avô, pai, tio1, tio2, eu, primo1, primo1filho, primo2];
+
+    const opcoes = { paisAbertos: ['eu', 'pai'], ladosAbertos: ['eu', 'primo1'] };
+    const semVizinho = layout(sozinho, opcoes);
+    const comVizinhoLayout = layout(comVizinho, opcoes);
+
+    const offset = (nodes: Node[]) => nó(nodes, 'primo1filho').position.x - nó(nodes, 'primo1').position.x;
+
+    // A família do tio2 ao lado empurra o ramo do tio1 inteiro, mas o filho de
+    // primo1 continua na mesma posição relativa a ele — a família se move em
+    // bloco, não se estica.
+    expect(offset(comVizinhoLayout.nodes)).toBe(offset(semVizinho.nodes));
+  });
+
+  it('ordena por distância estrutural: primo de primeiro grau mais perto que de segundo grau', () => {
+    const bisavô = pessoa('bisavô');
+    const avô = pessoa('avô', { fatherId: 'bisavô' });
+    const tioAvô = pessoa('tioAvô', { fatherId: 'bisavô' });
+    const pai = pessoa('pai', { fatherId: 'avô' });
+    const tio1 = pessoa('tio1', { fatherId: 'avô' });
+    const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai' });
+    const primo1 = pessoa('primo1', { fatherId: 'tio1' });
+    const tioAvôFilho = pessoa('tioAvôFilho', { fatherId: 'tioAvô' });
+    const primoSegundoGrau = pessoa('primoSegundoGrau', { fatherId: 'tioAvôFilho' });
+
+    const { nodes } = layout(
+      [bisavô, avô, tioAvô, pai, tio1, eu, primo1, tioAvôFilho, primoSegundoGrau],
+      { paisAbertos: ['eu', 'pai', 'avô'], ladosAbertos: ['eu', 'avô'] },
+    );
+
+    const x = (id: string) => nó(nodes, id).position.x;
+    const distânciaAoCentro = (id: string) => Math.abs(x(id) - x('eu'));
+
+    expect(distânciaAoCentro('primo1')).toBeLessThan(distânciaAoCentro('primoSegundoGrau'));
+  });
+
+  it('familyGroups: a caixa de uma família bate com o bounding box dos seus membros', () => {
+    const pai = pessoa('pai', { sex: 'MALE' });
+    const mãe = pessoa('mãe', { sex: 'FEMALE' });
+    const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai', motherId: 'mãe' });
+    const irmã = pessoa('irmã', { fatherId: 'pai', motherId: 'mãe' });
+    casar(pai, mãe, 'u1');
+
+    const { nodes, familyGroups } = layout([pai, mãe, eu, irmã], {
+      paisAbertos: ['eu'],
+      ladosAbertos: ['eu'],
+    });
+    const grupo = familyGroups.find((g) => g.id === 'pai|mãe');
+    expect(grupo).toBeDefined();
+
+    const membros = ['pai', 'mãe', 'eu', 'irmã'].map((id) => nó(nodes, id));
+    const esperado = {
+      minX: Math.min(...membros.map((n) => n.position.x)),
+      maxX: Math.max(...membros.map((n) => n.position.x)) + NODE_W,
+      minY: Math.min(...membros.map((n) => n.position.y)),
+      maxY: Math.max(...membros.map((n) => n.position.y)) + NODE_H,
+    };
+    expect(grupo).toEqual({ id: 'pai|mãe', ...esperado });
+  });
+
+  it('casal sem pais conhecidos continua a PASSO um do outro (a mesma família), não FAMILY_GAP', () => {
+    const { eu, fernanda, filha } = família();
+    const sogro = pessoa('sogro', { sex: 'MALE' });
+    const sogra = pessoa('sogra', { sex: 'FEMALE' });
+    fernanda.fatherId = 'sogro';
+    fernanda.motherId = 'sogra';
+    casar(sogro, sogra, 'u-sogros');
+
+    const { nodes } = layout([eu, fernanda, filha, sogro, sogra], { paisAbertos: ['fernanda'] });
+    const x = (id: string) => nó(nodes, id).position.x;
+
+    expect(Math.abs(x('sogro') - x('sogra'))).toBe(PASSO);
   });
 });

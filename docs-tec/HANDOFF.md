@@ -5,31 +5,29 @@ _Atualizado em 29/07/2026._
 ## Onde o projeto está
 
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
-busca/ordenação/paginação, árvore genealógica, calendário de aniversários — em tema claro ou escuro,
-e agora **com conta e login** (BL-10): cada pessoa que usa o kindred tem sua própria árvore, isolada
-das demais. A conta também já pode trocar o próprio e-mail e senha pela tela (BL-16), e quem tem
-acesso ao servidor consegue redefinir a senha de qualquer conta por linha de comando (BL-17,
-ADR-019) — **o backlog de produto está vazio** pela primeira vez.
+busca/ordenação/paginação, árvore genealógica — agora com **famílias agrupadas visualmente** — e
+calendário de aniversários — em tema claro ou escuro, e **com conta e login** (BL-10): cada pessoa que
+usa o kindred tem sua própria árvore, isolada das demais. A conta também já pode trocar o próprio
+e-mail e senha pela tela (BL-16), e quem tem acesso ao servidor consegue redefinir a senha de qualquer
+conta por linha de comando (BL-17, ADR-019) — **o backlog de produto está vazio**.
 
 **Marco de retomada — 29/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **258 testes** (84 na API, 167 no
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **263 testes** (84 na API, 172 no
 web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). Para retomar, basta subir o
 Postgres (`docker compose up -d postgres`) — não há item de backlog aberto, então "retomar" aqui é
 escolher um rumo novo, não continuar algo pela metade.
 
-> 🔑 **A conta com os dados reais tem senha gerada por script, e quase ficou perdida.** O
-> `db:backfill-owner` do BL-10 (ver seção própria abaixo) rodou contra o banco de dev sem ninguém
-> olhando o terminal na hora, e a senha só é impressa **uma vez**. Foi recuperada vasculhando o
-> transcript bruto da sessão — mas por pouco, e **não fica registrada aqui**: este repositório é
-> público, e a senha foi comunicada direto no chat da sessão em que foi achada, não em arquivo
-> commitado. O e-mail da conta é `dono@kindred.local` — a senha, quem já recebeu, guardou.
+> 🔑 **A senha da conta com os dados reais foi trocada nesta janela, a pedido de quem é dono dela.**
+> Para verificar o agrupamento de famílias (ver seção própria abaixo) contra a árvore de verdade, era
+> preciso entrar na conta real — e a senha gerada por script (ver o aviso que existia aqui antes) não
+> estava à mão nesta sessão. O dono da conta pediu, no próprio chat, para redefini-la com
+> `pnpm db:reset-password dono@kindred.local <senha-nova>` (BL-17, ADR-019) e usá-la para entrar. A
+> senha em si **não fica registrada aqui** — este repositório é público — e não é mais a gerada por
+> script: é a que o dono escolheu na hora.
 >
-> **Agora existem dois caminhos para trocar essa senha.** Pela aplicação, sabendo a atual: tela
-> `/account` (BL-16, `PATCH /api/auth/me`). Sem saber a atual, com acesso ao servidor:
-> `pnpm db:reset-password dono@kindred.local` (BL-17, ADR-019) — deixa uma senha nova ser escolhida
-> na hora, sem precisar da antiga. Qualquer um dos dois fecha o buraco original; nenhum foi usado
-> contra a conta real por uma sessão do Claude Code — trocar a senha gerada é decisão de quem é dono
-> da conta.
+> **Os dois caminhos de sempre continuam valendo para trocar de novo.** Pela aplicação, sabendo a
+> atual: tela `/account` (BL-16, `PATCH /api/auth/me`). Sem saber a atual, com acesso ao servidor:
+> `pnpm db:reset-password dono@kindred.local` (BL-17, ADR-019).
 
 > ⚠️ **O banco de dev tem dados reais.** Deixou de ser o seed de 23 pessoas fictícias: são ~150
 > pessoas da família de quem usa o kindred, com fotos e notas — agora todas na conta acima. Antes de
@@ -39,7 +37,11 @@ escolher um rumo novo, não continuar algo pela metade.
 
 ## Onde a última sessão parou
 
-**BL-17 fechou** (recuperar senha esquecida) — o último item do backlog, e o backlog **zerou**. Sem
+**Agrupamento de famílias na árvore fechou** (ADR-020), pedido direto do usuário fora do backlog —
+ver a seção própria logo abaixo, com o antes-e-depois e o defeito achado no meio do caminho.
+
+Antes disso, na mesma janela: **BL-17 fechou** (recuperar senha esquecida) — o último item do
+backlog, e o backlog **zerou**. Sem
 infraestrutura de e-mail no projeto, e com a conta real usando um domínio (`kindred.local`) que não é
 entregável, o fluxo clássico de "link por e-mail" não era viável — a decisão foi um comando de CLI
 (`pnpm db:reset-password <email> [senha-nova]`, ADR-019) que redefine a senha de uma conta existente e
@@ -91,6 +93,56 @@ em vez de `include`.
   primeiro tropeço da sessão.
 - **Um script que só imprime um segredo uma vez não pode rodar sem ninguém olhando.** É a lição do
   `db:backfill-owner` — ver o aviso de credencial no topo deste arquivo, e a seção "BL-10" abaixo.
+
+## Sessão de 29/07 — agrupamento de famílias na árvore (ADR-020)
+
+Pedido direto do usuário, com uma imagem de referência: agrupar visualmente cada família nuclear
+(casal + filhos) na árvore, com distância maior e equidistante entre uma família e a próxima, em
+qualquer geração — e parente de grau mais próximo (primo de primeiro grau) mais perto da pessoa
+central que um de grau maior. O algoritmo de layout (`tree-layout.ts`, ADR-009) já separava os dois
+ramos de sangue e mantinha irmãos juntos, mas o passo final de espaçamento tratava qualquer vizinho no
+mesmo rank do mesmo jeito — sem noção de "família" nenhuma.
+
+**Antes de escrever código**, três perguntas de escopo foram levadas ao usuário: a regra vale na
+árvore inteira ou só no nível de tios/primos do mockup (**a árvore inteira**), o gap entre famílias é
+quanto maior que o intrafamília (**~1,5×**), e além do espaçamento tem indicador visual (**sim, um
+contorno sutil por família**). Dado o tamanho da mudança — o arquivo mais delicado do projeto, com
+~20 testes de posição em pixel exato —, o trabalho passou por um plano escrito e aprovado antes da
+primeira linha de código.
+
+**O que entrou, todo em cima do algoritmo existente, sem reescrever nada:** `personalFamilyKey`
+(a chave `fatherId|motherId`, promovida de dentro de `siblingGroups` para função reaproveitável),
+`FAMILY_GAP` (`MIN_GAP × 1,5`, exportado), `buildStructuralDistances` (BFS a partir do central sobre
+filiação e união, para saber quem está estruturalmente mais perto), `collectDependents` (a mesma forma
+de `collectBranch` do ADR-009, só que descendo e lateral por `blockOf`) e `buildFamilyGroups` (a
+bounding box de cada família, novo campo `familyGroups` no retorno de `computeLayout`). O detalhamento
+completo, incluindo o porquê de cada peça, está no **ADR-020**.
+
+**O defeito achado no meio do caminho, e por que a correção não foi óbvia.** A primeira versão também
+juntava sogro/sogra/cunhado no mesmo `blockOf` do casal, achando que precisava disso para a cascata —
+e isso quebrou justamente o teste que garante que ninguém se sobrepõe (`não deixa dois nós se
+sobreporem em nenhuma geração`, do BL-13). Com o cunhado deixando de ser um bloco independente aos
+olhos de `spreadRanks`, o deslocamento em bloco da família do cônjuge (mecanismo do ADR-009) passou a
+poder pousar um cunhado exatamente em cima da pessoa central — porque o offset de irmãos e o
+deslocamento do casal são ambos múltiplos exatos de `MIN_GAP`, e as duas coincidências se cancelavam
+com frequência, não só nesse teste. A correção: reverter `blockOf` ao que já era (só o par
+cônjuge-âncora) e resolver "é a mesma família" por comparação par a par (`sameFamily`, olhando irmandade
+de sangue **ou** casamento entre qualquer membro de um bloco e qualquer membro do outro) em vez de uma
+chave única por bloco — sogro e sogra nunca ganham a mesma `personalFamilyKey` (a união deles nunca
+passa pelo laço âncora/convidado do `placeCouples`), mas continuam sendo reconhecidos como a mesma
+família por estarem casados.
+
+**Verificado em camadas.** Os 20 testes antigos de `tree-layout.test.ts` continuam exatamente como
+estavam (nenhuma expectativa mudou); 5 novos cobrem fronteira de família (`FAMILY_GAP` exato), gap
+intrafamília (`MIN_GAP`/`PASSO` exato), a cascata não distorcendo a forma interna de um ramo, a
+ordenação por distância estrutural (com um cenário construído a propósito: primo de sangue mais perto
+que um parente alcançado só por casamento, mais distante em saltos) e a bounding box de
+`familyGroups`. Contra a **base real** (~150 pessoas): sem senha da conta guardada nesta sessão (ver
+aviso no topo deste arquivo), o dono da conta pediu para redefini-la e testar de verdade — tios e
+primos aparecem em caixas distintas, com o gap maior entre famílias visível a olho, checado em tema
+claro e escuro, "Abrir todos relacionamentos" ligado, sem erro no console. Clicar ou passar o mouse no
+contorno de uma família (decorativo, sem `NodeData`) não abre o card de detalhe nem quebra o hover de
+ninguém — as guardas `node.type === 'person'` em `TreePage.tsx` cobrem exatamente isso.
 
 ## Sessão de 29/07 — recuperar senha esquecida (BL-17, ADR-019)
 

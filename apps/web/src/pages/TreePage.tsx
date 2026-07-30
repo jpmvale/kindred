@@ -25,6 +25,7 @@ import {
   NODE_W,
   NODE_H,
   type NodeData,
+  type FamilyGroup,
 } from './tree-layout';
 import { relationsOf } from './person-relations';
 import PersonDetailPanel from '../components/PersonDetailPanel';
@@ -248,7 +249,44 @@ function PersonNode({ data }: NodeProps) {
   );
 }
 
-const NODE_TYPES = { person: PersonNode };
+/** O contorno de uma família nuclear, desenhado atrás dos cards. Só decoração — não recebe clique/hover. */
+function FamilyGroupNode() {
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        borderRadius: 16,
+        background: 'var(--tree-familygroup-bg)',
+        border: '1px solid var(--tree-familygroup-border)',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+const NODE_TYPES = { person: PersonNode, familyGroup: FamilyGroupNode };
+
+/** Folga ao redor dos cards dentro do contorno da família. */
+const FAMILY_GROUP_PADDING = 18;
+
+function familyGroupNodes(familyGroups: FamilyGroup[]) {
+  return familyGroups.map((g) => ({
+    id: `group-${g.id}`,
+    type: 'familyGroup',
+    position: { x: g.minX - FAMILY_GROUP_PADDING, y: g.minY - FAMILY_GROUP_PADDING },
+    style: {
+      width: g.maxX - g.minX + FAMILY_GROUP_PADDING * 2,
+      height: g.maxY - g.minY + FAMILY_GROUP_PADDING * 2,
+      zIndex: -1,
+    },
+    selectable: false,
+    draggable: false,
+    focusable: false,
+    connectable: false,
+    data: {},
+  }));
+}
 
 // ─── Inner component ──────────────────────────────────────────────────────────
 
@@ -291,16 +329,21 @@ function TreeContent() {
       for (const union of hovered.unions ?? []) partnerIds.add(union.partnerId);
     }
 
-    setNodes((prev) => prev.map((node) => ({
-      ...node,
-      data: {
-        ...(node.data as Record<string, unknown>),
-        isHovered: hoveredId === node.id,
-        isParentOfHovered: parentIds.has(node.id),
-        isChildOfHovered: childIds.has(node.id),
-        isPartnerOfHovered: partnerIds.has(node.id),
-      },
-    })));
+    setNodes((prev) => prev.map((node) => {
+      // O contorno de família não tem `NodeData` nenhum — espalhar os campos de
+      // hover nele só sujaria o node à toa.
+      if (node.type !== 'person') return node;
+      return {
+        ...node,
+        data: {
+          ...(node.data as Record<string, unknown>),
+          isHovered: hoveredId === node.id,
+          isParentOfHovered: parentIds.has(node.id),
+          isChildOfHovered: childIds.has(node.id),
+          isPartnerOfHovered: partnerIds.has(node.id),
+        },
+      };
+    }));
 
     setEdges((prev) => prev.map((edge) => {
       const highlighted = hoveredId !== null && (edge.source === hoveredId || edge.target === hoveredId);
@@ -347,7 +390,9 @@ function TreeContent() {
   // desenho que o render já calculou. É sincronizar sistema de fora, que é para
   // o que serve um efeito.
   useEffect(() => {
-    setNodes(layout.nodes);
+    // Os contornos de família entram primeiro no array só por organização — quem
+    // manda no empilhamento visual é o `zIndex: -1` de cada um, não a ordem aqui.
+    setNodes([...familyGroupNodes(layout.familyGroups), ...layout.nodes]);
     setEdges(layout.edges);
     if (layout.nodes.length) setTimeout(() => applyHoverStyling(null), 0);
   }, [layout, applyHoverStyling, setEdges, setNodes]);
@@ -425,9 +470,9 @@ function TreeContent() {
         nodesConnectable={false}
         elementsSelectable={false}
         proOptions={{ hideAttribution: true }}
-        onNodeMouseEnter={(_, node) => setHoveredPersonId(node.id)}
+        onNodeMouseEnter={(_, node) => node.type === 'person' && setHoveredPersonId(node.id)}
         onNodeMouseLeave={() => setHoveredPersonId(null)}
-        onNodeClick={(_, node) => setSelectedPersonId(node.id)}
+        onNodeClick={(_, node) => node.type === 'person' && setSelectedPersonId(node.id)}
         onPaneClick={() => setSelectedPersonId(null)}
       >
         <Controls showInteractive={false} style={{ boxShadow: 'var(--shadow-panel)', borderRadius: 8 }} />

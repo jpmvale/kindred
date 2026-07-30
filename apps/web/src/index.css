@@ -112,6 +112,8 @@
   --tree-edge-union-on: #7c3aed;
   --tree-edge-ended: #d1d5db;
   --tree-edge-ended-on: #9ca3af;
+  --tree-familygroup-bg: rgba(99, 102, 241, 0.05);
+  --tree-familygroup-border: rgba(99, 102, 241, 0.16);
 }
 
 :root[data-theme='dark'] {
@@ -202,6 +204,8 @@
   --tree-edge-union-on: #c4b5fd;
   --tree-edge-ended: #454b57;
   --tree-edge-ended-on: #98a0ad;
+  --tree-familygroup-bg: rgba(129, 140, 248, 0.07);
+  --tree-familygroup-border: rgba(129, 140, 248, 0.2);
 }
 
 *, *::before, *::after {
