@@ -249,43 +249,77 @@ function PersonNode({ data }: NodeProps) {
   );
 }
 
-/** O contorno de uma família nuclear, desenhado atrás dos cards. Só decoração — não recebe clique/hover. */
-function FamilyGroupNode() {
+/**
+ * A chave de uma família: a fileira de irmãos marcada por trás e o traço que
+ * desce do casal e abre sobre ela (ADR-023). Só decoração — não recebe
+ * clique/hover. O traço é SVG porque precisa sair de um ponto acima da fileira,
+ * na coluna do casal, que não é necessariamente o meio dela.
+ */
+function FamilyGroupNode({ data }: { data: { stemX?: number; stemHeight: number } }) {
+  const { stemX, stemHeight } = data;
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        borderRadius: 16,
-        background: 'var(--tree-familygroup-bg)',
-        border: '1px solid var(--tree-familygroup-border)',
-        pointerEvents: 'none',
-      }}
-    />
+    <div style={{ width: '100%', height: '100%', position: 'relative', pointerEvents: 'none' }}>
+      {stemX !== undefined && (
+        <svg
+          width="100%"
+          height={stemHeight}
+          style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}
+          aria-hidden
+        >
+          <path
+            d={`M ${stemX} 0 V ${stemHeight}`}
+            fill="none"
+            stroke="var(--tree-familygroup-border)"
+            strokeWidth={2}
+          />
+        </svg>
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          top: stemHeight,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          borderRadius: 16,
+          background: 'var(--tree-familygroup-bg)',
+          border: '1px solid var(--tree-familygroup-border)',
+        }}
+      />
+    </div>
   );
 }
 
 const NODE_TYPES = { person: PersonNode, familyGroup: FamilyGroupNode };
 
-/** Folga ao redor dos cards dentro do contorno da família. */
+/** Folga ao redor dos cards dentro da marca do grupo de irmãos. */
 const FAMILY_GROUP_PADDING = 18;
 
 function familyGroupNodes(familyGroups: FamilyGroup[]) {
-  return familyGroups.map((g) => ({
-    id: `group-${g.id}`,
-    type: 'familyGroup',
-    position: { x: g.minX - FAMILY_GROUP_PADDING, y: g.minY - FAMILY_GROUP_PADDING },
-    style: {
-      width: g.maxX - g.minX + FAMILY_GROUP_PADDING * 2,
-      height: g.maxY - g.minY + FAMILY_GROUP_PADDING * 2,
-      zIndex: -1,
-    },
-    selectable: false,
-    draggable: false,
-    focusable: false,
-    connectable: false,
-    data: {},
-  }));
+  return familyGroups.map((g) => {
+    const top = g.minY - FAMILY_GROUP_PADDING;
+    // O traço nasce na base dos cards do casal e morre no topo da marca. Sem
+    // casal visível não há de onde descer: fica só a marca da fileira.
+    const stemHeight = g.stem ? Math.max(0, top - g.stem.y) : 0;
+    return {
+      id: `group-${g.id}`,
+      type: 'familyGroup',
+      position: { x: g.minX - FAMILY_GROUP_PADDING, y: top - stemHeight },
+      style: {
+        width: g.maxX - g.minX + FAMILY_GROUP_PADDING * 2,
+        height: g.maxY - g.minY + FAMILY_GROUP_PADDING * 2 + stemHeight,
+        zIndex: -1,
+      },
+      selectable: false,
+      draggable: false,
+      focusable: false,
+      connectable: false,
+      data: {
+        stemHeight,
+        stemX: g.stem ? g.stem.x - (g.minX - FAMILY_GROUP_PADDING) : undefined,
+      },
+    };
+  });
 }
 
 // ─── Inner component ──────────────────────────────────────────────────────────

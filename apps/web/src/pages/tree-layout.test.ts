@@ -382,7 +382,7 @@ describe('computeLayout — agrupamento de famílias', () => {
     expect(distânciaAoCentro('primo1')).toBeLessThan(distânciaAoCentro('primoSegundoGrau'));
   });
 
-  it('familyGroups: a caixa de uma família bate com o bounding box dos seus membros', () => {
+  it('familyGroups: a caixa é a fileira de irmãos, e a chave desce do meio do casal', () => {
     const pai = pessoa('pai', { sex: 'MALE' });
     const mãe = pessoa('mãe', { sex: 'FEMALE' });
     const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai', motherId: 'mãe' });
@@ -396,14 +396,62 @@ describe('computeLayout — agrupamento de famílias', () => {
     const grupo = familyGroups.find((g) => g.id === 'pai|mãe');
     expect(grupo).toBeDefined();
 
-    const membros = ['pai', 'mãe', 'eu', 'irmã'].map((id) => nó(nodes, id));
-    const esperado = {
-      minX: Math.min(...membros.map((n) => n.position.x)),
-      maxX: Math.max(...membros.map((n) => n.position.x)) + NODE_W,
-      minY: Math.min(...membros.map((n) => n.position.y)),
-      maxY: Math.max(...membros.map((n) => n.position.y)) + NODE_H,
-    };
-    expect(grupo).toEqual({ id: 'pai|mãe', ...esperado });
+    // Só os irmãos entram na caixa: o casal fica fora dela, ligado pela chave
+    // (ADR-023) — é isso que faz as caixas particionarem a árvore.
+    const irmãos = ['eu', 'irmã'].map((id) => nó(nodes, id));
+    const casal = ['pai', 'mãe'].map((id) => nó(nodes, id));
+    expect(grupo).toEqual({
+      id: 'pai|mãe',
+      minX: Math.min(...irmãos.map((n) => n.position.x)),
+      maxX: Math.max(...irmãos.map((n) => n.position.x)) + NODE_W,
+      minY: Math.min(...irmãos.map((n) => n.position.y)),
+      maxY: Math.max(...irmãos.map((n) => n.position.y)) + NODE_H,
+      stem: {
+        x:
+          (Math.min(...casal.map((n) => n.position.x)) + Math.max(...casal.map((n) => n.position.x))) /
+            2 +
+          NODE_W / 2,
+        y: Math.max(...casal.map((n) => n.position.y)) + NODE_H,
+      },
+    });
+  });
+
+  it('familyGroups: nenhuma caixa se sobrepõe a outra, nem em base grande', () => {
+    const avô = pessoa('avô');
+    const avó = pessoa('avó');
+    casar(avô, avó, 'u-avós');
+    const pessoas: Person[] = [avô, avó];
+    for (const filho of ['pai', 'tio1', 'tio2']) {
+      const p = pessoa(filho, { fatherId: 'avô', motherId: 'avó' });
+      const cônjuge = pessoa(`${filho}-cônjuge`);
+      casar(p, cônjuge, `u-${filho}`);
+      pessoas.push(p, cônjuge);
+      for (const n of [1, 2, 3]) {
+        pessoas.push(
+          pessoa(`${filho}-neto${n}`, {
+            fatherId: filho,
+            motherId: `${filho}-cônjuge`,
+            isCentralUser: filho === 'pai' && n === 1,
+          }),
+        );
+      }
+    }
+
+    const { familyGroups } = layout(pessoas, {
+      paisAbertos: ['pai-neto1', 'pai'],
+      ladosAbertos: ['pai-neto1', 'pai'],
+    });
+    expect(familyGroups.length).toBeGreaterThan(1);
+
+    for (let i = 0; i < familyGroups.length; i++) {
+      for (let j = i + 1; j < familyGroups.length; j++) {
+        const a = familyGroups[i];
+        const b = familyGroups[j];
+        const dx = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
+        const dy = Math.min(a.maxY, b.maxY) - Math.max(a.minY, b.minY);
+        expect(dx > 0 && dy > 0).toBe(false);
+      }
+    }
   });
 
   it('casal sem pais conhecidos continua a PASSO um do outro (a mesma família), não FAMILY_GAP', () => {

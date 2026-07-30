@@ -880,3 +880,36 @@ cópia local (só leitura) da base real, renderizada em SVG antes e depois. A ca
 tem muitos filhos com muitos netos ainda fica larga — é consequência geométrica de manter irmãos
 próximos **e** subárvores sem colisão —, e o indicador visual disso (caixa preenchida × chave
 genealógica) ficou como próximo assunto, não coberto por este ADR.
+
+---
+
+## ADR-023 — A marca de família é a fileira de irmãos, com a chave descendo do casal
+
+**Contexto.** O ADR-020 desenhava uma caixa por família nuclear envolvendo **casal + filhos**. Como
+cada pessoa é filha numa família e mãe ou pai na seguinte, ela entrava em **duas** caixas — e as duas
+se cruzavam, sempre. Na base real eram 59 pares de caixas sobrepostas só por esse aninhamento (mais
+42 por casamento entre ramos), e o efeito, nas palavras do usuário, é que "o fundo sutil fica quase
+invisível": 55 retângulos translúcidos empilhados viram um borrão sem informação.
+
+**Decisão.** A caixa passa a envolver **só a fileira de irmãos** — os filhos que compartilham a chave
+`fatherId|motherId` —, e o casal fica **fora** dela, ligado por uma **chave genealógica**: um traço
+que desce do meio do casal até o topo da marca (`FamilyGroup.stem`, o ponto de partida; `TreePage`
+desenha o traço e a marca no mesmo nó decorativo).
+
+O ganho não é só estético: como cada pessoa é filha de exatamente uma família, as caixas
+**particionam** a árvore — sobreposição entre elas passa a ser **impossível por construção**, não
+"reduzida". Na base real, de 55 caixas com 101 pares sobrepostos para **20 caixas, nenhum par
+sobreposto**. Um teste novo garante a propriedade num cenário de 20 pessoas.
+
+**Irmão único não forma caixa** (a regra de "2+ membros" continua, agora contando só irmãos): não há
+grupo a marcar em volta de uma pessoa só, e a linha de filiação já diz de quem ela é filha. Sem pai
+nem mãe visível não há de onde descer a chave — fica só a marca da fileira (`stem` opcional).
+
+**O que continua verdade, e não é defeito de desenho:** a fileira de sete irmãos que têm, cada um,
+uma família grande embaixo fica **larga**, e a marca dela também. É a consequência geométrica de
+manter irmãos próximos **e** subárvores sem colisão (ADR-022) — o desenho está dizendo a verdade
+sobre aquela família, não escondendo.
+
+**Verificado** com os 27 testes de `tree-layout.test.ts` (o do bounding box mudou de expectativa de
+propósito — é a mudança de semântica registrada aqui — e um novo garante o não-sobreposto) e os de
+`TreePage.test.tsx`, mais o desenho da base real em SVG, antes e depois.

@@ -16,8 +16,8 @@ conta por linha de comando (BL-17, ADR-019) — **o backlog de produto está vaz
 `pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **267 testes** (84 na API, 176 no
 web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). A árvore é a frente de trabalho
 aberta, sem item de backlog formal: o usuário está olhando o desenho na base real e pedindo ajuste a
-cada rodada (ADR-021, depois ADR-022). Falta commitar o empacotamento por família (ADR-022:
-`tree-layout.ts` e estes documentos).
+cada rodada (ADR-021, ADR-022, ADR-023). Falta commitar a chave genealógica (ADR-023:
+`tree-layout.ts`, `TreePage.tsx`, o teste e estes documentos).
 
 **Para subir tudo e olhar a árvore:** `docker compose up -d postgres`, um `.env` na raiz (copiado do
 `.env.example`, com `PORT=3005` para casar com o `API_URL` do
@@ -68,11 +68,15 @@ entrar na conta — `psql` no container despeja as pessoas em JSON, um teste des
 distância pai-filho e largura por geração, além de renderizar a árvore em SVG. Foi assim que os números
 acima saíram; o script era descartável, mas o caminho vale para a próxima mudança de layout.
 
-**O que ficou de fora, e é o próximo assunto natural:** a caixa de família de quem tem muitos filhos
-com muitos netos fica **muito larga** (consequência geométrica de manter irmãos próximos e subárvores
-sem colisão), e caixa preenchida talvez não seja o melhor indicador nessa escala — uma chave
-genealógica (o traço que desce do casal e abre sobre os filhos) leria melhor. Não foi mexido: é decisão
-visual, não de layout.
+**E a marca de família virou a chave genealógica** (ADR-023), fechando o "fundo sutil quase
+invisível": a caixa agora envolve **só a fileira de irmãos**, com o casal fora dela e um traço
+descendo do meio do casal até a marca. Como cada pessoa é filha de exatamente uma família, as caixas
+**particionam** a árvore — sobreposição entre elas ficou impossível por construção, e não só rara: de
+55 caixas com 101 pares sobrepostos para **20 caixas, zero sobreposição**, com um teste novo guardando
+a propriedade.
+
+Continua verdade (e não é defeito): a fileira de sete irmãos que têm, cada um, família grande embaixo
+fica larga — é o preço de manter irmãos próximos e subárvores sem colisão.
 
 Antes disso, na mesma janela: **as gerações da árvore passaram a ficar alinhadas** (ADR-021), continuação direta do agrupamento de
 famílias: o usuário apontou que juntar irmãos não faz sentido sem os pais em cima deles e os filhos

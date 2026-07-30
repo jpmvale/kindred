@@ -310,13 +310,15 @@ export interface LayoutOptions {
   onToggleSideDown: (personId: string) => void;
 }
 
-/** A caixa de uma família nuclear (casal-âncora + filhos), no mesmo espaço de `node.position`. */
+/** A caixa de um grupo de irmãos, no mesmo espaço de `node.position` (ADR-023). */
 export interface FamilyGroup {
   id: string;
   minX: number;
   maxX: number;
   minY: number;
   maxY: number;
+  /** De onde desce a chave até a fileira: o meio do casal, na base dos cards dele. */
+  stem?: { x: number; y: number };
 }
 
 export function computeLayout({
@@ -729,35 +731,50 @@ function collectDependents(
 }
 
 /**
- * A caixa de cada família nuclear (casal-âncora + filhos que compartilham a
- * mesma chave), para o indicador visual na árvore. Filho único sem nenhum dos
- * pais visível não forma caixa — não há "família" para desenhar em volta de
- * uma pessoa sozinha, sem par nem filho.
+ * A caixa de cada grupo de irmãos — os filhos que compartilham a mesma chave de
+ * família — mais o ponto de onde desce a chave genealógica: o meio do casal, uma
+ * geração acima (`stem`), quando pai ou mãe está visível.
+ *
+ * **É a fileira de irmãos, não a família inteira com o casal dentro** (ADR-023).
+ * Como cada pessoa é filha de exatamente uma família, as caixas **particionam** a
+ * árvore: não existe sobreposição possível entre elas. Envolvendo o casal junto,
+ * a mesma pessoa entrava em duas caixas (filha numa, mãe na seguinte) e elas se
+ * cruzavam sempre — 59 pares na base real, com o fundo sutil virando um borrão.
+ *
+ * Irmão único não forma caixa: não há grupo para marcar em volta de uma pessoa
+ * só — a linha de filiação já diz de quem ela é filha.
  */
 function buildFamilyGroups(people: Person[], layoutPos: Positions): FamilyGroup[] {
-  const membersByKey = new Map<string, Set<string>>();
+  const siblingsByKey = new Map<string, string[]>();
   for (const p of people) {
     const key = personalFamilyKey(p);
-    if (key === p.id) continue;
-    if (!membersByKey.has(key)) membersByKey.set(key, new Set());
-    membersByKey.get(key)!.add(p.id);
-    for (const parentId of key.split('|')) {
-      if (parentId && layoutPos.has(parentId)) membersByKey.get(key)!.add(parentId);
-    }
+    if (key === p.id || !layoutPos.has(p.id)) continue;
+    if (!siblingsByKey.has(key)) siblingsByKey.set(key, []);
+    siblingsByKey.get(key)!.push(p.id);
   }
 
   const groups: FamilyGroup[] = [];
-  for (const [key, idSet] of membersByKey) {
-    const ids = [...idSet].filter((id) => layoutPos.has(id));
+  for (const [key, ids] of siblingsByKey) {
     if (ids.length < 2) continue;
 
     const boxes = ids.map((id) => layoutPos.get(id)!);
+    const parents = key
+      .split('|')
+      .filter((parentId) => parentId && layoutPos.has(parentId))
+      .map((parentId) => layoutPos.get(parentId)!);
     groups.push({
       id: key,
       minX: Math.min(...boxes.map((b) => b.x)) - NODE_W / 2,
       maxX: Math.max(...boxes.map((b) => b.x)) + NODE_W / 2,
       minY: Math.min(...boxes.map((b) => b.y)) - NODE_H / 2,
       maxY: Math.max(...boxes.map((b) => b.y)) + NODE_H / 2,
+      stem:
+        parents.length === 0
+          ? undefined
+          : {
+              x: (Math.min(...parents.map((p) => p.x)) + Math.max(...parents.map((p) => p.x))) / 2,
+              y: Math.max(...parents.map((p) => p.y)) + NODE_H / 2,
+            },
     });
   }
   return groups;
