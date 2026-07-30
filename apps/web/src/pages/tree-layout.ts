@@ -22,6 +22,14 @@ const MIN_GAP = NODE_W + HORIZONTAL_NODE_GAP;
 export const FAMILY_GAP = Math.round(MIN_GAP * 1.5);
 
 /**
+ * O peso de quem, no alinhamento das gerações, não tem para onde ser puxado —
+ * um primo sem filhos quando a varredura sobe. Baixo de propósito: ele cede o
+ * lugar a quem tem família para alinhar, mas não zero, senão ficaria sem
+ * nenhuma preferência por onde já estava (ver `packRank`).
+ */
+const LOOSE_WEIGHT = 0.05;
+
+/**
  * As cores das arestas são `var(...)` em vez de hex porque elas viram `style` inline no SVG do
  * reactflow — e estilo inline resolve custom property normalmente, então a linha troca de cor junto
  * com o tema sem o layout saber que tema existe (ADR-015).
@@ -473,7 +481,12 @@ export function computeLayout({
   // Só para ordenar famílias por proximidade — não é o grau de parentesco do
   // backend, é uma contagem de saltos que o próprio layout consegue fazer.
   const distanceOf = buildStructuralDistances(people, unions, central?.id ?? null);
-  spreadRanks(layoutPos, coupleBlocks, allPeopleById, allChildrenOf, visibleIds, distanceOf, unions, centralX);
+  const gapRule = makeGapRule(allPeopleById, unions);
+  spreadRanks(layoutPos, coupleBlocks, allChildrenOf, visibleIds, distanceOf, gapRule, centralX);
+  // Por último, o alinhamento vertical das gerações: sem ele o agrupamento de
+  // irmãos fica sem sentido, com os pais deslocados para o lado em vez de em
+  // cima dos filhos (ADR-021).
+  alignGenerations(layoutPos, coupleBlocks, allPeopleById, allChildrenOf, visibleIds, gapRule);
   const familyGroups = buildFamilyGroups(people, layoutPos);
 
   // As arestas de união saem depois do layout porque quem é fonte e quem é alvo
@@ -859,6 +872,106 @@ function inLawGroups(people: Person[], inLawIds: Set<string>): Map<string, strin
   return groups;
 }
 
+// ─── Ranks, blocos e espaçamento ────────────────────────────────────────────
+
+/**
+ * Um bloco de um rank: uma pessoa, ou o casal (e o grupo de afinidade) que
+ * `placeCouples` amarrou em `blockOf` e que anda junto daí em diante. `members`
+ * guarda as **referências** das posições em `layoutPos` — mover o bloco é mover
+ * as pessoas dele.
+ */
+interface RankBlock {
+  anchorId: string;
+  ids: string[];
+  members: { x: number; y: number }[];
+  minX: number;
+  maxX: number;
+}
+
+/** As gerações, pela altura que o dagre deu: `y` arredondado à dezena. */
+function bucketByRank(layoutPos: Positions): Map<number, string[]> {
+  const buckets = new Map<number, string[]>();
+  for (const [id, pos] of layoutPos.entries()) {
+    const rankKey = Math.round(pos.y / 10) * 10;
+    if (!buckets.has(rankKey)) buckets.set(rankKey, []);
+    buckets.get(rankKey)!.push(id);
+  }
+  return buckets;
+}
+
+function buildRankBlocks(
+  ids: string[],
+  blockOf: Map<string, string>,
+  layoutPos: Positions,
+): RankBlock[] {
+  const byBlock = new Map<string, { id: string; pos: { x: number; y: number } }[]>();
+  for (const id of ids) {
+    const key = blockOf.get(id) ?? id;
+    if (!byBlock.has(key)) byBlock.set(key, []);
+    byBlock.get(key)!.push({ id, pos: layoutPos.get(id)! });
+  }
+
+  return [...byBlock.entries()]
+    .map(([anchorId, entries]) => ({
+      anchorId,
+      ids: entries.map((e) => e.id),
+      members: entries.map((e) => e.pos),
+      minX: Math.min(...entries.map((e) => e.pos.x)),
+      maxX: Math.max(...entries.map((e) => e.pos.x)),
+    }))
+    .sort((a, b) => a.minX - b.minX);
+}
+
+function shiftBlock(block: RankBlock, by: number) {
+  for (const member of block.members) member.x += by;
+  block.minX += by;
+  block.maxX += by;
+}
+
+const blockCenter = (block: RankBlock) => (block.minX + block.maxX) / 2;
+
+type GapRule = (a: RankBlock, b: RankBlock) => number;
+
+/**
+ * A distância mínima exigida entre dois blocos vizinhos: `MIN_GAP` dentro da
+ * mesma família nuclear, `FAMILY_GAP` na fronteira entre famílias diferentes
+ * (ADR-020).
+ *
+ * Dois blocos são a mesma família se ALGUÉM de um lado é irmão de sangue ou
+ * cônjuge de ALGUÉM do outro lado — comparação par a par, não por uma chave
+ * única do bloco: um bloco pode conter várias pessoas (casal + ex) ligadas a
+ * famílias diferentes cada uma.
+ *
+ * O casamento entra como sinal à parte (`marriedWith`, direto das uniões) e não
+ * por `blockOf`: sogro e sogra, por exemplo, nunca ganham a mesma chave ali (a
+ * união dos dois é resolvida só pela posição que o dagre já deu a eles, ver
+ * `placeCouples`), mas ainda são a mesma família para efeito de gap.
+ */
+function makeGapRule(peopleById: Map<string, Person>, unions: UnionLink[]): GapRule {
+  const familyKeyOf = (id: string) => {
+    const person = peopleById.get(id);
+    return person ? personalFamilyKey(person) : id;
+  };
+
+  const marriedWith = new Map<string, Set<string>>();
+  for (const u of unions) {
+    if (!marriedWith.has(u.aId)) marriedWith.set(u.aId, new Set());
+    if (!marriedWith.has(u.bId)) marriedWith.set(u.bId, new Set());
+    marriedWith.get(u.aId)!.add(u.bId);
+    marriedWith.get(u.bId)!.add(u.aId);
+  }
+
+  const sameFamily = (a: RankBlock, b: RankBlock) =>
+    a.ids.some((idA) => {
+      const keyA = familyKeyOf(idA);
+      return b.ids.some(
+        (idB) => (keyA !== idA && keyA === familyKeyOf(idB)) || (marriedWith.get(idA)?.has(idB) ?? false),
+      );
+    });
+
+  return (a, b) => (sameFamily(a, b) ? MIN_GAP : FAMILY_GAP);
+}
+
 /**
  * Garante a distância certa no mesmo rank, abrindo do centro para fora:
  * `MIN_GAP` entre blocos da mesma família nuclear, `FAMILY_GAP` na fronteira
@@ -873,23 +986,20 @@ function inLawGroups(people: Person[], inLawIds: Set<string>): Map<string, strin
  * já herda o mesmo deslocamento antes do rank dela ser processado — é assim
  * que uma família inteira (avô, filhos, netos) fica coesa verticalmente, não
  * só a geração em que o empurrão aconteceu.
+ *
+ * Aqui só se resolve o espaçamento e a ordem lateral; quem alinha pai sobre
+ * filho é o `alignGenerations`, depois (ADR-021).
  */
 function spreadRanks(
   layoutPos: Positions,
   blockOf: Map<string, string>,
-  peopleById: Map<string, Person>,
   childrenOf: Map<string, Set<string>>,
   visibleIds: Set<string>,
   distanceOf: Map<string, number>,
-  unions: UnionLink[],
+  requiredGap: GapRule,
   centralX: number,
 ) {
-  const rankBuckets = new Map<number, string[]>();
-  for (const [id, pos] of layoutPos.entries()) {
-    const rankKey = Math.round(pos.y / 10) * 10;
-    if (!rankBuckets.has(rankKey)) rankBuckets.set(rankKey, []);
-    rankBuckets.get(rankKey)!.push(id);
-  }
+  const rankBuckets = bucketByRank(layoutPos);
 
   const blockMembers = new Map<string, string[]>();
   for (const id of layoutPos.keys()) {
@@ -905,61 +1015,14 @@ function spreadRanks(
   // espaçamento por acúmulo.
   const cascaded = new Set<string>();
 
-  const familyKeyOf = (id: string) => {
-    const person = peopleById.get(id);
-    return person ? personalFamilyKey(person) : id;
-  };
-
-  // Quem é casado com quem, direto das uniões — não passa por `blockOf`
-  // porque sogro e sogra, por exemplo, nunca ganham a mesma chave ali (a
-  // união dos dois é resolvida só pela posição que o dagre já deu a eles, ver
-  // `placeCouples`), mas ainda são a mesma família para efeito de gap.
-  const marriedWith = new Map<string, Set<string>>();
-  for (const u of unions) {
-    if (!marriedWith.has(u.aId)) marriedWith.set(u.aId, new Set());
-    if (!marriedWith.has(u.bId)) marriedWith.set(u.bId, new Set());
-    marriedWith.get(u.aId)!.add(u.bId);
-    marriedWith.get(u.bId)!.add(u.aId);
-  }
-
-  // Dois blocos são a mesma família se ALGUÉM de um lado é irmão de sangue ou
-  // cônjuge de ALGUÉM do outro lado — comparação par a par, não por uma chave
-  // única do bloco: um bloco pode conter várias pessoas (casal + ex) ligadas
-  // a famílias diferentes cada uma.
-  const sameFamily = (a: { ids: string[] }, b: { ids: string[] }) =>
-    a.ids.some((idA) => {
-      const keyA = familyKeyOf(idA);
-      return b.ids.some(
-        (idB) => (keyA !== idA && keyA === familyKeyOf(idB)) || (marriedWith.get(idA)?.has(idB) ?? false),
-      );
-    });
-  const requiredGap = (a: { ids: string[] }, b: { ids: string[] }) => (sameFamily(a, b) ? MIN_GAP : FAMILY_GAP);
-
   const ranksAscending = [...rankBuckets.entries()].sort(([ay], [by]) => ay - by);
 
   for (const [, ids] of ranksAscending) {
-    const byBlock = new Map<string, { id: string; pos: { x: number; y: number } }[]>();
-    for (const id of ids) {
-      const key = blockOf.get(id) ?? id;
-      if (!byBlock.has(key)) byBlock.set(key, []);
-      byBlock.get(key)!.push({ id, pos: layoutPos.get(id)! });
-    }
-
-    const blocks = [...byBlock.entries()]
-      .map(([anchorId, entries]) => ({
-        anchorId,
-        ids: entries.map((e) => e.id),
-        members: entries.map((e) => e.pos),
-        minX: Math.min(...entries.map((e) => e.pos.x)),
-        maxX: Math.max(...entries.map((e) => e.pos.x)),
-      }))
-      .sort((a, b) => a.minX - b.minX);
+    const blocks = buildRankBlocks(ids, blockOf, layoutPos);
     if (blocks.length < 2) continue;
 
-    const shift = (block: (typeof blocks)[number], by: number) => {
-      for (const member of block.members) member.x += by;
-      block.minX += by;
-      block.maxX += by;
+    const shiftWithDependents = (block: RankBlock, by: number) => {
+      shiftBlock(block, by);
 
       const dependents = collectDependents(block.ids, childrenOf, visibleIds, blockOf, blockMembers);
       for (const id of dependents) {
@@ -982,7 +1045,7 @@ function spreadRanks(
       }
     });
 
-    const distanceOfBlock = (block: (typeof blocks)[number]) =>
+    const distanceOfBlock = (block: RankBlock) =>
       Math.min(...block.ids.map((id) => distanceOf.get(id) ?? Infinity));
 
     // Do lado que o dagre já escolheu (paterno/materno não muda), reordenado
@@ -996,14 +1059,191 @@ function spreadRanks(
     let prev = blocks[anchorIndex];
     for (const block of right) {
       const gap = requiredGap(prev, block);
-      shift(block, gap - (block.minX - prev.maxX));
+      shiftWithDependents(block, gap - (block.minX - prev.maxX));
       prev = block;
     }
     prev = blocks[anchorIndex];
     for (const block of left) {
       const gap = requiredGap(prev, block);
-      shift(block, -(gap - (prev.minX - block.maxX)));
+      shiftWithDependents(block, -(gap - (prev.minX - block.maxX)));
       prev = block;
+    }
+  }
+}
+
+// ─── Alinhamento das gerações ───────────────────────────────────────────────
+
+/**
+ * Deixa cada geração no lugar que a leitura de uma árvore genealógica espera:
+ * o casal (ou a pessoa sozinha) **em cima** dos filhos, e o grupo de irmãos
+ * **embaixo** dos pais. Sem isso, aproximar irmãos não significa nada — eles
+ * ficam lado a lado, mas com o pai deslocado para o canto, e a linha de
+ * filiação atravessa o desenho na diagonal (ADR-021).
+ *
+ * São quatro varreduras alternadas: de cima para baixo (cada bloco vai para o
+ * meio dos pais visíveis) e de baixo para cima (cada bloco vai para o meio dos
+ * filhos visíveis), duas vezes, terminando na de baixo para cima — as duas
+ * direções se puxam e convergem, e a última palavra é "pai centrado sobre os
+ * filhos". Nenhuma varredura mexe em `y`: geração é assunto do dagre.
+ *
+ * O espaçamento é preservado porque quem posiciona cada rank é o `packRank`,
+ * que respeita o gap exigido entre blocos vizinhos — `MIN_GAP` dentro da
+ * família, `FAMILY_GAP` na fronteira (ADR-020). O lado de cada ramo
+ * (paterno/materno) e a ordenação por proximidade continuam vindo do
+ * `spreadRanks`: descem dos pais, geração após geração, junto com a ordem.
+ * A cascata do `spreadRanks` não é necessária aqui: a varredura de cima para
+ * baixo já processa o rank do filho depois do rank do pai, e a de baixo para
+ * cima, o contrário.
+ */
+function alignGenerations(
+  layoutPos: Positions,
+  blockOf: Map<string, string>,
+  peopleById: Map<string, Person>,
+  childrenOf: Map<string, Set<string>>,
+  visibleIds: Set<string>,
+  requiredGap: GapRule,
+) {
+  const ranks = [...bucketByRank(layoutPos).entries()]
+    .sort(([ay], [by]) => ay - by)
+    .map(([, ids]) => ids);
+  if (ranks.length < 2) return;
+
+  /** O meio do intervalo ocupado por um conjunto de pessoas — não a média: é o
+   * centro do espaço que elas ocupam, que é o que fica embaixo (ou em cima). */
+  const spanCenter = (ids: Iterable<string>) => {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const id of ids) {
+      const pos = layoutPos.get(id);
+      if (!pos) continue;
+      min = Math.min(min, pos.x);
+      max = Math.max(max, pos.x);
+    }
+    return min === Infinity ? null : (min + max) / 2;
+  };
+
+  const childrenCenter = (block: RankBlock) => {
+    const children: string[] = [];
+    for (const id of block.ids) {
+      for (const childId of childrenOf.get(id) ?? []) {
+        if (visibleIds.has(childId)) children.push(childId);
+      }
+    }
+    return spanCenter(children);
+  };
+
+  const parentsCenter = (block: RankBlock) => {
+    const parents: string[] = [];
+    for (const id of block.ids) {
+      const person = peopleById.get(id);
+      if (!person) continue;
+      for (const parentId of [person.fatherId, person.motherId]) {
+        if (parentId && visibleIds.has(parentId)) parents.push(parentId);
+      }
+    }
+    return spanCenter(parents);
+  };
+
+  const sweep = (direction: 'down' | 'up') => {
+    const order = direction === 'down' ? ranks : [...ranks].reverse();
+    for (const ids of order) {
+      const blocks = buildRankBlocks(ids, blockOf, layoutPos);
+      const targets = blocks.map((block) => {
+        const anchor = direction === 'down' ? parentsCenter(block) : childrenCenter(block);
+        // Quem não tem para onde ser puxado nesta direção (o primo sem filhos,
+        // subindo) só quer ficar onde está — e cede o lugar a quem tem família
+        // para alinhar, em vez de disputar o mesmo ponto de igual para igual.
+        return anchor === null
+          ? { desired: blockCenter(block), weight: LOOSE_WEIGHT }
+          : { desired: anchor, weight: 1 };
+      });
+      // A ordem lateral se decide descendo, junto com as gerações: o rank herda
+      // a ordem dos pais (e com ela o lado paterno/materno e a proximidade que
+      // `spreadRanks` decidiu). Subindo, ela é só respeitada — reordenar os pais
+      // pelos filhos jogaria uma tia de primeiro grau para fora de um ramo mais
+      // distante que por acaso tivesse a prole mais à esquerda.
+      packRank(blocks, targets, requiredGap, direction === 'down');
+    }
+  };
+
+  for (let round = 0; round < 2; round++) {
+    sweep('down');
+    sweep('up');
+  }
+}
+
+/**
+ * Põe os blocos de um rank o mais perto possível de onde cada um quer estar
+ * (`desired`), sem violar o gap exigido entre vizinhos. É a solução exata desse
+ * problema — minimizar a soma dos quadrados dos desvios sujeito a
+ * `centro[i+1] - centro[i] >= separação[i]` —, obtida descontando as separações
+ * acumuladas e caindo numa regressão isotônica (PAVA, "pool adjacent
+ * violators"): enquanto o bloco novo quer ficar à esquerda do anterior, os dois
+ * viram um pool só, no meio dos dois. Um passe guloso da esquerda para a direita
+ * empurraria a família inteira para um lado; aqui o grupo que não cabe se divide
+ * em volta do centro que ele queria.
+ *
+ * Cada destino tem um peso: quem está sendo alinhado à família pesa 1, quem só
+ * quer ficar onde está pesa `LOOSE_WEIGHT` — assim, num empate de destino, o
+ * bloco solto desliza para o lado e o casal fica sobre os filhos, em vez dos
+ * dois se dividirem em volta do ponto disputado.
+ *
+ * A ordem lateral, quando `reorder`, passa a ser a ordem dos destinos: irmãos
+ * que o espaçamento tinha espalhado pelo rank (um à esquerda de tudo, os outros
+ * dois à direita) querem o mesmo lugar — o meio dos pais — e por isso voltam a
+ * ficar lado a lado. Quem herda a ordem é o rank de baixo, geração após
+ * geração, então o lado paterno/materno e a ordenação por proximidade decididos
+ * em `spreadRanks` continuam valendo: descem dos pais.
+ */
+function packRank(
+  blocks: RankBlock[],
+  targets: { desired: number; weight: number }[],
+  requiredGap: GapRule,
+  reorder: boolean,
+) {
+  if (blocks.length === 0) return;
+
+  const order = blocks.map((block, i) => ({ block, ...targets[i] }));
+  if (reorder) {
+    order.sort((a, b) => a.desired - b.desired || blockCenter(a.block) - blockCenter(b.block));
+  }
+  blocks = order.map((entry) => entry.block);
+  const desired = order.map((entry) => entry.desired);
+  const weights = order.map((entry) => entry.weight);
+
+  // Quanto o centro de cada bloco tem de estar à direita do centro do primeiro.
+  const offsets = [0];
+  for (let i = 1; i < blocks.length; i++) {
+    const halfWidths =
+      (blocks[i - 1].maxX - blocks[i - 1].minX) / 2 + (blocks[i].maxX - blocks[i].minX) / 2;
+    offsets.push(offsets[i - 1] + halfWidths + requiredGap(blocks[i - 1], blocks[i]));
+  }
+
+  // Os pools: `value` é onde o pool ficou, `weight` o peso somado dele e `size`
+  // quantos blocos ele engloba.
+  const values: number[] = [];
+  const poolWeights: number[] = [];
+  const sizes: number[] = [];
+  for (let i = 0; i < blocks.length; i++) {
+    let value = desired[i] - offsets[i];
+    let weight = weights[i];
+    let size = 1;
+    while (values.length > 0 && values[values.length - 1] > value) {
+      const pooledValue = values.pop()!;
+      const pooledWeight = poolWeights.pop()!;
+      value = (value * weight + pooledValue * pooledWeight) / (weight + pooledWeight);
+      weight += pooledWeight;
+      size += sizes.pop()!;
+    }
+    values.push(value);
+    poolWeights.push(weight);
+    sizes.push(size);
+  }
+
+  let i = 0;
+  for (let pool = 0; pool < values.length; pool++) {
+    for (let member = 0; member < sizes[pool]; member++, i++) {
+      shiftBlock(blocks[i], values[pool] + offsets[i] - blockCenter(blocks[i]));
     }
   }
 }

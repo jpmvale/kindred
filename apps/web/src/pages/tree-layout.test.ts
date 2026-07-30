@@ -420,3 +420,110 @@ describe('computeLayout — agrupamento de famílias', () => {
     expect(Math.abs(x('sogro') - x('sogra'))).toBe(PASSO);
   });
 });
+
+describe('computeLayout — alinhamento das gerações (ADR-021)', () => {
+  /** O meio do espaço que um conjunto de pessoas ocupa. */
+  function centro(nodes: Node[], ids: string[]) {
+    const xs = ids.map((id) => nó(nodes, id).position.x);
+    return (Math.min(...xs) + Math.max(...xs)) / 2;
+  }
+
+  it('centra o casal sobre os filhos, em vez de jogar os pais para o lado', () => {
+    const pai = pessoa('pai', { sex: 'MALE' });
+    const mãe = pessoa('mãe', { sex: 'FEMALE' });
+    const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai', motherId: 'mãe' });
+    const irmã = pessoa('irmã', { fatherId: 'pai', motherId: 'mãe' });
+    const irmão = pessoa('irmão', { fatherId: 'pai', motherId: 'mãe' });
+    casar(pai, mãe, 'u1');
+
+    const { nodes } = layout([pai, mãe, eu, irmã, irmão], {
+      paisAbertos: ['eu'],
+      ladosAbertos: ['eu'],
+    });
+
+    expect(centro(nodes, ['pai', 'mãe'])).toBeCloseTo(centro(nodes, ['eu', 'irmã', 'irmão']));
+  });
+
+  it('põe cada tio sobre os próprios filhos, e não sobre os primos do outro ramo', () => {
+    const avô = pessoa('avô', { sex: 'MALE' });
+    const pai = pessoa('pai', { fatherId: 'avô' });
+    const tio1 = pessoa('tio1', { fatherId: 'avô' });
+    const tio2 = pessoa('tio2', { fatherId: 'avô' });
+    const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai' });
+    const primo1a = pessoa('primo1a', { fatherId: 'tio1' });
+    const primo1b = pessoa('primo1b', { fatherId: 'tio1' });
+    const primo2a = pessoa('primo2a', { fatherId: 'tio2' });
+
+    const { nodes } = layout([avô, pai, tio1, tio2, eu, primo1a, primo1b, primo2a], {
+      paisAbertos: ['eu', 'pai'],
+      ladosAbertos: ['eu'],
+    });
+
+    expect(centro(nodes, ['tio1'])).toBeCloseTo(centro(nodes, ['primo1a', 'primo1b']));
+    expect(centro(nodes, ['tio2'])).toBeCloseTo(centro(nodes, ['primo2a']));
+    // O avô, uma geração acima, fica sobre os três filhos dele.
+    expect(centro(nodes, ['avô'])).toBeCloseTo(centro(nodes, ['pai', 'tio1', 'tio2']));
+  });
+
+  it('alinha três gerações em coluna quando cada uma tem um filho só', () => {
+    const avô = pessoa('avô');
+    const pai = pessoa('pai', { fatherId: 'avô' });
+    const eu = pessoa('eu', { isCentralUser: true, fatherId: 'pai' });
+    const filho = pessoa('filho', { fatherId: 'eu' });
+
+    const { nodes } = layout([avô, pai, eu, filho], { paisAbertos: ['eu', 'pai'] });
+    const x = (id: string) => nó(nodes, id).position.x;
+
+    expect(x('pai')).toBeCloseTo(x('avô'));
+    expect(x('eu')).toBeCloseTo(x('pai'));
+    expect(x('filho')).toBeCloseTo(x('eu'));
+  });
+
+  it('não sobrepõe ninguém depois de alinhar, mesmo com muitos primos', () => {
+    const avô = pessoa('avô');
+    const avó = pessoa('avó');
+    casar(avô, avó, 'u-avós');
+    const pessoas: Person[] = [avô, avó];
+
+    // Três filhos do casal de avós, cada um casado e com três filhos.
+    for (const filho of ['pai', 'tio1', 'tio2']) {
+      const p = pessoa(filho, { fatherId: 'avô', motherId: 'avó' });
+      const cônjuge = pessoa(`${filho}-cônjuge`);
+      casar(p, cônjuge, `u-${filho}`);
+      pessoas.push(p, cônjuge);
+      for (const n of [1, 2, 3]) {
+        pessoas.push(
+          pessoa(`${filho}-neto${n}`, {
+            fatherId: filho,
+            motherId: `${filho}-cônjuge`,
+            isCentralUser: filho === 'pai' && n === 1,
+          }),
+        );
+      }
+    }
+
+    const { nodes } = layout(pessoas, {
+      paisAbertos: ['pai-neto1', 'pai'],
+      ladosAbertos: ['pai-neto1', 'pai'],
+    });
+
+    const porLinha = new Map<number, number[]>();
+    for (const n of nodes) {
+      if (!porLinha.has(n.position.y)) porLinha.set(n.position.y, []);
+      porLinha.get(n.position.y)!.push(n.position.x);
+    }
+    for (const xs of porLinha.values()) {
+      const ordenados = [...xs].sort((a, b) => a - b);
+      for (let i = 1; i < ordenados.length; i++) {
+        expect(ordenados[i] - ordenados[i - 1]).toBeGreaterThanOrEqual(PASSO - 0.001);
+      }
+    }
+
+    // E cada família continua com o casal em cima dos próprios filhos.
+    for (const filho of ['pai', 'tio1', 'tio2']) {
+      expect(centro(nodes, [filho, `${filho}-cônjuge`])).toBeCloseTo(
+        centro(nodes, [1, 2, 3].map((n) => `${filho}-neto${n}`)),
+      );
+    }
+  });
+});

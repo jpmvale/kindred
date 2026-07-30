@@ -729,3 +729,71 @@ perto que um primo alcançado só por união, mais distante em saltos), a boundi
 e o caso do casal sem pais conhecidos (regressão do `sameFamily`). Rodando contra a base real (~150
 pessoas, só leitura, pela tela) com "Abrir todos relacionamentos": tios e primos aparecem agrupados em
 caixas distintas, com gap visivelmente maior entre famílias que dentro delas, em tema claro e escuro.
+
+---
+
+## ADR-021 — Alinhar as gerações depois do espaçamento: pai em cima, filho embaixo
+
+**Contexto.** O ADR-020 aproximou irmãos e afastou famílias, mas mexia só na coordenada horizontal
+**dentro de cada rank**, sem olhar quem estava em cima nem embaixo. O usuário apontou o que sobrou:
+juntar irmãos não significa nada se os pais não estiverem em cima deles e os filhos embaixo. Na base
+real era o que acontecia — o `siblingGroups` recentrava o grupo de irmãos, a regra direcional grudava
+pai e mãe nos lados da pessoa central, e o `spreadRanks` reordenava blocos por distância estrutural,
+cada passo desses puxando alguém para longe da própria prole. O sintoma final é uma geração inteira
+de primos à esquerda de um tio que fica à direita, com a linha de filiação atravessando o desenho.
+
+**Decisão — uma passada final de alinhamento, não uma reescrita.** `alignGenerations`, depois do
+`spreadRanks` e antes de `buildFamilyGroups`, faz quatro varreduras alternadas (duas voltas de
+"descendo" + "subindo", terminando subindo):
+
+- **descendo**, rank por rank de cima para baixo, cada bloco quer o **meio do intervalo dos pais
+  visíveis**;
+- **subindo**, de baixo para cima, cada bloco quer o **meio do intervalo dos filhos visíveis**.
+
+As duas direções se puxam e convergem em poucas voltas; a última palavra é da subida, "o casal em
+cima dos filhos", que é o pedido literal. `y` nunca é tocado: geração continua sendo assunto do
+dagre. A cascata do `spreadRanks` (`collectDependents`) não é necessária aqui — descendo, o rank do
+filho é processado depois do rank do pai, e subindo, o contrário.
+
+**Quem posiciona cada rank é o `packRank`, e ele resolve o problema exato.** Dados os destinos de
+cada bloco, achar as posições mais próximas deles que ainda respeitem
+`centro[i+1] - centro[i] >= separação[i]` (com a separação sendo `MIN_GAP` ou `FAMILY_GAP` do
+ADR-020, agora extraída para `makeGapRule`) é minimizar uma soma de quadrados sob restrições de
+ordem: descontando as separações acumuladas, cai numa **regressão isotônica**, resolvida com PAVA
+("pool adjacent violators") em O(n). Um passe guloso da esquerda para a direita — a primeira ideia —
+empurraria a família inteira para um lado; com o pool, o grupo que não cabe se divide em volta do
+ponto que queria.
+
+**Cada destino tem peso, e é isso que resolve o empate.** Quem está sendo alinhado à família pesa 1;
+quem não tem para onde ser puxado naquela direção (o primo sem filhos, quando a varredura sobe, e
+por isso só "quer ficar onde está") pesa `LOOSE_WEIGHT = 0,05`. Sem peso, os dois disputavam o mesmo
+ponto de igual para igual e se dividiam em volta dele — na verificação, um casal ficou um `MIN_GAP`
+inteiro fora do centro dos próprios três filhos por causa de um primo solto ao lado. Com peso, o
+bloco solto desliza e o casal fica sobre os filhos (o desvio residual cai de 232 px para ~21 px, ou
+seja, de um card inteiro para um décimo dele).
+
+**A ordem lateral se decide descendo, e só é respeitada subindo.** Na descida o rank é reordenado
+pelos destinos — é o que junta de volta irmãos que o espaçamento tinha espalhado pelo rank, porque
+todos querem o mesmo lugar (o meio dos pais); o rank de baixo herda essa ordem, geração após
+geração, e com ela o lado paterno/materno e a ordenação por proximidade que o `spreadRanks` decidiu.
+Na subida a ordem é preservada: reordenar os pais pelos filhos jogava uma tia de primeiro grau para
+fora de um ramo mais distante que por acaso tinha a prole mais à esquerda — apareceu exatamente
+assim na verificação visual, com uma tia caindo depois de um primo do pai.
+
+**As regras anteriores continuam onde estavam.** A regra direcional (lado paterno à direita, materno
+à esquerda) e a ordenação por distância estrutural seguem no `spreadRanks`, decidindo **de que lado**
+cada ramo cresce; o alinhamento decide **onde exatamente**, e onde as duas coisas se contradizem —
+"pai um `MIN_GAP` à direita da pessoa central" contra "pai em cima dos filhos" — quem vence é o
+alinhamento, porque é o que a leitura de uma árvore genealógica pede. Extraídos para serem usados
+pelos dois: `bucketByRank`, `buildRankBlocks`, `shiftBlock` e `makeGapRule` (o `spreadRanks` encolheu
+sem mudar de comportamento; nenhum teste dele mudou de expectativa).
+
+**Verificado** com os 21 testes de `tree-layout.test.ts` que já existiam, todos inalterados, mais 4
+novos: casal centrado sobre três filhos, cada tio sobre a própria prole (e o avô sobre os três
+filhos), três gerações de filho único em coluna, e uma família de 20 pessoas (avós, três filhos
+casados, nove netos) onde nada se sobrepõe e cada casal continua centrado sobre os próprios filhos.
+Além dos testes, o layout foi renderizado em SVG antes e depois numa família sintética de 28 pessoas
+(bisavós, avós dos dois lados, tios com cônjuge e filhos, irmãos, sobrinho, filhos) e conferido
+número por número: menor distância no rank igual a `MIN_GAP` exato, e todo pai/mãe a meio passo
+(`MIN_GAP / 2`, o próprio deslocamento do casal) do centro dos filhos — a base real não foi usada
+desta vez porque exigiria a senha da conta do dono, e a geometria é o que estava em questão.

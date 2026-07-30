@@ -5,17 +5,25 @@ _Atualizado em 29/07/2026._
 ## Onde o projeto está
 
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
-busca/ordenação/paginação, árvore genealógica — agora com **famílias agrupadas visualmente** — e
+busca/ordenação/paginação, árvore genealógica — agora com **famílias agrupadas visualmente e as
+gerações alinhadas** (pai em cima, filho embaixo) — e
 calendário de aniversários — em tema claro ou escuro, e **com conta e login** (BL-10): cada pessoa que
 usa o kindred tem sua própria árvore, isolada das demais. A conta também já pode trocar o próprio
 e-mail e senha pela tela (BL-16), e quem tem acesso ao servidor consegue redefinir a senha de qualquer
 conta por linha de comando (BL-17, ADR-019) — **o backlog de produto está vazio**.
 
-**Marco de retomada — 29/07/2026, fim da janela.** Working tree limpo, nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **263 testes** (84 na API, 172 no
-web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). Para retomar, basta subir o
-Postgres (`docker compose up -d postgres`) — não há item de backlog aberto, então "retomar" aqui é
-escolher um rumo novo, não continuar algo pela metade.
+**Marco de retomada — 29/07/2026, fim da janela.** Nada pela metade. Conferido:
+`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **267 testes** (84 na API, 176 no
+web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). Working tree limpo. O usuário viu
+o alinhamento das gerações (ADR-021) rodando na base real e aprovou — **"melhorou bastante, mas ainda
+tem muita coisa que precisamos evoluir"**: a árvore continua sendo a frente de trabalho aberta, sem
+item de backlog formal ainda.
+
+**Para subir tudo e olhar a árvore:** `docker compose up -d postgres`, um `.env` na raiz (copiado do
+`.env.example`, com `PORT=3005` para casar com o `API_URL` do
+[`.claude/launch.json`](../.claude/launch.json), que agora tem as duas entradas — `kindred-api` na
+3005 e `kindred-web` na 5174) e os dois dev servers. O `.env` não vai para o git e não existia no
+começo desta janela.
 
 > 🔑 **A senha da conta com os dados reais foi trocada nesta janela, a pedido de quem é dono dela.**
 > Para verificar o agrupamento de famílias (ver seção própria abaixo) contra a árvore de verdade, era
@@ -37,7 +45,24 @@ escolher um rumo novo, não continuar algo pela metade.
 
 ## Onde a última sessão parou
 
-**Agrupamento de famílias na árvore fechou** (ADR-020), pedido direto do usuário fora do backlog —
+**As gerações da árvore passaram a ficar alinhadas** (ADR-021), continuação direta do agrupamento de
+famílias: o usuário apontou que juntar irmãos não faz sentido sem os pais em cima deles e os filhos
+embaixo. A resposta foi uma passada final de alinhamento (`alignGenerations`) sobre o que o
+`spreadRanks` já fazia — quatro varreduras alternadas (cada bloco vai para o meio dos pais, descendo;
+para o meio dos filhos, subindo), com o posicionamento de cada rank resolvido exatamente por
+regressão isotônica (`packRank`) para respeitar `MIN_GAP`/`FAMILY_GAP` sem empurrar a família toda
+para um lado. Duas coisas só apareceram verificando o desenho: sem **peso** nos destinos, um primo
+sem filhos disputava o mesmo ponto com um casal e o tirava um `MIN_GAP` inteiro de cima dos próprios
+filhos (daí `LOOSE_WEIGHT`); e reordenar o rank **subindo** jogava uma tia de primeiro grau para fora
+de um ramo mais distante (daí a ordem se decidir só na descida). Detalhes no ADR-021.
+
+A verificação foi por geometria, não pela base real: renderizei o layout em SVG antes e depois numa
+família sintética de 28 pessoas e conferi número por número (menor distância no rank = `MIN_GAP`
+exato; todo pai/mãe a meio passo do centro dos filhos). Conferir contra a árvore de verdade exigiria
+a senha da conta do dono, e ninguém pediu para trocá-la nesta janela — o que estava em questão era a
+geometria.
+
+Antes disso, na mesma janela: **agrupamento de famílias na árvore fechou** (ADR-020), pedido direto do usuário fora do backlog —
 ver a seção própria logo abaixo, com o antes-e-depois e o defeito achado no meio do caminho.
 
 Antes disso, na mesma janela: **BL-17 fechou** (recuperar senha esquecida) — o último item do
