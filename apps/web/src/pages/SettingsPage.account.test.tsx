@@ -10,15 +10,15 @@ vi.mock('../api/auth', () => ({
 
 const { authApi } = await import('../api/auth');
 const { accountLoader } = await import('../loaders');
-const { default: AccountPage } = await import('./AccountPage');
+const { default: SettingsPage } = await import('./SettingsPage');
 const { renderRota } = await import('../test-utils');
 
 const usuario: AuthUser = { id: 'u1', name: 'Ana Souza', email: 'ana@x.com' };
 
 const montar = () =>
   renderRota(
-    [{ path: '/account', element: <AccountPage />, loader: accountLoader }],
-    '/account',
+    [{ path: '/settings', element: <SettingsPage />, loader: accountLoader }],
+    '/settings',
   );
 
 const erro = (status: number, message: string) =>
@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.mocked(authApi.me).mockResolvedValue(usuario);
 });
 
-describe('AccountPage', () => {
+describe('Configurações — conta', () => {
   it('carrega o e-mail atual do loader', async () => {
     montar();
     expect(await screen.findByDisplayValue('ana@x.com')).toBeInTheDocument();

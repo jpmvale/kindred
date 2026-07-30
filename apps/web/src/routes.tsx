@@ -6,10 +6,9 @@ import LocationsPage from './pages/LocationsPage';
 import SetupPage from './pages/SetupPage';
 import TreePage from './pages/TreePage';
 import CalendarPage from './pages/CalendarPage';
-import BackupPage from './pages/BackupPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import AccountPage from './pages/AccountPage';
+import SettingsPage from './pages/SettingsPage';
 import {
   accountLoader,
   guestOnlyLoader,
@@ -42,8 +41,11 @@ export const router = createBrowserRouter([
       { path: 'locations', element: <LocationsPage />, loader: locationsLoader },
       { path: 'calendar', element: <CalendarPage />, loader: peopleLoader },
       { path: 'tree', element: <TreePage />, loader: peopleLoader },
-      { path: 'backup', element: <BackupPage /> },
-      { path: 'account', element: <AccountPage />, loader: accountLoader },
+      { path: 'settings', element: <SettingsPage />, loader: accountLoader },
+      // Os endereços antigos continuam valendo: backup e conta viraram seções de
+      // Configurações (ADR-027), e link velho não pode virar tela de erro.
+      { path: 'backup', element: <Navigate to="/settings" replace /> },
+      { path: 'account', element: <Navigate to="/settings" replace /> },
     ],
   },
 ]);

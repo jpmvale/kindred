@@ -127,7 +127,7 @@ export default function SetupPage() {
         </form>
       </div>
       <p className="text-muted" style={{ marginTop: '1rem', textAlign: 'center' }}>
-        Já tem um backup? <Link to="/backup">Restaurar em vez de cadastrar</Link>
+        Já tem um backup? <Link to="/settings">Restaurar em vez de cadastrar</Link>
       </p>
     </div>
   );

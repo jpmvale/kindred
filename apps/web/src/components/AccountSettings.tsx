@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useLoaderData } from 'react-router-dom';
 import type { AuthUser } from '@kindred/types';
 import { authApi } from '../api/auth';
 import { errorMessage, isConflict, isUnauthorized } from '../api-error';
 
-export default function AccountPage() {
-  const user = useLoaderData() as AuthUser;
+/**
+ * Trocar e-mail e senha da conta (BL-16). Vive como seção de Configurações
+ * (ADR-027) — era uma tela própria em `/account`.
+ */
+export default function AccountSettings({ user }: { user: AuthUser }) {
 
   const [email, setEmail] = useState(user.email);
   const [newPassword, setNewPassword] = useState('');
@@ -61,11 +63,13 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="page" style={{ maxWidth: 420 }}>
-      <div className="page-header">
-        <h1>Minha conta</h1>
-      </div>
-      <div className="form-card">
+    <section className="settings-section">
+      <h2 className="settings-section-title">Conta</h2>
+      <p className="settings-section-hint">
+        Trocar a senha derruba as outras sessões desta conta: quem estiver logado
+        em outro dispositivo entra de novo.
+      </p>
+      <div className="form-card" style={{ maxWidth: 420 }}>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="conta-nome">Nome</label>
@@ -131,6 +135,6 @@ export default function AccountPage() {
           </div>
         </form>
       </div>
-    </div>
+    </section>
   );
 }

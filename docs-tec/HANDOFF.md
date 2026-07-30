@@ -45,6 +45,12 @@ começo desta janela.
 
 ## Onde a última sessão parou
 
+**Backup e conta viraram seções de Configurações** (ADR-027), em `/settings`: o menu tinha "Backup"
+disputando espaço com as telas de conteúdo, e a conta ficava escondida no nome do usuário. As páginas
+viraram componentes (`AccountSettings`, `BackupSettings`) e `/backup` e `/account` redirecionam para
+a tela nova.
+
+
 **O card de detalhe da árvore foi refeito** (ADR-026): cada parente é uma linha clicável com avatar,
 nome e a informação que situa (parentesco, anos), os grupos têm contagem, o topo virou cartão de
 identidade e o "Editar pessoa" saiu da área que rola. Entraram os **cônjuges**, que faltavam. E clicar

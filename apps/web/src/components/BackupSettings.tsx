@@ -30,7 +30,11 @@ function readCountsHint(raw: unknown): BackupCounts | null {
   };
 }
 
-export default function BackupPage() {
+/**
+ * Exportar e restaurar o banco inteiro (BL-06). Vive como seção de Configurações
+ * (ADR-027) — era uma tela própria em `/backup`.
+ */
+export default function BackupSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [exporting, setExporting] = useState(false);
@@ -119,13 +123,11 @@ export default function BackupPage() {
   }
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <h1>Backup</h1>
-      </div>
+    <section className="settings-section">
+      <h2 className="settings-section-title">Backup</h2>
 
-      <div className="form-card" style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ marginTop: 0 }}>Exportar</h2>
+      <div className="form-card" style={{ marginBottom: '1rem' }}>
+        <h3 style={{ marginTop: 0 }}>Exportar</h3>
         <p style={{ color: 'var(--muted)' }}>
           Baixa uma cópia completa do banco — pessoas, uniões, locais e fotos — num
           arquivo JSON. É o mesmo formato que o <code>pnpm db:backup</code> gera.
@@ -137,7 +139,7 @@ export default function BackupPage() {
       </div>
 
       <div className="form-card">
-        <h2 style={{ marginTop: 0 }}>Importar</h2>
+        <h3 style={{ marginTop: 0 }}>Importar</h3>
         <p style={{ color: 'var(--muted)' }}>
           Escolha um arquivo de backup para restaurar. Isto{' '}
           <strong>substitui os dados atuais</strong> pelo conteúdo do arquivo.
@@ -217,6 +219,6 @@ export default function BackupPage() {
           </button>
         )}
       </div>
-    </div>
+    </section>
   );
 }

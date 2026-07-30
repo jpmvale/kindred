@@ -1018,3 +1018,30 @@ do desenho) e 1 novo de `relationsOf`, mais a aparência conferida no navegador 
 com o CSS real. O `TreePage` continua com teste de fumaça só: no jsdom o reactflow não mede nada, e
 verificar centralização por lá seria medir o dublê.
 
+---
+
+## ADR-027 — Backup e conta viraram seções de uma tela de Configurações
+
+**Contexto.** O menu lateral tinha "Backup" como item de primeira ordem, ao lado de Pessoas, Árvore,
+Calendário e Locais — coisas que são o produto —, e "Minha conta" ficava escondida no nome do usuário,
+no rodapé. Duas telas de **ajuste do sistema** disputando espaço com as telas de **conteúdo**. Pedido
+do usuário: uma tela de configurações com login/senha e exportação juntos.
+
+**Decisão.** Uma rota `/settings` ("Configurações") com seções empilhadas, e o que era página virou
+componente: `AccountSettings` (e-mail e senha, BL-16) e `BackupSettings` (exportar e restaurar, BL-06).
+A página só compõe as duas e carrega o usuário pelo `accountLoader` que já existia. No menu, "Backup"
+deu lugar a "Configurações" (ícone de engrenagem), e o nome do usuário no rodapé aponta para lá também
+— dois caminhos para o mesmo lugar, que é como se procura configuração.
+
+**Seções empilhadas, não abas.** São duas, e ambas curtas; aba aqui seria esconder metade do conteúdo
+para economizar uma rolagem que não existe. Quando houver uma terceira ou quarta seção, a decisão se
+revisita.
+
+**Os endereços antigos continuam valendo:** `/backup` e `/account` redirecionam para `/settings`
+(`<Navigate replace>`). Link velho — inclusive o "Restaurar em vez de cadastrar" da tela de setup, que
+foi atualizado — não pode virar tela de erro.
+
+**Verificado** com os 15 testes que já existiam das duas telas, agora montando `SettingsPage`: o de
+backup passou a esperar o loader resolver (antes a rota não tinha loader nenhum e renderizava
+síncrona), e nenhum mudou de expectativa quanto ao comportamento. `pnpm typecheck`, `pnpm lint` e
+`pnpm test` limpos.

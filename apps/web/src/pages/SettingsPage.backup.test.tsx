@@ -11,11 +11,21 @@ vi.mock('../api/backup', () => ({
 }));
 
 const { backupApi } = await import('../api/backup');
-const { default: BackupPage } = await import('./BackupPage');
+const { default: SettingsPage } = await import('./SettingsPage');
 const { renderRota } = await import('../test-utils');
 
-const montar = () =>
-  renderRota([{ path: '/backup', element: <BackupPage /> }], '/backup');
+/** A seção de conta divide a tela com a de backup, e ela precisa do usuário. */
+const usuário = { id: 'u1', name: 'Ana Souza', email: 'ana@x.com' };
+
+/** Espera a rota resolver o loader antes de devolver: sem isso o corpo ainda está vazio. */
+async function montar() {
+  const resultado = renderRota(
+    [{ path: '/settings', element: <SettingsPage />, loader: () => usuário }],
+    '/settings',
+  );
+  await screen.findByRole('heading', { name: 'Backup' });
+  return resultado;
+}
 
 /** Erro de axios com status e mensagem, do jeito que a API kindred devolve. */
 function erroApi(status: number, message: string) {
@@ -61,7 +71,7 @@ beforeEach(() => {
   window.location = { href: '' };
 });
 
-describe('BackupPage — exportar', () => {
+describe('Configurações — exportar backup', () => {
   it('baixa o backup e dispara o download', async () => {
     const user = userEvent.setup();
     const blob = new Blob(['{}'], { type: 'application/json' });
@@ -72,7 +82,7 @@ describe('BackupPage — exportar', () => {
     const clique = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {});
-    montar();
+    await montar();
 
     await user.click(screen.getByRole('button', { name: 'Baixar backup' }));
 
@@ -83,7 +93,7 @@ describe('BackupPage — exportar', () => {
   it('mostra erro se o download falhar', async () => {
     const user = userEvent.setup();
     vi.mocked(backupApi.export).mockRejectedValue(new Error('rede caiu'));
-    montar();
+    await montar();
 
     await user.click(screen.getByRole('button', { name: 'Baixar backup' }));
 
@@ -93,10 +103,10 @@ describe('BackupPage — exportar', () => {
   });
 });
 
-describe('BackupPage — importar', () => {
+describe('Configurações — importar backup', () => {
   it('lê o arquivo e mostra o resumo antes de restaurar', async () => {
     const user = userEvent.setup();
-    montar();
+    await montar();
 
     await user.upload(campoArquivo(), arquivoValido(5));
 
@@ -108,7 +118,7 @@ describe('BackupPage — importar', () => {
 
   it('recusa arquivo que não é JSON', async () => {
     const user = userEvent.setup();
-    montar();
+    await montar();
 
     const ruim = new File(['isto não é json'], 'ruim.json', {
       type: 'application/json',
@@ -125,7 +135,7 @@ describe('BackupPage — importar', () => {
 
   it('recusa arquivo que não tem cara de backup do kindred', async () => {
     const user = userEvent.setup();
-    montar();
+    await montar();
 
     const estranho = new File([JSON.stringify({ nada: 'a ver' })], 'estranho.json', {
       type: 'application/json',
@@ -147,7 +157,7 @@ describe('BackupPage — importar', () => {
       Union: 0,
       PersonPhoto: 0,
     });
-    montar();
+    await montar();
 
     await user.upload(campoArquivo(), arquivoValido(5));
     await user.click(await screen.findByRole('button', { name: 'Restaurar' }));
@@ -161,7 +171,7 @@ describe('BackupPage — importar', () => {
     vi.mocked(backupApi.restore).mockRejectedValueOnce(
       erroApi(409, 'O banco já tem 143 pessoa(s).'),
     );
-    montar();
+    await montar();
 
     await user.upload(campoArquivo(), arquivoValido(5));
     await user.click(await screen.findByRole('button', { name: 'Restaurar' }));
@@ -181,7 +191,7 @@ describe('BackupPage — importar', () => {
     vi.mocked(backupApi.restore).mockRejectedValueOnce(
       erroApi(409, 'O banco já tem 143 pessoa(s).'),
     );
-    montar();
+    await montar();
 
     await user.upload(campoArquivo(), arquivoValido(5));
     await user.click(await screen.findByRole('button', { name: 'Restaurar' }));
@@ -200,7 +210,7 @@ describe('BackupPage — importar', () => {
     vi.mocked(backupApi.restore)
       .mockRejectedValueOnce(erroApi(409, 'O banco já tem 143 pessoa(s).'))
       .mockResolvedValueOnce({ Location: 2, Person: 5, Union: 0, PersonPhoto: 0 });
-    montar();
+    await montar();
 
     await user.upload(campoArquivo(), arquivoValido(5));
     await user.click(await screen.findByRole('button', { name: 'Restaurar' }));

@@ -1189,6 +1189,30 @@ button:disabled {
   gap: 8px;
 }
 
+/* ─── Configurações ──────────────────────────────────────────────────────────
+ *
+ * Uma tela, seções empilhadas (ADR-027): cada uma com título, dica opcional e os
+ * cards de sempre por dentro.
+ */
+
+.settings-section {
+  margin-bottom: 2rem;
+}
+
+.settings-section-title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.settings-section-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  max-width: 44rem;
+}
+
 /* ─── Card de detalhe na árvore ──────────────────────────────────────────────
  *
  * Painel em coluna: o miolo rola, o rodapé com "Editar pessoa" fica parado — numa
