@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError } from 'axios';
 import type { Location, Person, PersonUnion } from '@kindred/types';
@@ -52,9 +52,39 @@ const uniao = (partner: Person, over: Partial<PersonUnion> = {}): PersonUnion =>
     ...over,
   }) as PersonUnion;
 
+/**
+ * Os campos de pessoa e local são comboboxes digitáveis (ADR-024), não `select`:
+ * abrir é focar o campo, e as opções são `role="option"`.
+ */
+async function abrirEListar(user: ReturnType<typeof userEvent.setup>, campo: string) {
+  await user.click(screen.getByLabelText(campo));
+  return opções().map((o) => o.textContent);
+}
+
+/**
+ * Só as opções do popover aberto: os `select` nativos que sobraram na tela
+ * (sexo, tipo de relacionamento) também têm `role="option"` dentro.
+ */
+function opções() {
+  return within(screen.getByRole('listbox')).getAllByRole('option');
+}
+
+async function escolher(
+  user: ReturnType<typeof userEvent.setup>,
+  campo: string,
+  nome: string,
+) {
+  await user.click(screen.getByLabelText(campo));
+  await user.click(within(screen.getByRole('listbox')).getByRole('option', { name: new RegExp(nome) }));
+}
+
 const MIGUEL = pessoa('Miguel Souza', { sex: 'MALE', birthDate: '1988-05-30' });
 const FERNANDA = pessoa('Fernanda Alves');
 const CARLOS = pessoa('Carlos Souza');
+/** Para os filtros do campo de pai/mãe (RN-016): sexo declarado e datas. */
+const JOSÉ = pessoa('José Ramires', { sex: 'MALE', birthDate: '1955-02-10' });
+const MARIA = pessoa('Maria Ramires', { sex: 'FEMALE', birthDate: '1958-09-04' });
+const BEBÊ = pessoa('Théo Souza', { sex: 'MALE', birthDate: '2020-01-01' });
 
 function montar(url: string) {
   const rotas = [
@@ -152,21 +182,21 @@ describe('PersonFormPage — edição', () => {
   });
 
   it('a própria pessoa não aparece como pai nem como mãe', async () => {
+    const user = userEvent.setup();
     editarMiguel();
     await screen.findByLabelText('Nome *');
 
-    const pai = screen.getByLabelText('Pai') as HTMLSelectElement;
-    const nomes = [...pai.options].map((o) => o.textContent);
+    const nomes = await abrirEListar(user, 'Pai');
     expect(nomes).not.toContain('Miguel Souza');
     expect(nomes).toContain('Carlos Souza');
   });
 
   it('quem já tem união não volta na lista de candidatos (RN-011)', async () => {
+    const user = userEvent.setup();
     editarMiguel();
     await screen.findByLabelText('Nome *');
 
-    const candidatos = screen.getByLabelText('Cônjuge a adicionar') as HTMLSelectElement;
-    const nomes = [...candidatos.options].map((o) => o.textContent);
+    const nomes = await abrirEListar(user, 'Cônjuge a adicionar');
     expect(nomes).not.toContain('Fernanda Alves');
     expect(nomes).toContain('Carlos Souza');
   });
@@ -194,7 +224,7 @@ describe('PersonFormPage — edição', () => {
       ...MIGUEL,
       unions: [uniao(FERNANDA), uniao(CARLOS, { status: 'ENDED' })],
     });
-    await user.selectOptions(screen.getByLabelText('Cônjuge a adicionar'), CARLOS.id);
+    await escolher(user, 'Cônjuge a adicionar', 'Carlos Souza');
     await user.click(screen.getByRole('button', { name: 'Adicionar' }));
 
     expect(unionsApi.create).toHaveBeenCalledWith(
@@ -400,5 +430,72 @@ describe('PersonFormPage — edição', () => {
     );
 
     expect(unionsApi.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe('PersonFormPage — campos digitáveis e filtros de filiação (ADR-024, RN-016)', () => {
+  beforeEach(() => {
+    vi.mocked(peopleApi.getAll).mockResolvedValue([MIGUEL, FERNANDA, CARLOS, JOSÉ, MARIA, BEBÊ]);
+  });
+
+  it('digitar filtra a lista, ignorando acento e caixa', async () => {
+    const user = userEvent.setup();
+    montar('/people/new');
+    await screen.findByLabelText('Nome *');
+
+    await user.type(screen.getByLabelText('Pai'), 'jose');
+
+    const nomes = opções().map((o) => o.textContent);
+    expect(nomes).toHaveLength(1);
+    expect(nomes[0]).toMatch(/José Ramires/);
+  });
+
+  it('o campo de pai não oferece mulheres, e o de mãe não oferece homens', async () => {
+    const user = userEvent.setup();
+    montar('/people/new');
+    await screen.findByLabelText('Nome *');
+
+    const pais = await abrirEListar(user, 'Pai');
+    expect(pais.some((n) => n?.includes('Maria Ramires'))).toBe(false);
+    expect(pais.some((n) => n?.includes('José Ramires'))).toBe(true);
+    // Quem não tem sexo cadastrado continua nas duas listas: metade da base é assim.
+    expect(pais.some((n) => n?.includes('Carlos Souza'))).toBe(true);
+
+    await user.keyboard('{Escape}');
+    const mães = await abrirEListar(user, 'Mãe');
+    expect(mães.some((n) => n?.includes('José Ramires'))).toBe(false);
+    expect(mães.some((n) => n?.includes('Maria Ramires'))).toBe(true);
+  });
+
+  it('com a data de nascimento preenchida, esconde quem não teria idade — e deixa ver assim mesmo', async () => {
+    const user = userEvent.setup();
+    montar('/people/new');
+    await screen.findByLabelText('Nome *');
+
+    await user.type(screen.getByLabelText('Data de nascimento'), '1988-05-30');
+
+    const pais = await abrirEListar(user, 'Pai');
+    expect(pais.some((n) => n?.includes('Théo Souza'))).toBe(false);
+    expect(pais.some((n) => n?.includes('José Ramires'))).toBe(true);
+
+    // A saída de emergência: o filtro é conveniência, não trava.
+    await user.click(screen.getByRole('button', { name: /Mostrar todos/ }));
+    expect(opções().some((o) => o.textContent?.includes('Théo Souza'))).toBe(true);
+  });
+
+  it('escolher no combobox manda o id no salvamento', async () => {
+    const user = userEvent.setup();
+    vi.mocked(peopleApi.create).mockResolvedValue(pessoa('Novo'));
+    montar('/people/new');
+    await screen.findByLabelText('Nome *');
+
+    await user.type(screen.getByLabelText('Nome *'), 'Novo Alguém');
+    await escolher(user, 'Pai', 'José Ramires');
+    await escolher(user, 'Mãe', 'Maria Ramires');
+    await user.click(screen.getByRole('button', { name: 'Criar' }));
+
+    expect(peopleApi.create).toHaveBeenCalledWith(
+      expect.objectContaining({ fatherId: JOSÉ.id, motherId: MARIA.id }),
+    );
   });
 });

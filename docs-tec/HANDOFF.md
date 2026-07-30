@@ -45,6 +45,19 @@ começo desta janela.
 
 ## Onde a última sessão parou
 
+**Os campos de escolher gente viraram comboboxes digitáveis** (ADR-024), com o comportamento do
+`multi-select` do repo coda mas com o campo sendo a própria busca. Vale para pai, mãe, local e cônjuge
+— as listas longas; os `select` de enumeração (sexo, tipo de relacionamento, situação) continuam
+nativos de propósito. A busca ignora acento e caixa, anda pelo teclado, e cada opção mostra uma
+segunda linha (parentesco, anos) para separar homônimos.
+
+Junto veio o filtro de **quem faz sentido como pai ou mãe** (RN-026, `parent-candidates.ts`): sexo
+(mas quem está sem sexo continua nas duas listas — boa parte da base é assim) e, quando a data de
+nascimento já foi preenchida, idade entre 12 e 80 anos e ninguém que já havia falecido — com 280 dias
+de folga para o pai, porque filho póstumo existe. É conveniência, não trava: a lista sempre oferece
+"mostrar todos", e quem já está escolhido nunca some.
+
+
 **A árvore passou a empacotar por família, medindo distância por contorno** (ADR-022). Vendo o
 resultado do ADR-021 na base real, o usuário apontou sobreposição por todo lado — "o fundo sutil fica
 quase invisível" — e parentes de primeiro grau longe, com um caso nomeado (o Levi longe dos pais),

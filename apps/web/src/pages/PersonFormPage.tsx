@@ -8,6 +8,8 @@ import {
 import { peopleApi } from '../api/people';
 import { unionsApi } from '../api/unions';
 import { errorMessage } from '../api-error';
+import { Combobox } from '../components/Combobox';
+import { parentCandidates, type ParentRole } from './parent-candidates';
 import { ACCEPTED_PHOTO_TYPES, fileToPhotoUpload, photoUrl } from '../photo';
 import type { PersonFormPageData } from '../loaders';
 import { RELATIONSHIP_LABELS, UNION_STATUS_LABELS } from '../labels';
@@ -66,6 +68,70 @@ function toFormData(person: Person | null): PersonFormData {
     motherId: person.motherId ?? null,
     locationId: person.locationId ?? null,
   };
+}
+
+/** A segunda linha de cada opção: o que ajuda a distinguir dois homônimos. */
+function personHint(person: Person): string | undefined {
+  const parts = [
+    person.kinshipDegree,
+    person.birthDate ? `n. ${person.birthDate.slice(0, 4)}` : null,
+    person.deathDate ? `f. ${person.deathDate.slice(0, 4)}` : person.deceased ? 'falecido' : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : undefined;
+}
+
+/**
+ * O campo de pai ou de mãe: um combobox já filtrado pelo que faz sentido —
+ * sexo e datas (RN-016) —, com a saída de emergência de listar todo mundo.
+ *
+ * O filtro é conveniência, nunca trava: se a base tem gente sem sexo ou sem
+ * data (e tem muita), essa gente continua na lista, e "mostrar todos" traz o
+ * resto sem pedir explicação.
+ */
+function ParentPicker({
+  id,
+  label,
+  role,
+  people,
+  childBirthDate,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  role: ParentRole;
+  people: Person[];
+  childBirthDate?: string | null;
+  value: string | null;
+  onChange: (value: string | null) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const { options, hidden } = parentCandidates(people, {
+    role,
+    childBirthDate,
+    keepId: value,
+  });
+  const visible = showAll ? people : options;
+
+  return (
+    <Combobox
+      id={id}
+      ariaLabel={label}
+      placeholder={role === 'father' ? 'Não informado' : 'Não informada'}
+      value={value}
+      onChange={onChange}
+      options={visible.map((p) => ({ value: p.id, label: p.name, hint: personHint(p) }))}
+      footer={
+        hidden > 0 && (
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowAll((v) => !v)}>
+            {showAll
+              ? `Mostrar só quem se encaixa (${hidden} fora do filtro)`
+              : `Mostrar todos (${hidden} ocultos por sexo ou data)`}
+          </button>
+        )
+      }
+    />
+  );
 }
 
 export default function PersonFormPage() {
@@ -379,16 +445,14 @@ export default function PersonFormPage() {
 
           <div className="form-group">
             <label htmlFor="pessoa-local">Local de convívio</label>
-            <select
+            <Combobox
               id="pessoa-local"
-              value={form.locationId ?? ''}
-              onChange={(e) => set('locationId', e.target.value || null)}
-            >
-              <option value="">Não informado</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>{loc.name}</option>
-              ))}
-            </select>
+              ariaLabel="Local de convívio"
+              placeholder="Não informado"
+              value={form.locationId ?? null}
+              onChange={(value) => set('locationId', value)}
+              options={locations.map((loc) => ({ value: loc.id, label: loc.name }))}
+            />
             {locations.length === 0 && (
               <span className="field-hint">
                 Nenhum local cadastrado.{' '}
@@ -402,30 +466,28 @@ export default function PersonFormPage() {
 
             <div className="form-group" style={{ marginBottom: '0.75rem' }}>
               <label htmlFor="pessoa-pai">Pai</label>
-              <select
+              <ParentPicker
                 id="pessoa-pai"
-                value={form.fatherId ?? ''}
-                onChange={(e) => set('fatherId', e.target.value || null)}
-              >
-                <option value="">Não informado</option>
-                {selectablePeople.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                label="Pai"
+                role="father"
+                people={selectablePeople}
+                childBirthDate={form.birthDate}
+                value={form.fatherId ?? null}
+                onChange={(value) => set('fatherId', value)}
+              />
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label htmlFor="pessoa-mae">Mãe</label>
-              <select
+              <ParentPicker
                 id="pessoa-mae"
-                value={form.motherId ?? ''}
-                onChange={(e) => set('motherId', e.target.value || null)}
-              >
-                <option value="">Não informada</option>
-                {selectablePeople.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                label="Mãe"
+                role="mother"
+                people={selectablePeople}
+                childBirthDate={form.birthDate}
+                value={form.motherId ?? null}
+                onChange={(value) => set('motherId', value)}
+              />
             </div>
           </fieldset>
 
@@ -476,18 +538,20 @@ export default function PersonFormPage() {
                 ))}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                  <select
-                    value={newPartnerId}
-                    disabled={unionBusy}
-                    onChange={(e) => setNewPartnerId(e.target.value)}
-                    style={{ width: 'auto', minWidth: '10rem' }}
-                    aria-label="Cônjuge a adicionar"
-                  >
-                    <option value="">Adicionar cônjuge...</option>
-                    {availableForUnion.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                  <div style={{ minWidth: '14rem', flex: '1 1 14rem' }}>
+                    <Combobox
+                      ariaLabel="Cônjuge a adicionar"
+                      placeholder="Adicionar cônjuge..."
+                      disabled={unionBusy}
+                      value={newPartnerId || null}
+                      onChange={(value) => setNewPartnerId(value ?? '')}
+                      options={availableForUnion.map((p) => ({
+                        value: p.id,
+                        label: p.name,
+                        hint: personHint(p),
+                      }))}
+                    />
+                  </div>
                   <select
                     value={newStatus}
                     disabled={unionBusy}

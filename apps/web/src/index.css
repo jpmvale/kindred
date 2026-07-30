@@ -397,6 +397,121 @@ fieldset legend {
   padding: 0 0.5rem;
 }
 
+/* ─── Combobox (select digitável, ADR-024) ───────────────────────────────────
+ *
+ * O campo herda a aparência dos outros (a regra de `input` acima já pega), e o que
+ * vem aqui é só o popover, o botão de limpar e o estado da opção sob o cursor.
+ */
+
+.combobox {
+  position: relative;
+}
+
+.combobox-input {
+  padding-right: 2rem;
+  cursor: text;
+}
+
+/* Sem valor escolhido o placeholder é dica; com valor ele é o próprio valor, e
+ * precisa ter a cor de texto normal — o campo fica vazio enquanto está fechado. */
+.combobox-input.has-value::placeholder {
+  color: var(--foreground);
+}
+
+.combobox-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.25rem;
+  background: transparent;
+  color: var(--faint);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.combobox-clear:hover {
+  background: var(--accent);
+  color: var(--strong);
+}
+
+.combobox-popover {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.12);
+}
+
+.combobox-list {
+  max-height: 16rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+}
+
+.combobox-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.combobox-option.active {
+  background: var(--accent);
+}
+
+.combobox-option-hint {
+  font-size: 0.78rem;
+  color: var(--faint);
+}
+
+.combobox-empty {
+  padding: 0.6rem;
+  color: var(--faint);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.combobox-footer {
+  border-top: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+}
+
+.combobox-footer button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .field-hint {
   font-size: 0.8rem;
   color: var(--faint);

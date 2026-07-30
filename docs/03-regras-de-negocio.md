@@ -60,6 +60,21 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   árvore e o calendário carregam todo mundo de uma vez, então o que viaja precisa ter tamanho
   conhecido. Se um dia a nota crescer sem limite, ela sai do `findMany` como a foto saiu.
 
+- **RN-026** — A lista de **pai** e de **mãe** no cadastro chega **filtrada pelo que é plausível**,
+  para encurtar uma fila de 150 pessoas:
+
+  - **sexo** — o campo "Pai" não oferece quem está cadastrada como feminino, nem "Mãe" quem está como
+    masculino. **Sexo em branco continua nos dois**: boa parte da base foi cadastrada sem essa
+    informação, e sumir com essa gente seria pior que a fila.
+  - **datas, e só quando a data de nascimento de quem está sendo cadastrado já foi preenchida** — some
+    quem teria menos de **12** ou mais de **80** anos no nascimento da criança, e quem já havia
+    falecido. Para o **pai** a morte vale até **280 dias antes** do nascimento: filho póstumo existe;
+    para a mãe, não. Quem está sem data nenhuma nunca é escondido por essa regra.
+
+  É filtro de **conveniência, não de validade**: a tela sempre oferece "mostrar todos", e quem já está
+  escolhido nunca some da lista (senão abrir um cadastro antigo esvaziaria o campo). Quem valida de
+  verdade continua sendo a API.
+
 ## União conjugal
 
 - **RN-011** — Uma união liga **duas pessoas distintas** e o par é **único**: não existem duas uniões

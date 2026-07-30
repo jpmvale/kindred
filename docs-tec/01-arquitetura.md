@@ -913,3 +913,45 @@ sobre aquela família, não escondendo.
 **Verificado** com os 27 testes de `tree-layout.test.ts` (o do bounding box mudou de expectativa de
 propósito — é a mudança de semântica registrada aqui — e um novo garante o não-sobreposto) e os de
 `TreePage.test.tsx`, mais o desenho da base real em SVG, antes e depois.
+
+---
+
+## ADR-024 — Os campos de escolher gente são comboboxes digitáveis
+
+**Contexto.** Escolher pai, mãe, local ou cônjuge era um `<select>` nativo com a base inteira dentro —
+150 pessoas numa lista rolável, sem busca. Pedido direto do usuário, com referência: o `multi-select`
+do repo **coda** (`apps/front/src/components/multi-select.tsx`), que abre um popover com campo de
+busca, fecha no Esc ou no clique fora.
+
+**Decisão.** Um componente próprio, `Combobox` (escolha única), em
+[`components/Combobox.tsx`](../apps/web/src/components/Combobox.tsx) — sem dependência nova: o coda
+usa Tailwind e `lucide-react`, o kindred usa CSS próprio (ADR-015), então o que se reaproveita é o
+**comportamento**, não o código.
+
+Diferença de forma em relação ao coda, de propósito: lá o gatilho é um botão e a busca é um campo
+**dentro** do popover; aqui **o campo é a busca**. Sendo escolha única e já tendo rótulo próprio no
+formulário, um campo só é menos coisa na tela e menos um clique — foca e digita. Fechado, ele mostra o
+escolhido; aberto, mostra o que está sendo digitado.
+
+- **Sem acento e sem caixa** na comparação: numa base em português, "jose" tem de achar "José" — a
+  mesma regra que a busca da listagem já segue (RN-016).
+- **Teclado**: ↓/↑ andam, Enter escolhe, Esc fecha, Tab sai. `role="combobox"` + `role="listbox"`.
+- **Segunda linha** em cada opção (`hint`): parentesco e anos de nascimento/falecimento — é o que
+  separa dois homônimos, e a base real tem vários.
+- **`onMouseDown` e não `onClick`** para escolher: o fechamento por clique fora acontece no
+  `mousedown`, e a opção sumia antes de o clique completar.
+
+**Onde foi aplicado, e onde não.** Nos campos de lista longa — pai, mãe, local de convívio e cônjuge a
+adicionar. Os `select` de **enumeração** (sexo, tipo de relacionamento, situação da união) continuam
+nativos: com três opções, digitar é mais trabalho que abrir, e o nativo já leva teclado e acessibilidade
+de graça.
+
+**A regra de quem aparece** na lista de pai/mãe é da RN-026 e vive à parte, em
+[`parent-candidates.ts`](../apps/web/src/pages/parent-candidates.ts) — pura, como `people-list-query`
+e `person-relations`, testável sem montar tela.
+
+**Verificado** com 7 testes da regra (sexo, limites de idade, filho póstumo, escolhido preservado) e 4
+de tela (digitar filtra ignorando acento, pai não oferece mulher, "mostrar todos" traz os escondidos,
+escolher manda o id no salvamento), mais os 20 testes que já existiam do formulário — três deles
+reescritos para a interação nova, que não é mais `selectOptions`. A aparência foi conferida no
+navegador, em tema claro e escuro, numa página descartável com o CSS real.
