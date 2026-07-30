@@ -636,6 +636,21 @@ export function computeLayout({
   return { nodes, edges, familyGroups };
 }
 
+/**
+ * Para onde a viewport deve olhar: o meio do card da pessoa central (ADR-025).
+ * Não havendo pessoa central — base recém-criada, ou o filtro escondeu todo
+ * mundo —, vale o primeiro nó, que é melhor que canto nenhum.
+ *
+ * Mora aqui, e não na página, porque é conta sobre o desenho: a página só
+ * repassa o ponto para o reactflow, sem decidir nada.
+ */
+export function viewportTarget(nodes: Node[]): { x: number; y: number } | null {
+  const central = nodes.find((node) => (node.data as NodeData | undefined)?.isCentralUser);
+  const target = central ?? nodes[0];
+  if (!target) return null;
+  return { x: target.position.x + NODE_W / 2, y: target.position.y + NODE_H / 2 };
+}
+
 type Positions = Map<string, { x: number; y: number }>;
 
 // ─── Agrupamento familiar ───────────────────────────────────────────────────

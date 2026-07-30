@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Node, Edge } from 'reactflow';
 import type { Person, PersonUnion, UnionStatus } from '@kindred/types';
-import { computeLayout, FAMILY_GAP, NODE_H, NODE_W, type NodeData } from './tree-layout';
+import {
+  computeLayout,
+  FAMILY_GAP,
+  NODE_H,
+  NODE_W,
+  viewportTarget,
+  type NodeData,
+} from './tree-layout';
 
 // ─── Cenário ──────────────────────────────────────────────────────────────────
 
@@ -573,5 +580,33 @@ describe('computeLayout — alinhamento das gerações (ADR-021)', () => {
         centro(nodes, [1, 2, 3].map((n) => `${filho}-neto${n}`)),
       );
     }
+  });
+});
+
+describe('viewportTarget — para onde a tela olha (ADR-025)', () => {
+  it('aponta para o meio do card da pessoa central, não para o canto do desenho', () => {
+    const { todos } = família();
+    const { nodes } = layout(todos);
+
+    const eu = nó(nodes, 'eu');
+    expect(viewportTarget(nodes)).toEqual({
+      x: eu.position.x + NODE_W / 2,
+      y: eu.position.y + NODE_H / 2,
+    });
+  });
+
+  it('sem pessoa central, cai no primeiro nó em vez de devolver nada', () => {
+    const pai = pessoa('pai');
+    const filha = pessoa('filha', { fatherId: 'pai' });
+    const { nodes } = layout([pai, filha]);
+
+    expect(viewportTarget(nodes)).toEqual({
+      x: nodes[0].position.x + NODE_W / 2,
+      y: nodes[0].position.y + NODE_H / 2,
+    });
+  });
+
+  it('sem nó nenhum, não inventa ponto', () => {
+    expect(viewportTarget([])).toBeNull();
   });
 });

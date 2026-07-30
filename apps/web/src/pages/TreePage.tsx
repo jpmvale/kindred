@@ -24,6 +24,7 @@ import {
   EDGE_COLORS,
   NODE_W,
   NODE_H,
+  viewportTarget,
   type NodeData,
   type FamilyGroup,
 } from './tree-layout';
@@ -326,7 +327,7 @@ function familyGroupNodes(familyGroups: FamilyGroup[]) {
 
 function TreeContent() {
   const people = useLoaderData() as Person[];
-  const { fitView } = useReactFlow();
+  const { setCenter, getZoom } = useReactFlow();
   // Vira `false` quando entram nós que o reactflow ainda não mediu, e `true` quando
   // todos têm tamanho. É o sinal que o enquadramento espera (ver o efeito abaixo).
   const nodesInitialized = useNodesInitialized();
@@ -432,20 +433,23 @@ function TreeContent() {
   }, [layout, applyHoverStyling, setEdges, setNodes]);
 
   /*
-   * Enquadrar depende de o reactflow **já ter medido** os nós: sem largura e altura ele não sabe
-   * calcular os limites do desenho, e o `fitView` desiste em silêncio, deixando a viewport no zoom e
-   * na posição de antes. Era o que acontecia ao abrir todos os relacionamentos na base real (BL-15):
-   * os 117 nós entravam nas posições certas, a viewport continuava no zoom 2,5 de quando havia um nó
-   * só, e tudo caía fora da tela — parecia árvore vazia.
+   * Expandir **não mexe no zoom**: a viewport só desliza até a pessoa central, no zoom em que a
+   * pessoa já estava (ADR-025). Enquadrar tudo (`fitView`) era o que havia antes, e numa árvore de
+   * 13 mil px de largura significava afastar até os cards virarem tijolinhos ilegíveis a cada clique
+   * de expandir — o desenho inteiro cabendo na tela não é o que se quer ver, é a família em volta de
+   * quem está no centro.
    *
-   * Esperar por cronômetro (era `setTimeout(..., 20)`) é uma aposta no tamanho da base: dava certo
-   * com as 23 pessoas do seed e não dava com 143. O `useNodesInitialized` é o próprio sinal de que a
-   * medição terminou, então não há prazo a chutar.
+   * Ainda depende de o reactflow **já ter medido** os nós (`useNodesInitialized`): sem largura e
+   * altura não há centro que preste, e o efeito silenciaria deixando tudo fora da tela — foi o que
+   * acontecia com os 117 nós da base real (BL-15). Esperar por cronômetro (era `setTimeout(..., 20)`)
+   * é uma aposta no tamanho da base; o sinal de medição pronta não tem prazo a chutar.
    */
   useEffect(() => {
     if (empty || !nodesInitialized) return;
-    fitView({ padding: 0.06, duration: 350 });
-  }, [empty, nodesInitialized, layout, fitView]);
+    const target = viewportTarget(layout.nodes);
+    if (!target) return;
+    setCenter(target.x, target.y, { zoom: getZoom(), duration: 350 });
+  }, [empty, nodesInitialized, layout, setCenter, getZoom]);
 
   useEffect(() => {
     if (empty) return;
@@ -495,8 +499,6 @@ function TreeContent() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.06 }}
         minZoom={0.04}
         maxZoom={2.5}
         nodesDraggable={false}

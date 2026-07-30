@@ -45,6 +45,15 @@ começo desta janela.
 
 ## Onde a última sessão parou
 
+**Expandir a árvore parou de mexer no zoom** (ADR-025): a viewport agora só desliza até a pessoa
+central, no zoom em que quem está olhando já estava. O `fitView` a cada mudança enquadrava a árvore
+inteira — 13 mil px de largura — e transformava os cards em tijolinhos a cada clique de expandir.
+
+**A edição de pessoa passou a mostrar os filhos**, com link para abrir cada um. É leitura, não campo:
+a filiação continua morando no cadastro do filho (RN-003), e a seção diz isso em uma linha para
+ninguém procurar um "adicionar filho" que não existe.
+
+
 **Os campos de escolher gente viraram comboboxes digitáveis** (ADR-024), com o comportamento do
 `multi-select` do repo coda mas com o campo sendo a própria busca. Vale para pai, mãe, local e cônjuge
 — as listas longas; os `select` de enumeração (sexo, tipo de relacionamento, situação) continuam

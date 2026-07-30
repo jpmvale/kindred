@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Link,
   useLoaderData,
   useNavigate,
   useParams,
@@ -325,6 +326,17 @@ export default function PersonFormPage() {
   }
 
   const selectablePeople = people.filter((p) => p.id !== id);
+  // Os filhos não são campo desta pessoa — a filiação mora no cadastro de cada um
+  // (RN-003) —, mas quem está editando quer vê-los aqui. Mais velho primeiro; sem
+  // data, no fim, por nome.
+  const children = people
+    .filter((p) => id && (p.fatherId === id || p.motherId === id))
+    .sort((a, b) => {
+      if (a.birthDate && b.birthDate) return a.birthDate.localeCompare(b.birthDate);
+      if (a.birthDate) return -1;
+      if (b.birthDate) return 1;
+      return a.name.localeCompare(b.name, 'pt-BR');
+    });
   // Quem já tem união com esta pessoa não volta na lista: o par é único (RN-011).
   const alreadyPartnered = new Set(unions.map((u) => u.partnerId));
   const availableForUnion = selectablePeople.filter(
@@ -490,6 +502,34 @@ export default function PersonFormPage() {
               />
             </div>
           </fieldset>
+
+          {isEdit && (
+            <fieldset>
+              <legend>Filhos</legend>
+
+              {children.length === 0 ? (
+                <p className="text-faint" style={{ fontSize: '0.85rem', margin: 0 }}>
+                  Ninguém cadastrado como filho ou filha.
+                </p>
+              ) : (
+                <ul className="plain-list">
+                  {children.map((child) => (
+                    <li key={child.id}>
+                      <Link to={`/people/${child.id}/edit`}>{child.name}</Link>
+                      {personHint(child) && (
+                        <span className="field-hint"> · {personHint(child)}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <span className="field-hint">
+                A filiação mora no cadastro de cada filho: para incluir alguém aqui, abra a pessoa e
+                aponte o pai ou a mãe.
+              </span>
+            </fieldset>
+          )}
 
           <fieldset>
             <legend>Uniões</legend>

@@ -955,3 +955,28 @@ de tela (digitar filtra ignorando acento, pai não oferece mulher, "mostrar todo
 escolher manda o id no salvamento), mais os 20 testes que já existiam do formulário — três deles
 reescritos para a interação nova, que não é mais `selectOptions`. A aparência foi conferida no
 navegador, em tema claro e escuro, numa página descartável com o CSS real.
+
+---
+
+## ADR-025 — Expandir a árvore não mexe no zoom; a viewport centra na pessoa central
+
+**Contexto.** Toda vez que o desenho mudava — expandir pais, abrir laterais, ligar/desligar um filtro
+— a página chamava `fitView`, que enquadra a árvore **inteira**. Com a árvore compacta do ADR-022
+(13 mil px de largura na base real), "inteira" significa afastar até os cards virarem tijolinhos
+ilegíveis, e isso acontecia **a cada clique**. Pedido do usuário: ao expandir, não mexer no zoom, e
+manter a vista centrada na pessoa central.
+
+**Decisão.** O efeito de enquadramento virou `setCenter(x, y, { zoom: getZoom() })`: desliza a
+viewport até o meio do card da pessoa central, **no zoom em que o usuário já estava**. O `fitView` (e
+o `fitViewOptions`) saíram também da inicialização do `<ReactFlow>` — a vista de partida é o zoom
+padrão (1), com a pessoa central no meio, em vez de um enquadramento que ninguém pediu.
+
+Quem decide o ponto é `viewportTarget(nodes)`, em [`tree-layout.ts`](../apps/web/src/pages/tree-layout.ts):
+pessoa central, ou o primeiro nó quando não há uma (base recém-criada). É conta sobre o desenho, então
+mora com o desenho e é testável sem DOM — no jsdom o reactflow não mede nada, e um teste de tela aqui
+mediria o dublê, não a decisão.
+
+**O que continua igual:** a espera pelo `useNodesInitialized` antes de mexer na viewport. Sem os nós
+medidos não há centro que preste, e o efeito silenciaria deixando tudo fora da tela — foi exatamente o
+defeito do BL-15. E o controle de enquadrar continua na barra do reactflow: quem **quiser** ver tudo,
+clica.

@@ -512,6 +512,21 @@ fieldset legend {
   cursor: pointer;
 }
 
+/* Lista simples dentro de um fieldset — hoje, os filhos de quem está sendo editado. */
+.plain-list {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.plain-list a {
+  color: var(--primary);
+}
+
 .field-hint {
   font-size: 0.8rem;
   color: var(--faint);

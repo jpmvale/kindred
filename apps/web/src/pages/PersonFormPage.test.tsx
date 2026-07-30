@@ -499,3 +499,36 @@ describe('PersonFormPage — campos digitáveis e filtros de filiação (ADR-024
     );
   });
 });
+
+describe('PersonFormPage — filhos de quem está sendo editado', () => {
+  const FILHA = pessoa('Laura Souza', { fatherId: MIGUEL.id, birthDate: '2015-03-02' });
+  const FILHO = pessoa('Théo Souza', { motherId: MIGUEL.id, birthDate: '2012-08-19' });
+
+  beforeEach(() => {
+    vi.mocked(peopleApi.getAll).mockResolvedValue([MIGUEL, FERNANDA, CARLOS, FILHA, FILHO]);
+  });
+
+  it('lista os filhos, do mais velho para o mais novo, com link para cada um', async () => {
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    const filhos = screen.getAllByRole('link', { name: /Souza/ });
+    expect(filhos.map((l) => l.textContent)).toEqual(['Théo Souza', 'Laura Souza']);
+    expect(filhos[0]).toHaveAttribute('href', `/people/${FILHO.id}/edit`);
+  });
+
+  it('quem não tem filho vê o vazio explicado', async () => {
+    vi.mocked(peopleApi.getAll).mockResolvedValue([MIGUEL, FERNANDA, CARLOS]);
+    editarMiguel();
+    await screen.findByLabelText('Nome *');
+
+    expect(screen.getByText(/Ninguém cadastrado como filho/)).toBeInTheDocument();
+  });
+
+  it('no cadastro novo a seção nem aparece: sem pessoa salva não há filho possível', async () => {
+    montar('/people/new');
+    await screen.findByLabelText('Nome *');
+
+    expect(screen.queryByText(/Ninguém cadastrado como filho/)).not.toBeInTheDocument();
+  });
+});
