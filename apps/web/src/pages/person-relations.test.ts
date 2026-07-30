@@ -65,4 +65,25 @@ describe('relationsOf', () => {
 
     expect(r?.father).toBeNull();
   });
+
+  it('traz os cônjuges, vigente antes de desfeita, resolvendo o parceiro na lista', () => {
+    // Sem paginação a API manda só o id do parceiro (BL-14, ADR-017), então o
+    // objeto tem de sair da própria lista carregada.
+    const eu = pessoa('eu', {
+      unions: [
+        { id: 'u2', partnerId: 'ana', status: 'ENDED' },
+        { id: 'u1', partnerId: 'fernanda', status: 'CURRENT' },
+        { id: 'u3', partnerId: 'fora-da-lista', status: 'CURRENT' },
+      ],
+    } as Partial<Person>);
+    const fernanda = pessoa('fernanda');
+    const ana = pessoa('ana');
+
+    const r = relationsOf('eu', [eu, fernanda, ana]);
+
+    expect(r?.partners.map((p) => `${p.person.id}:${p.status}`)).toEqual([
+      'fernanda:CURRENT',
+      'ana:ENDED',
+    ]);
+  });
 });

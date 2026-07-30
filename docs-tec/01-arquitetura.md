@@ -980,3 +980,41 @@ mediria o dublê, não a decisão.
 medidos não há centro que preste, e o efeito silenciaria deixando tudo fora da tela — foi exatamente o
 defeito do BL-15. E o controle de enquadrar continua na barra do reactflow: quem **quiser** ver tudo,
 clica.
+
+---
+
+## ADR-026 — O card de detalhe é uma lista de pessoas, e clicar num parente leva a árvore até ele
+
+**Contexto.** O card lateral (aberto ao clicar num nó) listava os parentes como nomes sublinhados um
+embaixo do outro, com rótulos minúsculos em caixa alta: dava para ler, mas não para *usar* — nada
+dizia quem era cada um, e clicar só trocava o conteúdo do card, deixando a árvore exatamente onde
+estava. Pedido do usuário: caprichar no desenho do componente e, ao clicar num parente, **centralizar
+a árvore nele**, mexendo só na posição, nunca no zoom.
+
+**Decisão — o card virou uma lista de pessoas de verdade.** Cada parente é uma **linha inteira
+clicável** com avatar (a mesma cor por sexo dos nós da árvore, para o card e o desenho falarem a
+mesma língua), nome e uma segunda linha que situa: parentesco e anos de vida. Os grupos ganharam
+título com contagem, o topo virou um cartão de identidade centrado (foto maior, nome, parentesco,
+etiquetas), as datas viraram pares rótulo/valor com a conta em cinza ao lado (`38 anos`, `há 16
+anos`), e o botão **"Editar pessoa" saiu da área que rola**: numa família grande ele ficava a uma
+rolagem de distância, sendo a ação mais usada depois de olhar o card.
+
+**Cônjuges entraram na lista** (`relationsOf` passou a devolvê-los, vigente antes de desfeita, com a
+união encerrada marcada). Um card de família sem o cônjuge era uma lacuna esquisita — e o parceiro é
+resolvido na própria lista carregada, porque sem paginação a API manda só o id (BL-14, ADR-017).
+
+**Clicar leva a árvore até a pessoa** (`focusPerson` em `TreePage`): `setCenter` na posição do nó,
+com `zoom: getZoom()` — a mesma decisão do ADR-025, agora aplicada a um alvo escolhido a dedo em vez
+da pessoa central.
+
+**Nem todo parente tem para onde a tela ir.** O card mostra a família **inteira**, inclusive quem não
+foi expandido na árvore (é o ponto do `relationsOf`: a lista vem do loader, não do desenho). Para
+esses, centralizar não existe — então a linha vem esmaecida e com o título dizendo "não está desenhado
+na árvore", em vez de virar um clique que não faz nada. O card ainda troca para ele: ler sobre alguém
+funciona mesmo sem ele estar no desenho.
+
+**Verificado** com 8 testes do card (incluindo cônjuges com união desfeita e a marca de quem está fora
+do desenho) e 1 novo de `relationsOf`, mais a aparência conferida no navegador em tema claro e escuro
+com o CSS real. O `TreePage` continua com teste de fumaça só: no jsdom o reactflow não mede nada, e
+verificar centralização por lá seria medir o dublê.
+

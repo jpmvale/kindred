@@ -421,6 +421,30 @@ function TreeContent() {
 
   const empty = layout.nodes.length === 0;
 
+  /** Quem está desenhado agora — o card usa para saber que parente tem para onde ir. */
+  const drawnIds = useMemo(() => new Set(layout.nodes.map((node) => node.id)), [layout]);
+
+  /**
+   * Escolher alguém no card: troca o card **e** leva a árvore até a pessoa, na
+   * horizontal e na vertical, sem tocar no zoom (ADR-026). Quem não está
+   * desenhado — o card mostra a família inteira, não só o que foi expandido —
+   * só troca o card; a linha dele no painel já avisa que não há para onde ir.
+   */
+  const focusPerson = useCallback(
+    (personId: string) => {
+      setSelectedPersonId(personId);
+      const node = layout.nodes.find((n) => n.id === personId);
+      if (!node) return;
+      setCenter(node.position.x + NODE_W / 2, node.position.y + NODE_H / 2, {
+        zoom: getZoom(),
+        duration: 350,
+      });
+    },
+    [layout, setCenter, getZoom],
+  );
+
+
+
   // O reactflow guarda os nós por conta: este efeito só empurra para ele o
   // desenho que o render já calculou. É sincronizar sistema de fora, que é para
   // o que serve um efeito.
@@ -584,7 +608,8 @@ function TreeContent() {
         <PersonDetailPanel
           relations={selectedRelations}
           onClose={() => setSelectedPersonId(null)}
-          onSelectPerson={setSelectedPersonId}
+          onSelectPerson={focusPerson}
+          drawnIds={drawnIds}
         />
       )}
     </div>

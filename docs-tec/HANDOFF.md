@@ -45,6 +45,13 @@ começo desta janela.
 
 ## Onde a última sessão parou
 
+**O card de detalhe da árvore foi refeito** (ADR-026): cada parente é uma linha clicável com avatar,
+nome e a informação que situa (parentesco, anos), os grupos têm contagem, o topo virou cartão de
+identidade e o "Editar pessoa" saiu da área que rola. Entraram os **cônjuges**, que faltavam. E clicar
+num parente agora **leva a árvore até ele** — posição só, zoom intocado (mesma decisão do ADR-025).
+Quem não está desenhado aparece esmaecido, porque para esse não há movimento a prometer.
+
+
 **Expandir a árvore parou de mexer no zoom** (ADR-025): a viewport agora só desliza até a pessoa
 central, no zoom em que quem está olhando já estava. O `fitView` a cada mudança enquadrava a árvore
 inteira — 13 mil px de largura — e transformava os cards em tijolinhos a cada clique de expandir.
