@@ -168,3 +168,23 @@ describe('anos e rótulos', () => {
     );
   });
 });
+
+describe('datas parciais no calendário (RN-027)', () => {
+  it('quem tem só o ano não entra: não há dia para marcar', () => {
+    const entradas = buildEntries([pessoa('p1', { birthDate: '1942' })], false);
+    expect(entradas).toEqual([]);
+  });
+
+  it('dia e mês sem ano entram, e a marca não promete idade', () => {
+    const entradas = buildEntries([pessoa('p1', { birthDate: '--05-30' })], false);
+
+    expect(entradas).toHaveLength(1);
+    expect(entradas[0]).toMatchObject({ month: 5, day: 30, sourceYear: null });
+    expect(yearsAt(entradas[0], new Date(2026, 4, 30))).toBeNull();
+    expect(entryTitle(entradas[0], new Date(2026, 4, 30))).toBe('p1');
+  });
+
+  it('mês sem dia também não entra: o quadrado seria escolhido no chute', () => {
+    expect(buildEntries([pessoa('p1', { birthDate: '1942-05' })], false)).toEqual([]);
+  });
+});

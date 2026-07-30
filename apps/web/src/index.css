@@ -1189,6 +1189,59 @@ button:disabled {
   gap: 8px;
 }
 
+/* ─── Campo de data parcial (ADR-028) ────────────────────────────────────────
+ *
+ * Três caixas com a cara de um campo só: a borda é do contêiner, não de cada uma.
+ */
+
+.partial-date-fields {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--input-border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.partial-date-fields:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px var(--ring-soft);
+}
+
+/* A regra global de `input` (três `:not()` de atributo) daria borda e largura
+ * total a cada caixa, e ganha de `.classe.classe` por especificidade — daí o
+ * seletor com elemento e classe repetida, que empata e vence por vir depois. */
+.partial-date-fields input.partial-date-field.partial-date-field {
+  width: 2.1rem;
+  padding: 0.35rem 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.partial-date-fields input.partial-date-field.is-year {
+  width: 3.2rem;
+}
+
+.partial-date-field:focus {
+  outline: none;
+}
+
+.partial-date-sep {
+  color: var(--faint);
+}
+
+.partial-date-warn {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--danger-text);
+}
+
 /* ─── Configurações ──────────────────────────────────────────────────────────
  *
  * Uma tela, seções empilhadas (ADR-027): cada uma com título, dica opcional e os

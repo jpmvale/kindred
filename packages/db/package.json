@@ -25,6 +25,7 @@
     "db:backup": "tsx src/backup.ts",
     "db:restore": "tsx src/restore.ts",
     "db:anonymize": "tsx src/anonymize.ts",
+    "db:trim-january-first": "tsx src/trim-january-first.ts",
     "clean": "rm -rf dist .turbo *.tsbuildinfo"
   },
   "prisma": {

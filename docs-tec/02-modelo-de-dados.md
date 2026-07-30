@@ -37,8 +37,8 @@ sessão vencida é apagada na próxima vez que alguém tenta usá-la (`AuthServi
 | `userId` | uuid | não | FK → `users.id`, `onDelete: Cascade` — dona da linha (RN-022) |
 | `name` | text | não | |
 | `sex` | enum `Sex` | sim | `MALE`, `FEMALE` |
-| `birthDate` | timestamp | sim | |
-| `deathDate` | timestamp | sim | |
+| `birthDate` | varchar(10) | sim | data **parcial** (RN-027): `AAAA-MM-DD`, `AAAA-MM`, `AAAA`, `--MM-DD` ou `--MM` |
+| `deathDate` | varchar(10) | sim | idem |
 | `deceased` | boolean | não | default `false`; derivado de `deathDate` quando ela existe (RN-006) |
 | `relationshipType` | enum `RelationshipType` | não | `FAMILY`, `FRIEND`, `ACQUAINTANCE`, `OTHER` — cônjuge **não** está aqui, virou `unions` (ADR-008) |
 | `isCentralUser` | boolean | não | default `false`; no máximo um `true` **por conta** (RN-001, garantido na aplicação) |

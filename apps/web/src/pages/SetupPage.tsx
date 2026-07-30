@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { peopleApi } from '../api/people';
 import { ACCEPTED_PHOTO_TYPES, fileToPhotoUpload } from '../photo';
 import type { PhotoUploadData, Sex } from '@kindred/types';
+import PartialDateInput from '../components/PartialDateInput';
 
 export default function SetupPage() {
   const navigate = useNavigate();
@@ -91,11 +92,11 @@ export default function SetupPage() {
           </div>
           <div className="form-group">
             <label htmlFor="setup-nascimento">Data de nascimento</label>
-            <input
+            <PartialDateInput
               id="setup-nascimento"
-              type="date"
+              label="nascimento"
               value={form.birthDate}
-              onChange={(e) => set('birthDate', e.target.value)}
+              onChange={(value) => set('birthDate', value ?? '')}
             />
           </div>
           <div className="form-group">

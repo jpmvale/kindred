@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { Person } from '@kindred/types';
 import { photoUrl } from '../photo';
-import { formatDateOnly, getAgeInYears } from '../date';
+import { ageOf, formatPartialDate, parsePartialDate } from '../date';
 import { RELATIONSHIP_LABELS, SEX_LABELS } from '../labels';
 import type { PersonRelations } from '../pages/person-relations';
 
@@ -34,8 +34,8 @@ function avatarBg(person: Person) {
 }
 
 function years(person: Person) {
-  const birth = person.birthDate?.slice(0, 4);
-  const death = person.deathDate?.slice(0, 4);
+  const birth = parsePartialDate(person.birthDate)?.year;
+  const death = parsePartialDate(person.deathDate)?.year;
   if (birth && death) return `${birth} – ${death}`;
   if (birth) return birth;
   if (death) return `† ${death}`;
@@ -133,12 +133,10 @@ export default function PersonDetailPanel({
 
   const dead = Boolean(person.deceased || person.deathDate);
   const foto = photoUrl(person);
-  const birthLabel = formatDateOnly(person.birthDate);
-  const age = dead
-    ? getAgeInYears(person.birthDate, person.deathDate)
-    : getAgeInYears(person.birthDate);
-  const deathLabel = formatDateOnly(person.deathDate);
-  const yearsSinceDeath = getAgeInYears(person.deathDate);
+  const birthLabel = formatPartialDate(person.birthDate);
+  const age = dead ? ageOf(person.birthDate, person.deathDate) : ageOf(person.birthDate);
+  const deathLabel = formatPartialDate(person.deathDate);
+  const yearsSinceDeath = ageOf(person.deathDate);
 
   const parents = [father, mother].filter((p): p is Person => Boolean(p));
   const partnerNotes = new Map(
@@ -177,7 +175,12 @@ export default function PersonDetailPanel({
                 <dt>Nascimento</dt>
                 <dd>
                   {birthLabel}
-                  {age !== null && <span className="pd-fact-extra">{age} anos</span>}
+                  {age !== null && (
+                    <span className="pd-fact-extra">
+                      {age.approximate ? '~' : ''}
+                      {age.years} anos
+                    </span>
+                  )}
                 </dd>
               </div>
             )}
@@ -187,7 +190,10 @@ export default function PersonDetailPanel({
                 <dd>
                   {deathLabel}
                   {yearsSinceDeath !== null && (
-                    <span className="pd-fact-extra">há {yearsSinceDeath} anos</span>
+                    <span className="pd-fact-extra">
+                      há {yearsSinceDeath.approximate ? '~' : ''}
+                      {yearsSinceDeath.years} anos
+                    </span>
                   )}
                 </dd>
               </div>

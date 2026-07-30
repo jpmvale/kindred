@@ -21,6 +21,7 @@
     "db:backup": "pnpm --filter @kindred/db db:backup",
     "db:restore": "pnpm --filter @kindred/db db:restore",
     "db:anonymize": "pnpm --filter @kindred/db db:anonymize",
+    "db:trim-january-first": "pnpm --filter @kindred/db db:trim-january-first",
     "db:studio": "pnpm --filter @kindred/db db:studio"
   },
   "devDependencies": {

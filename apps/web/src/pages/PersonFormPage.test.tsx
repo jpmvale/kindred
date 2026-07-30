@@ -69,6 +69,20 @@ function opções() {
   return within(screen.getByRole('listbox')).getAllByRole('option');
 }
 
+/**
+ * A data agora são três caixas independentes (RN-027): dia, mês e ano. Digitar
+ * nas três é o caminho de sempre — cada uma avança sozinha quando enche.
+ */
+async function preencherData(
+  user: ReturnType<typeof userEvent.setup>,
+  campo: 'nascimento' | 'falecimento',
+  { dia, mês, ano }: { dia?: string; mês?: string; ano?: string },
+) {
+  if (dia) await user.type(screen.getByLabelText(`Dia do ${campo}`), dia);
+  if (mês) await user.type(screen.getByLabelText(`Mês do ${campo}`), mês);
+  if (ano) await user.type(screen.getByLabelText(`Ano do ${campo}`), ano);
+}
+
 async function escolher(
   user: ReturnType<typeof userEvent.setup>,
   campo: string,
@@ -178,7 +192,9 @@ describe('PersonFormPage — edição', () => {
 
     expect(await screen.findByLabelText('Nome *')).toHaveValue('Miguel Souza');
     expect(screen.getByLabelText('Sexo')).toHaveValue('MALE');
-    expect(screen.getByLabelText('Data de nascimento')).toHaveValue('1988-05-30');
+    expect(screen.getByLabelText('Dia do nascimento')).toHaveValue('30');
+    expect(screen.getByLabelText('Mês do nascimento')).toHaveValue('05');
+    expect(screen.getByLabelText('Ano do nascimento')).toHaveValue('1988');
   });
 
   it('a própria pessoa não aparece como pai nem como mãe', async () => {
@@ -208,7 +224,7 @@ describe('PersonFormPage — edição', () => {
     const falecido = screen.getByRole('checkbox', { name: /Falecido/ });
     expect(falecido).not.toBeChecked();
 
-    await user.type(screen.getByLabelText('Data de falecimento'), '2020-01-15');
+    await preencherData(user, 'falecimento', { dia: '15', mês: '01', ano: '2020' });
 
     expect(falecido).toBeChecked();
     expect(falecido).toBeDisabled();
@@ -472,7 +488,7 @@ describe('PersonFormPage — campos digitáveis e filtros de filiação (ADR-024
     montar('/people/new');
     await screen.findByLabelText('Nome *');
 
-    await user.type(screen.getByLabelText('Data de nascimento'), '1988-05-30');
+    await preencherData(user, 'nascimento', { dia: '30', mês: '05', ano: '1988' });
 
     const pais = await abrirEListar(user, 'Pai');
     expect(pais.some((n) => n?.includes('Théo Souza'))).toBe(false);

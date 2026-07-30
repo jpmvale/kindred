@@ -42,6 +42,30 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   `FRIEND`, `ACQUAINTANCE` e `OTHER` — **cônjuge não é um deles**: virou vínculo próprio (RN-011).
 - **RN-006** — Data de falecimento preenchida ⇒ `deceased = true`; limpar a data ⇒ `deceased = false`.
   A flag existe para o caso "sabe-se que faleceu, não se sabe quando".
+- **RN-027** — Nascimento e falecimento são datas **parciais**: dia, mês e ano são independentes, e
+  cada um é opcional. Numa árvore de família metade das pessoas antigas tem só o ano — e obrigar a
+  data inteira fazia inventar 1º de janeiro, que a árvore então repetia como se fosse verdade.
+
+  As formas possíveis, no formato canônico que viaja na API e mora no banco:
+
+  | valor        | lê-se                        |
+  |--------------|------------------------------|
+  | `1988-05-30` | 30/05/1988                   |
+  | `1988-05`    | maio de 1988                 |
+  | `1988`       | 1988                         |
+  | `--05-30`    | 30 de maio, ano desconhecido |
+  | `--05`       | maio, ano desconhecido       |
+
+  **Dia exige mês** — dia 30 sem saber de que mês não cai em calendário nenhum; é a única combinação
+  que não existe. O que cada tela faz com o que falta:
+
+  - **idade** só sai com ano, e vem marcada com `~` quando falta dia ou mês (a conta erra por até um
+    ano);
+  - **calendário** (RN-020) mostra quem tem **dia e mês**, com ou sem ano — sem ano, a marca não diz
+    "faz X anos"; quem tem só o ano não aparece, porque não há dia a marcar;
+  - **ordenação por data** põe `1988` entre `1987-12` e `1988-05`, e quem não tem ano vai para o fim:
+    é desconhecido, não antigo.
+
 - **RN-007** — Pessoa sem foto é exibida com a inicial do nome.
 - **RN-008** — Local é opcional e vem do cadastro de Locais; a pessoa guarda a referência, não o
   texto.

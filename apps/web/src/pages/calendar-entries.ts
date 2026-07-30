@@ -7,6 +7,7 @@
  * ser testada sem montar a página, como o layout da árvore.
  */
 import type { Person } from '@kindred/types';
+import { parsePartialDate } from '../date';
 
 export type CalendarEntryKind =
   /** Aniversário de quem está vivo. */
@@ -25,8 +26,12 @@ export type CalendarEntry = {
   /** 1–12, como vem da data ISO — não é índice de mês do `Date`. */
   month: number;
   day: number;
-  /** Ano de origem (nascimento ou falecimento), para contar quantos anos faz. */
-  sourceYear: number;
+  /**
+   * Ano de origem (nascimento ou falecimento), para contar quantos anos faz.
+   * `null` quando a data é parcial e não tem ano (RN-027): a data entra no
+   * calendário do mesmo jeito, só não dá para dizer "faz X anos".
+   */
+  sourceYear: number | null;
 };
 
 export type UpcomingEntry = CalendarEntry & {
@@ -36,13 +41,17 @@ export type UpcomingEntry = CalendarEntry & {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * O calendário precisa de **dia e mês** — é o que faz uma data cair num quadrado.
+ * O ano é opcional (RN-027): sem ele a data aparece, só não conta idade. Quem
+ * tem só o ano não entra: não há dia nenhum para marcar.
+ */
 function parseDateParts(
   dateStr?: string | null,
-): { year: number; month: number; day: number } | null {
-  if (!dateStr) return null;
-  const [year, month, day] = dateStr.slice(0, 10).split('-').map(Number);
-  if (!year || !month || !day) return null;
-  return { year, month, day };
+): { year: number | null; month: number; day: number } | null {
+  const parts = parsePartialDate(dateStr);
+  if (!parts?.month || !parts.day) return null;
+  return { year: parts.year, month: parts.month, day: parts.day };
 }
 
 /** RN-006: a flag ou a data — qualquer uma das duas diz que a pessoa faleceu. */
@@ -178,10 +187,12 @@ export function nextOccurrences(
 
 /**
  * Quantos anos a data completa naquela ocorrência — a idade de quem faz
- * aniversário, ou há quanto tempo a pessoa se foi. Nulo quando o ano de origem
- * não faz sentido (data futura, cadastro errado).
+ * aniversário, ou há quanto tempo a pessoa se foi. Nulo quando não há ano de
+ * origem (data parcial sem ano, RN-027) ou quando a conta não faz sentido (data
+ * futura, cadastro errado). Quem chama já trata o nulo mostrando só o nome.
  */
 export function yearsAt(entry: CalendarEntry, occurrence: Date): number | null {
+  if (entry.sourceYear === null) return null;
   const years = occurrence.getFullYear() - entry.sourceYear;
   return years > 0 ? years : null;
 }

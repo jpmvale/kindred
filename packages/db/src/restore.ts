@@ -55,6 +55,17 @@ export type BackupFile = {
 const data = (valor: unknown) => (valor ? new Date(valor as string) : null);
 
 /**
+ * Nascimento e falecimento são texto parcial (RN-027, ADR-028). Backup antigo
+ * traz o ISO completo com hora — fica só a parte da data, que é o que o formato
+ * canônico usa.
+ */
+const dataParcial = (valor: unknown) => {
+  if (!valor) return null;
+  const texto = valor instanceof Date ? valor.toISOString() : String(valor);
+  return texto.includes('T') ? texto.slice(0, 10) : texto;
+};
+
+/**
  * Confere que um valor já desserializado é um backup válido — usado tanto pelo
  * CLI (depois de ler o arquivo) quanto pela API (o corpo do upload já chega
  * como objeto, sem passar por disco).
@@ -141,8 +152,8 @@ export function buildRestoreOperations(
           name: pessoa.name as string,
           userId: ownerId ?? (pessoa.userId as string),
           sex: pessoa.sex as never,
-          birthDate: data(pessoa.birthDate),
-          deathDate: data(pessoa.deathDate),
+          birthDate: dataParcial(pessoa.birthDate),
+          deathDate: dataParcial(pessoa.deathDate),
           deceased: pessoa.deceased as boolean,
           relationshipType: pessoa.relationshipType as never,
           isCentralUser: pessoa.isCentralUser as boolean,

@@ -47,8 +47,12 @@ model Person {
   id               String           @id @default(uuid())
   name             String
   sex              Sex?
-  birthDate        DateTime?
-  deathDate        DateTime?
+  /// Data parcial (RN-027): `YYYY-MM-DD`, `YYYY-MM`, `YYYY`, `--MM-DD` ou `--MM`.
+  /// Texto, e não `DateTime`, porque metade da árvore de uma família tem só o ano —
+  /// e um `DateTime` obriga a inventar 1º de janeiro, que é exatamente a mentira
+  /// que este campo passou a não contar mais (ADR-028).
+  birthDate        String?          @db.VarChar(10)
+  deathDate        String?          @db.VarChar(10)
   deceased         Boolean          @default(false)
   relationshipType RelationshipType
   isCentralUser    Boolean          @default(false)

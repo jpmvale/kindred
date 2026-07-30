@@ -16,6 +16,7 @@ import { normalizeForSearch } from './search.util';
 import { MAX_PHOTO_BYTES, matchesMimeType } from './photo.util';
 import { UploadPhotoDto } from './dto/upload-photo.dto';
 import { FindPeopleQueryDto } from './dto/find-people-query.dto';
+import { partialDateSortKey } from './partial-date';
 
 const INCLUDE = {
   father: true,
@@ -200,8 +201,8 @@ export class PeopleService {
       data: {
         name: dto.name,
         sex: dto.sex ?? null,
-        birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
-        deathDate: dto.deathDate ? new Date(dto.deathDate) : null,
+        birthDate: dto.birthDate || null,
+        deathDate: dto.deathDate || null,
         deceased: dto.deathDate ? true : (dto.deceased ?? false),
         relationshipType: dto.relationshipType,
         isCentralUser: dto.isCentralUser ?? false,
@@ -309,9 +310,12 @@ export class PeopleService {
         const bHasBirthDate = Boolean(b.birthDate);
         if (aHasBirthDate !== bHasBirthDate) return aHasBirthDate ? -1 : 1;
 
-        const aTime = a.birthDate ? new Date(a.birthDate).getTime() : 0;
-        const bTime = b.birthDate ? new Date(b.birthDate).getTime() : 0;
-        if (aTime !== bTime) return (aTime - bTime) * direction;
+        // Chave textual, não `Date`: a data pode ser parcial (RN-027), e
+        // `1988` tem de ficar entre `1987-12` e `1988-05` — o que a comparação
+        // de string com os campos preenchidos com zero já dá de graça.
+        const aKey = partialDateSortKey(a.birthDate);
+        const bKey = partialDateSortKey(b.birthDate);
+        if (aKey !== bKey) return aKey.localeCompare(bKey) * direction;
         return a.name.localeCompare(b.name, 'pt-BR');
       }
 
@@ -319,10 +323,11 @@ export class PeopleService {
       const bHasBirthDate = Boolean(b.birthDate);
       if (aHasBirthDate !== bHasBirthDate) return aHasBirthDate ? -1 : 1;
 
-      const now = Date.now();
-      const aAgeMs = now - new Date(a.birthDate!).getTime();
-      const bAgeMs = now - new Date(b.birthDate!).getTime();
-      if (aAgeMs !== bAgeMs) return (aAgeMs - bAgeMs) * direction;
+      // Mais velho é quem nasceu antes: a mesma chave da ordenação por data,
+      // invertida. Sem `Date`, pelo mesmo motivo de lá.
+      const aKey = partialDateSortKey(a.birthDate);
+      const bKey = partialDateSortKey(b.birthDate);
+      if (aKey !== bKey) return bKey.localeCompare(aKey) * direction;
       return a.name.localeCompare(b.name, 'pt-BR');
     });
 
@@ -449,10 +454,10 @@ export class PeopleService {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.sex !== undefined && { sex: dto.sex ?? null }),
         ...(dto.birthDate !== undefined && {
-          birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+          birthDate: dto.birthDate || null,
         }),
         ...(dto.deathDate !== undefined && {
-          deathDate: dto.deathDate ? new Date(dto.deathDate) : null,
+          deathDate: dto.deathDate || null,
         }),
         ...(resolvedDeceased !== undefined && { deceased: resolvedDeceased }),
         ...(dto.relationshipType !== undefined && {

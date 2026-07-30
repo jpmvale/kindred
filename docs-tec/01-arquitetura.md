@@ -1045,3 +1045,50 @@ foi atualizado — não pode virar tela de erro.
 backup passou a esperar o loader resolver (antes a rota não tinha loader nenhum e renderizava
 síncrona), e nenhum mudou de expectativa quanto ao comportamento. `pnpm typecheck`, `pnpm lint` e
 `pnpm test` limpos.
+
+---
+
+## ADR-028 — Data parcial: nascimento e falecimento viram texto
+
+**Contexto.** `birthDate` e `deathDate` eram `DateTime`, e a tela era um `<input type="date">`: ou se
+sabia a data inteira, ou não se cadastrava nada. Numa árvore de família isso não se sustenta — de
+boa parte dos antigos se sabe **só o ano**. O que acontecia na prática era pior que o campo vazio:
+quem sabia só o ano cadastrava **1º de janeiro**, e a árvore, a lista e o calendário repetiam a data
+inventada como se fosse informação. Na base real eram 8 pessoas assim, e só uma nasceu mesmo em 1º de
+janeiro.
+
+**Decisão — texto no formato ISO 8601 encurtado**, uma coluna por data como antes:
+`AAAA-MM-DD`, `AAAA-MM`, `AAAA`, `--MM-DD`, `--MM` (RN-027). As alternativas pesadas foram descartadas:
+
+- **`DateTime` + coluna de precisão** (`DIA`/`MÊS`/`ANO`) não expressa "30 de maio, ano desconhecido"
+  — que é justamente o caso de quem se lembra do aniversário mas não do ano, comum numa família.
+- **Três colunas inteiras por data** (`birthYear`, `birthMonth`, `birthDay`) expressa tudo, mas
+  multiplica o contrato por três e obriga a mexer em cada consumidor; o texto continua sendo **um
+  campo string**, do jeito que a API já entregava, então quem só exibe a data quase não muda.
+
+Ordenar texto ainda funciona porque o formato é ordenável por natureza — `partialDateSortKey`
+preenche o que falta com zero, e `1988` cai entre `1987-12` e `1988-05`. A função existe duas vezes,
+no web e na API, porque `@kindred/types` não carrega valor em runtime (ADR-005).
+
+**Dia exige mês.** É a única restrição sobre "cada campo é independente" — dia 30 sem mês não cai em
+calendário nenhum, e guardá-lo seria guardar ruído. A tela **não apaga** o dia digitado antes do mês:
+ele fica na caixa, com um aviso, até o mês chegar. Sumir com o que a pessoa acabou de digitar seria
+pior que esperar.
+
+**O campo continua rápido para quem sabe a data inteira**, que é o caso em 95% dos cadastros: três
+caixas (`dd`, `mm`, `aaaa`) que **avançam sozinhas quando enchem**, então `30`, `05`, `1988` sai num
+sopro, sem mouse nem Tab; backspace em caixa vazia volta para a anterior. Foi o critério declarado
+pelo usuário — mudar sem estragar o caminho comum —, e é o motivo de não ser um campo de texto livre
+com máscara nem um seletor de calendário.
+
+**A migração é em dois passos, de propósito.** A migration SQL só converte o tipo
+(`to_char(..., 'YYYY-MM-DD')`), preservando o que havia; encurtar `AAAA-01-01` para `AAAA` é um
+**script à parte** (`pnpm db:trim-january-first`), com passagem seca por padrão e `--keep "Nome"` para
+quem nasceu mesmo em 1º de janeiro. Distinguir a data real da inventada é decisão de quem conhece a
+família, não de uma migration que roda sozinha em qualquer banco.
+
+**Verificado** com 27 testes novos (o núcleo de datas parciais, o campo de três caixas com
+auto-avanço e backspace, o calendário com data sem ano) e os 208 que já existiam no web mais os 84 da
+API, todos verdes. Na base real: backup antes de tudo, migration aplicada com as 191 datas
+preservadas, passagem seca conferida pessoa a pessoa e então `--apply` — 7 encurtadas para o ano, e o
+Raimundo da Silva Moreno mantido em `1942-01-01`, que é a data de verdade dele.

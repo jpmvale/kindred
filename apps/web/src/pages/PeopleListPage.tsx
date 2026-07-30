@@ -8,7 +8,7 @@ import {
 } from 'react-router-dom';
 import { peopleApi } from '../api/people';
 import { photoUrl } from '../photo';
-import { formatDateOnly, getAgeInYears } from '../date';
+import { ageOf, formatPartialDate, getAgeInYears } from '../date';
 import type { PeopleSortField, SortDirection } from '@kindred/types';
 import type { PeopleListData } from '../loaders';
 import {
@@ -147,8 +147,8 @@ export default function PeopleListPage() {
       {people.map((person) => (
         (() => {
           const isDead = Boolean(person.deceased || person.deathDate);
-          const ageNow = getAgeInYears(person.birthDate, undefined);
-          const ageAtDeath = getAgeInYears(person.birthDate, person.deathDate);
+          const ageNow = ageOf(person.birthDate, undefined);
+          const ageAtDeath = ageOf(person.birthDate, person.deathDate);
           const yearsSinceDeath = getYearsSinceDate(person.deathDate);
           const ageLabel = isDead ? ageAtDeath : ageNow;
           const foto = photoUrl(person);
@@ -166,7 +166,8 @@ export default function PeopleListPage() {
               {isDead && <span className="person-dagger">†</span>}
               {ageLabel !== null && (
                 <span className="person-age">
-                  - {ageLabel}{isDead ? '' : ' anos'}
+                  {/* O `~` avisa que a data é parcial e a conta pode errar por um ano. */}
+                  - {ageLabel.approximate ? '~' : ''}{ageLabel.years}{isDead ? '' : ' anos'}
                 </span>
               )}
               {person.isCentralUser && <span className="person-you">(você)</span>}
@@ -187,10 +188,10 @@ export default function PeopleListPage() {
                 <span className="person-meta">· {SEX_LABELS[person.sex]}</span>
               )}
               {person.birthDate && (
-                <span className="person-meta">· {formatDateOnly(person.birthDate)}</span>
+                <span className="person-meta">· {formatPartialDate(person.birthDate)}</span>
               )}
               {person.deathDate && (
-                <span className="person-meta is-faint">· † {formatDateOnly(person.deathDate)}</span>
+                <span className="person-meta is-faint">· † {formatPartialDate(person.deathDate)}</span>
               )}
               {person.deceased && !person.deathDate && (
                 <span className="person-meta is-faint">· † Falecido</span>

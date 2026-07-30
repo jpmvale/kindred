@@ -73,9 +73,15 @@ function jitter(iso: string | null, semente: number): string | null {
   if (!iso) return null;
   const passo = (semente % 20) - 10;
   const dias = passo >= 0 ? passo + 1 : passo;
-  const d = new Date(iso);
+
+  // Data parcial (RN-027) só é deslocada quando está completa: mexer em `1988`
+  // ou `1988-05` mudaria o ano ou o mês, que é justamente o que a pessoa sabe.
+  const completa = /^\d{4}-\d{2}-\d{2}/.exec(iso);
+  if (!completa) return iso;
+
+  const d = new Date(`${completa[0]}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + dias);
-  return d.toISOString();
+  return d.toISOString().slice(0, 10);
 }
 
 function nome(indice: number, sexo: string | null): string {

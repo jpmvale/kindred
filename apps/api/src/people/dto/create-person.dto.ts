@@ -1,12 +1,12 @@
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Matches,
 } from 'class-validator';
 import { RelationshipType, Sex } from '@kindred/db';
 
@@ -22,6 +22,17 @@ export { RelationshipType, Sex };
  */
 export const NOTES_MAX_LENGTH = 2000;
 
+/**
+ * Data parcial (RN-027): `YYYY-MM-DD`, `YYYY-MM`, `YYYY`, `--MM-DD` ou `--MM`.
+ * Dia exige mês — não há calendário em que dia sozinho signifique alguma coisa —,
+ * e por isso `--DD` não está na lista.
+ */
+const PARTIAL_DATE_REGEX =
+  /^(?:\d{4}(?:-\d{2}(?:-\d{2})?)?|--\d{2}(?:-\d{2})?)$/;
+
+const MENSAGEM_DATA =
+  'A data deve ser AAAA-MM-DD, AAAA-MM, AAAA, --MM-DD ou --MM (dia exige mês).';
+
 export class CreatePersonDto {
   @IsString()
   name: string;
@@ -31,11 +42,11 @@ export class CreatePersonDto {
   sex?: Sex;
 
   @IsOptional()
-  @IsDateString()
+  @Matches(PARTIAL_DATE_REGEX, { message: MENSAGEM_DATA })
   birthDate?: string;
 
   @IsOptional()
-  @IsDateString()
+  @Matches(PARTIAL_DATE_REGEX, { message: MENSAGEM_DATA })
   deathDate?: string;
 
   @IsOptional()

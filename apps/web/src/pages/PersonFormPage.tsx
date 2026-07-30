@@ -10,8 +10,10 @@ import { peopleApi } from '../api/people';
 import { unionsApi } from '../api/unions';
 import { errorMessage } from '../api-error';
 import { Combobox } from '../components/Combobox';
+import PartialDateInput from '../components/PartialDateInput';
 import { parentCandidates, type ParentRole } from './parent-candidates';
 import { ACCEPTED_PHOTO_TYPES, fileToPhotoUpload, photoUrl } from '../photo';
+import { parsePartialDate, partialDateSortKey } from '../date';
 import type { PersonFormPageData } from '../loaders';
 import { RELATIONSHIP_LABELS, UNION_STATUS_LABELS } from '../labels';
 import type {
@@ -60,8 +62,8 @@ function toFormData(person: Person | null): PersonFormData {
   return {
     name: person.name,
     sex: person.sex ?? null,
-    birthDate: person.birthDate ? person.birthDate.slice(0, 10) : '',
-    deathDate: person.deathDate ? person.deathDate.slice(0, 10) : '',
+    birthDate: person.birthDate ?? '',
+    deathDate: person.deathDate ?? '',
     deceased: person.deceased ?? Boolean(person.deathDate),
     relationshipType: person.relationshipType,
     notes: person.notes ?? '',
@@ -71,12 +73,21 @@ function toFormData(person: Person | null): PersonFormData {
   };
 }
 
+/** O ano de uma data parcial, quando ela tem ano (RN-027). */
+function anoDe(value?: string | null): number | null {
+  return parsePartialDate(value)?.year ?? null;
+}
+
 /** A segunda linha de cada opção: o que ajuda a distinguir dois homônimos. */
 function personHint(person: Person): string | undefined {
   const parts = [
     person.kinshipDegree,
-    person.birthDate ? `n. ${person.birthDate.slice(0, 4)}` : null,
-    person.deathDate ? `f. ${person.deathDate.slice(0, 4)}` : person.deceased ? 'falecido' : null,
+    anoDe(person.birthDate) ? `n. ${anoDe(person.birthDate)}` : null,
+    anoDe(person.deathDate)
+      ? `f. ${anoDe(person.deathDate)}`
+      : person.deceased
+        ? 'falecido'
+        : null,
   ].filter(Boolean);
   return parts.length > 0 ? parts.join(' · ') : undefined;
 }
@@ -332,7 +343,9 @@ export default function PersonFormPage() {
   const children = people
     .filter((p) => id && (p.fatherId === id || p.motherId === id))
     .sort((a, b) => {
-      if (a.birthDate && b.birthDate) return a.birthDate.localeCompare(b.birthDate);
+      if (a.birthDate && b.birthDate) {
+        return partialDateSortKey(a.birthDate).localeCompare(partialDateSortKey(b.birthDate));
+      }
       if (a.birthDate) return -1;
       if (b.birthDate) return 1;
       return a.name.localeCompare(b.name, 'pt-BR');
@@ -404,21 +417,24 @@ export default function PersonFormPage() {
 
           <div className="form-group">
             <label htmlFor="pessoa-nascimento">Data de nascimento</label>
-            <input
+            <PartialDateInput
               id="pessoa-nascimento"
-              type="date"
-              value={form.birthDate ?? ''}
-              onChange={(e) => set('birthDate', e.target.value)}
+              label="nascimento"
+              value={form.birthDate}
+              onChange={(value) => set('birthDate', value ?? '')}
             />
+            <span className="field-hint">
+              Dia, mês e ano são independentes: sabendo só o ano, preencha só o ano (RN-027).
+            </span>
           </div>
 
           <div className="form-group">
             <label htmlFor="pessoa-falecimento">Data de falecimento</label>
-            <input
+            <PartialDateInput
               id="pessoa-falecimento"
-              type="date"
-              value={form.deathDate ?? ''}
-              onChange={(e) => set('deathDate', e.target.value)}
+              label="falecimento"
+              value={form.deathDate}
+              onChange={(value) => set('deathDate', value ?? '')}
             />
           </div>
 

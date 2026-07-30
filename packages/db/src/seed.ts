@@ -309,8 +309,10 @@ async function main() {
       data: {
         name: seed.name,
         sex: seed.sex ?? null,
-        birthDate: seed.birthDate ? new Date(seed.birthDate) : null,
-        deathDate: seed.deathDate ? new Date(seed.deathDate) : null,
+        // Texto, não `Date`: a data é parcial (RN-027, ADR-028) e as do seed já
+        // estão no formato canônico.
+        birthDate: seed.birthDate ?? null,
+        deathDate: seed.deathDate ?? null,
         deceased: Boolean(seed.deathDate),
         relationshipType: seed.relationshipType ?? "FAMILY",
         isCentralUser: seed.isCentralUser ?? false,

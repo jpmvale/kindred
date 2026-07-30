@@ -1,4 +1,5 @@
 import type { Person, Sex } from '@kindred/types';
+import { parsePartialDate } from '../date';
 
 /**
  * Quem pode aparecer na lista de pai ou de mãe de alguém (RN-016). É um filtro
@@ -97,12 +98,19 @@ function plausibleByDates(person: Person, childBirth: number, role: ParentRole):
 
 const DAY = 24 * 60 * 60 * 1000;
 
-/** Só a parte da data (`YYYY-MM-DD`), em UTC: fuso não pode mudar quem aparece na lista. */
+/**
+ * A data parcial (RN-027) vira um instante comparável, completando o que falta
+ * com o começo do período: `1988` vira 1º de janeiro de 1988. Serve para
+ * **filtrar por plausibilidade**, onde um mês de erro não muda nada — e não para
+ * mostrar data nenhuma na tela. Sem ano não há como comparar: vira `null`, e a
+ * pessoa fica na lista.
+ *
+ * Em UTC porque fuso não pode mudar quem aparece na lista.
+ */
 function parseDate(value?: string | null): number | null {
-  if (!value) return null;
-  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
-  if (!year || !month || !day) return null;
-  return Date.UTC(year, month - 1, day);
+  const parts = parsePartialDate(value);
+  if (!parts?.year) return null;
+  return Date.UTC(parts.year, (parts.month ?? 1) - 1, parts.day ?? 1);
 }
 
 function yearsBetween(from: number, to: number): number {

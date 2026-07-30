@@ -45,6 +45,15 @@ começo desta janela.
 
 ## Onde a última sessão parou
 
+**Datas viraram parciais** (RN-027, ADR-028): dia, mês e ano são independentes e opcionais, guardados
+como texto (`1988-05-30`, `1988-05`, `1988`, `--05-30`, `--05`). O campo são três caixas que avançam
+sozinhas quando enchem, para não estragar o caminho de quem sabe a data inteira. Na base real, as 8
+pessoas cadastradas em 1º de janeiro (o "só sei o ano" da época do `DateTime`) viraram só o ano —
+menos o Raimundo da Silva Moreno, que nasceu mesmo nesse dia. O corte foi por script
+(`pnpm db:trim-january-first`, passagem seca por padrão), não pela migration: distinguir a data real
+da inventada é decisão de quem conhece a família.
+
+
 **Backup e conta viraram seções de Configurações** (ADR-027), em `/settings`: o menu tinha "Backup"
 disputando espaço com as telas de conteúdo, e a conta ficava escondida no nome do usuário. As páginas
 viraram componentes (`AccountSettings`, `BackupSettings`) e `/backup` e `/account` redirecionam para

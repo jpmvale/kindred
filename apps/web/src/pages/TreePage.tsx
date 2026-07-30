@@ -30,6 +30,7 @@ import {
 } from './tree-layout';
 import { relationsOf } from './person-relations';
 import PersonDetailPanel from '../components/PersonDetailPanel';
+import { parsePartialDate } from '../date';
 
 // ─── Person node ──────────────────────────────────────────────────────────────
 
@@ -57,8 +58,9 @@ function avatarBg(sex?: string | null, isCentral?: boolean) {
   return 'var(--tree-avatar-unknown)';
 }
 
+/** O ano de uma data parcial (RN-027) — `1988-05-30`, `1988-05` e `1988` dão 1988. */
 function year(d?: string | null) {
-  return d ? new Date(d).getFullYear() : null;
+  return parsePartialDate(d)?.year ?? null;
 }
 
 function PersonNode({ data }: NodeProps) {
