@@ -5,8 +5,8 @@ _Atualizado em 29/07/2026._
 ## Onde o projeto está
 
 O MVP funciona de ponta a ponta: cadastro de pessoas e locais, cálculo de parentesco, lista com
-busca/ordenação/paginação, árvore genealógica — agora com **famílias agrupadas visualmente e as
-gerações alinhadas** (pai em cima, filho embaixo) — e
+busca/ordenação/paginação, árvore genealógica — agora com **famílias agrupadas, gerações alinhadas
+(pai em cima, filho embaixo) e nenhum cartão sobre outro** — e
 calendário de aniversários — em tema claro ou escuro, e **com conta e login** (BL-10): cada pessoa que
 usa o kindred tem sua própria árvore, isolada das demais. A conta também já pode trocar o próprio
 e-mail e senha pela tela (BL-16), e quem tem acesso ao servidor consegue redefinir a senha de qualquer
@@ -14,10 +14,10 @@ conta por linha de comando (BL-17, ADR-019) — **o backlog de produto está vaz
 
 **Marco de retomada — 29/07/2026, fim da janela.** Nada pela metade. Conferido:
 `pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **267 testes** (84 na API, 176 no
-web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). Working tree limpo. O usuário viu
-o alinhamento das gerações (ADR-021) rodando na base real e aprovou — **"melhorou bastante, mas ainda
-tem muita coisa que precisamos evoluir"**: a árvore continua sendo a frente de trabalho aberta, sem
-item de backlog formal ainda.
+web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). A árvore é a frente de trabalho
+aberta, sem item de backlog formal: o usuário está olhando o desenho na base real e pedindo ajuste a
+cada rodada (ADR-021, depois ADR-022). Falta commitar o empacotamento por família (ADR-022:
+`tree-layout.ts` e estes documentos).
 
 **Para subir tudo e olhar a árvore:** `docker compose up -d postgres`, um `.env` na raiz (copiado do
 `.env.example`, com `PORT=3005` para casar com o `API_URL` do
@@ -45,7 +45,36 @@ começo desta janela.
 
 ## Onde a última sessão parou
 
-**As gerações da árvore passaram a ficar alinhadas** (ADR-021), continuação direta do agrupamento de
+**A árvore passou a empacotar por família, medindo distância por contorno** (ADR-022). Vendo o
+resultado do ADR-021 na base real, o usuário apontou sobreposição por todo lado — "o fundo sutil fica
+quase invisível" — e parentes de primeiro grau longe, com um caso nomeado (o Levi longe dos pais),
+lembrando que o canvas é infinito e que a distância entre famílias é **piso, não teto**. Medindo:
+244 pares de caixas sobrepostas, dois cartões a **19 px** um do outro e filhos a 3771 px do pai.
+
+Duas causas, uma delas maior que o sintoma: o espaçamento trabalhava **um rank por vez**, sem saber a
+largura da descendência; e **todas** as 54 pessoas com pai e mãe cadastrados têm os pais **sem união
+registrada**, então o mecanismo de casal nunca disparava na base real — pai e mãe eram duas famílias
+independentes (7163 px separavam os pais da pessoa central). Agora co-parentalidade é casal para o
+layout (sem virar linha desenhada), cada família é um corpo rígido e a separação sai do contorno de
+toda a descendência. Depois de tudo, uma passada separa árvores inteiras — uma família sem pais
+visíveis é raiz no meio do desenho e o rank de cima não a vê. Medido depois: vizinho mais próximo em
+**232 px exatos** (nenhum cartão sobre outro), caixas sobrepostas de 244 para 101 — 59 delas por
+aninhamento inevitável —, Levi a 116 px do pai **e** da mãe. Detalhes, com o beco sem saída do
+"satélite para cima" registrado para não repetir, no ADR-022.
+
+**Como foi verificado, e o que dá para reaproveitar:** dá para rodar o layout contra a base real sem
+entrar na conta — `psql` no container despeja as pessoas em JSON, um teste descartável roda
+`computeLayout` com tudo expandido (o mesmo que "Abrir todos relacionamentos") e mede sobreposição,
+distância pai-filho e largura por geração, além de renderizar a árvore em SVG. Foi assim que os números
+acima saíram; o script era descartável, mas o caminho vale para a próxima mudança de layout.
+
+**O que ficou de fora, e é o próximo assunto natural:** a caixa de família de quem tem muitos filhos
+com muitos netos fica **muito larga** (consequência geométrica de manter irmãos próximos e subárvores
+sem colisão), e caixa preenchida talvez não seja o melhor indicador nessa escala — uma chave
+genealógica (o traço que desce do casal e abre sobre os filhos) leria melhor. Não foi mexido: é decisão
+visual, não de layout.
+
+Antes disso, na mesma janela: **as gerações da árvore passaram a ficar alinhadas** (ADR-021), continuação direta do agrupamento de
 famílias: o usuário apontou que juntar irmãos não faz sentido sem os pais em cima deles e os filhos
 embaixo. A resposta foi uma passada final de alinhamento (`alignGenerations`) sobre o que o
 `spreadRanks` já fazia — quatro varreduras alternadas (cada bloco vai para o meio dos pais, descendo;

@@ -797,3 +797,86 @@ Além dos testes, o layout foi renderizado em SVG antes e depois numa família s
 número por número: menor distância no rank igual a `MIN_GAP` exato, e todo pai/mãe a meio passo
 (`MIN_GAP / 2`, o próprio deslocamento do casal) do centro dos filhos — a base real não foi usada
 desta vez porque exigiria a senha da conta do dono, e a geometria é o que estava em questão.
+
+---
+
+## ADR-022 — Cada família é um bloco rígido, e a distância entre elas sai do contorno
+
+**Contexto.** Rodando o ADR-021 contra a base real (149 pessoas, "Abrir todos relacionamentos"), o
+usuário viu o que os testes sintéticos não pegavam: **sobreposição por todo lado** — a ponto de o fundo
+sutil de cada família (ADR-020) virar um borrão só, "quase invisível" — e parentes de primeiro grau
+longe uns dos outros, com um caso nomeado: o Levi a 1449 px do pai. Medindo o desenho:
+**244 pares de caixas de família sobrepostas**, o vizinho mais próximo de alguém no mesmo rank a
+**19 px** (cartão sobre cartão) e filhos a até **3771 px** do pai. E o recado explícito: o canvas é
+infinito, `FAMILY_GAP` é **piso e não teto** — família grande pode empurrar as vizinhas.
+
+**A causa raiz era outra, e maior.** `spreadRanks` (ADR-020) e o alinhamento (ADR-021) trabalhavam
+**um rank por vez**, sem nenhuma noção da largura do que vinha embaixo. Duas famílias vizinhas numa
+geração ficavam a `FAMILY_GAP` — e as descendências delas, com dez pessoas cada, se atropelavam na
+geração seguinte. Pior: na base real **todas** as 54 pessoas com pai e mãe cadastrados têm os pais
+**sem união registrada** — e o mecanismo de casal (`placeCouples`, ADR-009) só olhava uniões. Pai e
+mãe eram duas famílias independentes, cada uma puxada para um lado: 7163 px separavam os pais da
+pessoa central.
+
+**Decisão.** O posicionamento horizontal passou a ser um empacotamento por família, `packFamilies`,
+com quatro peças:
+
+- **Co-parentalidade é casal para o layout.** `coParentLinks` gera um par para cada pai+mãe do mesmo
+  filho visível, e esses pares entram em tudo que trata de casal (`placeCouples`, gap, distância
+  estrutural). **Só a união registrada vira linha desenhada** — co-parentalidade posiciona, não
+  inventa vínculo. `placeCouples` também passou a registrar o bloco de um par que já estava lado a
+  lado sem mover ninguém (era o caso do sogro com a sogra, que chegam juntos no deslocamento em bloco
+  do grupo de afinidade): sem o bloco, o empacotamento rasgava o casal em duas metades, cada uma
+  puxada por um lado.
+- **Unidade = casal (ou pessoa) e sua família como corpo rígido.** Uma unidade se move inteira, com a
+  descendência: o alinhamento pai-sobre-filho feito num rank não se desfaz quando o rank de cima abre
+  espaço.
+- **A distância vem do contorno, não do rank.** Para cada família, o contorno é "por geração, até onde
+  ela vai para cada lado" (relativo ao próprio centro, então sobrevive ao deslocamento). A separação
+  exigida entre duas vizinhas é o **pior caso entre todas as gerações em que as duas existem** — o
+  rank dos netos manda tanto quanto o dos pais. É isso que faz a família grande empurrar a vizinha em
+  vez de invadi-la, exatamente como pedido.
+- **A ordem lateral vem da floresta**, por percurso em profundidade, com raízes e irmãos na ordem que
+  o `spreadRanks` decidiu (lado paterno/materno e parente mais próximo por dentro, ADR-020). Ordenando
+  por `x`, ramos diferentes se intercalavam e o contorno só conseguia resolver a colisão abrindo vãos
+  absurdos: **10 mil px de vazio** numa geração, e o desenho inteiro passando de 13 mil para 47 mil px.
+
+**Duas noções de "filho", de propósito.** Para o **destino** (onde a família quer ficar) valem todos os
+filhos visíveis — é o que mantém o sogro sobre o cônjuge (ADR-009) mesmo com ele fora da floresta
+abaixo. Para o **deslocamento** vale só a floresta, onde cada unidade tem no máximo uma unidade-pai
+(escolhida pelo lado de **sangue**: quem entra por casamento não adota a família do par como
+descendência) — assim duas famílias nunca compartilham descendência e ninguém recebe dois empurrões
+somados. No mesmo rank, um bloco desconta os blocos **aninhados dentro dele** (o cunhado, que desce
+dos sogros e senta na fileira do casal): sem o desconto ele andava duas vezes, e o contorno do bloco
+de fora incluía o de dentro — a família media distância contra si mesma e deixava o cunhado a meio
+cartão do cônjuge.
+
+**A árvore não é uma árvore, e isso custou duas peças a mais.** Uma família sem pais visíveis é
+**raiz no meio do desenho** (os sogros; os avós que só entraram porque uma neta casou) e não aparece
+em nenhum rank acima dela — o espaçamento por rank simplesmente não a vê, e um ramo inteiro descia por
+cima. Daí: (1) a varredura repete `PACK_PASSES` vezes, cada passada corrigindo o que a anterior
+desarrumou; e (2) uma passada final separa **árvores inteiras** pelo mesmo contorno, cada uma como um
+corpo rígido só — vem depois de tudo e não desarruma nada, porque mover uma árvore preserva todas as
+distâncias internas. Tentar resolver isso pendurando a raiz órfã na família do filho (satélite "para
+cima") foi um beco sem saída registrado aqui para não ser repetido: quebra a monotonia de geração do
+varrimento, e o contorno de uma família passou a ter membros 7 mil px à esquerda, num rank acima do
+seu.
+
+**`packRank` virou `solvePositions`**, agora recebendo separações prontas (do contorno) em vez de
+calculá-las: continua sendo a regressão isotônica ponderada do ADR-021 (PAVA), com `LOOSE_WEIGHT` para
+quem não tem filhos a centralizar. O resultado é arredondado ao micropixel — a média ponderada do pool
+traz ruído de ponto flutuante (um gap de 232 saindo 231,99999999999997) que se acumularia rank a rank.
+
+**Resultado medido na base real** (mesmo cenário do começo): vizinho mais próximo no mesmo rank
+**232 px exatos** — `MIN_GAP`, ou seja, **nenhum cartão sobre outro**, contra 19 px antes; caixas de
+família sobrepostas de 244 para **101**, e as que sobraram são **59 por aninhamento** (a mesma pessoa é
+filha numa família e mãe na seguinte — inerente a uma caixa por família nuclear) mais 42 de famílias
+ligadas por casamento entre ramos; o Levi a **116 px do pai e 116 px da mãe** (meio passo, ou seja,
+exatamente sob o casal); largura total 13,5 mil px para 125 nós, com a geração mais cheia (35 pessoas)
+em 12,4 mil — ~353 px por pessoa, à beira do `FAMILY_GAP`, isto é, compacto.
+
+**Verificado** com os 25 testes de `tree-layout.test.ts` inalterados, mais a medição acima sobre uma
+cópia local (só leitura) da base real, renderizada em SVG antes e depois. A caixa de família de quem
+tem muitos filhos com muitos netos ainda fica larga — é consequência geométrica de manter irmãos
+próximos **e** subárvores sem colisão —, e o indicador visual disso (caixa preenchida × chave
+genealógica) ficou como próximo assunto, não coberto por este ADR.
