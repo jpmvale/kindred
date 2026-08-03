@@ -1,0 +1,102 @@
+# Produção. Standalone — NÃO combine com o docker-compose.yml de desenvolvimento:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# O compose de dev publica o Postgres em 0.0.0.0:5432 e usa senha fixa no
+# arquivo. Combinar os dois herdaria as duas coisas, e como o Docker escreve
+# iptables direto — passando por cima do ufw — o banco ficaria exposto à
+# internet com o firewall marcando "active".
+#
+# Aqui o Postgres faz bind só em 127.0.0.1:5433 (5433 e não 5432 porque o coda
+# também roda Postgres na mesma máquina) e a senha vem do .env.prod.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kindred-db-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kindred
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env.prod}
+      POSTGRES_DB: kindred
+    ports:
+      # O endereço é a única coisa protegendo o banco — sem o 127.0.0.1 isto
+      # publicaria em 0.0.0.0. Acesso externo é só por túnel SSH.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - kindred_pgdata_prod:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kindred"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Aplica as migrations e sai. A API só sobe depois que este termina bem.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["pnpm", "--filter", "@kindred/db", "db:migrate"]
+    environment:
+      DATABASE_URL: postgresql://kindred:${POSTGRES_PASSWORD}@postgres:5432/kindred?schema=public
+    networks:
+      - internal
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kindred-api
+    restart: unless-stopped
+    command: ["node", "apps/api/dist/main.js"]
+    environment:
+      DATABASE_URL: postgresql://kindred:${POSTGRES_PASSWORD}@postgres:5432/kindred?schema=public
+      PORT: "3000"
+      # Sem isto o cookie de sessão sai sem `Secure` (BL-10).
+      NODE_ENV: production
+    networks:
+      - internal
+      - edge
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: kindred-web
+    restart: unless-stopped
+    networks:
+      - edge
+
+networks:
+  internal:
+    driver: bridge
+  # Criada fora do compose: `docker network create edge`. É por ela que o Caddy
+  # compartilhado alcança os três projetos sem que eles se enxerguem entre si.
+  edge:
+    external: true
+
+volumes:
+  kindred_pgdata_prod:
