@@ -6,12 +6,30 @@ Nenhum item aberto no momento.
 
 **Concluídos.**
 
+- **Datas parciais** — dia, mês e ano viraram independentes e opcionais (RN-027, ADR-028): quem sabe
+  só o ano cadastra só o ano, em vez de inventar 1º de janeiro como o campo antigo obrigava. O
+  caminho de quem sabe a data inteira continua rápido, com três caixas que avançam sozinhas. Na base
+  real, 7 datas inventadas viraram só o ano por script (`db:trim-january-first`).
+- **Configurações** — backup e conta viraram seções de uma tela só, `/settings` (ADR-027): o menu
+  tinha "Backup" disputando espaço com as telas de conteúdo, e a conta ficava escondida no nome do
+  usuário.
+- **Campos de escolher gente digitáveis** — pai, mãe, local e cônjuge viraram comboboxes com busca
+  que ignora acento (ADR-024), e a lista de pai/mãe chega filtrada pelo que é plausível — sexo e
+  datas —, sempre com a saída de "mostrar todos" (RN-026).
+- **A árvore reempacotada por família** — cada família é um bloco rígido e a distância entre elas sai
+  do contorno de toda a descendência (ADR-022), com as gerações alinhadas (ADR-021) e a marca de
+  família virando a fileira de irmãos com a chave descendo do casal (ADR-023). Na base real: nenhum
+  cartão sobre outro, nenhuma caixa de família sobreposta, e filho a meio passo do pai e da mãe.
+  Expandir deixou de mexer no zoom (ADR-025), e o card de detalhe virou lista de gente que leva a
+  árvore até o parente clicado (ADR-026).
+
 - **BL-17** — recuperar senha esquecida, por `pnpm db:reset-password <email> [senha-nova]`
   (ADR-019), não pela aplicação: sem infraestrutura de e-mail no projeto (e a conta real usa
   `dono@kindred.local`, que não é entregável), a recuperação exige acesso ao servidor — o mesmo nível
   de acesso que hoje resolveria isso com um `UPDATE` na mão, só que sem risco de errar o hash. Derruba
   todas as sessões da conta redefinida.
-- **BL-16** — trocar e-mail e senha da própria conta (`PATCH /api/auth/me`, tela `/account`). A senha
+- **BL-16** — trocar e-mail e senha da própria conta (`PATCH /api/auth/me`, hoje uma seção de
+  `/settings`, ADR-027). A senha
   atual é sempre exigida, mesmo para só trocar o e-mail — mesma defesa do login contra uma sessão
   sequestrada assumir a conta de vez. Trocar a senha derruba as outras sessões, mas mantém a atual (RN-025).
 - **BL-10** — multiusuário com login: cada conta tem sua própria árvore, isolada — nenhuma pessoa,
@@ -49,10 +67,13 @@ Nenhum item aberto no momento.
   aplicado antes da pintura (ADR-015). De quebra, os campos de formulário ganharam tratamento de
   verdade: o `<textarea>` não tinha estilo nenhum e os controles de união estavam com a aparência
   crua do navegador.
-- **BL-15** — a árvore deixou de ficar vazia ao abrir todos os relacionamentos. O `fitView` era
+- **BL-15** — a árvore deixou de ficar vazia ao abrir todos os relacionamentos. O enquadramento era
   chamado por cronômetro, antes de o reactflow medir os nós, e desistia em silêncio deixando a
-  viewport no zoom anterior; agora espera o `useNodesInitialized`. Só aparecia em base grande.
-- **BL-06** — exportar e importar pela própria tela (`/backup`), reusando exatamente o formato do
+  viewport no zoom anterior; agora espera o `useNodesInitialized`. Só aparecia em base grande. (O
+  enquadramento em si saiu depois, no ADR-025: expandir não mexe mais no zoom, só centra na pessoa
+  central.)
+- **BL-06** — exportar e importar pela própria tela (hoje uma seção de `/settings`, ADR-027),
+  reusando exatamente o formato do
   `db:backup`/`db:restore` (ADR-013): baixar gera o arquivo, subir restaura, e restaurar sobre um
   banco ocupado pede confirmação antes de apagar (RN-021, ADR-016). GEDCOM — trocar dados com outros
   programas de genealogia — continua de fora, e é bem mais trabalho.

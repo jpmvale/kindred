@@ -66,6 +66,9 @@ Regras implementadas hoje. O identificador (**RN-\***) é o que o código e os c
   - **ordenação por data** põe `1988` entre `1987-12` e `1988-05`, e quem não tem ano vai para o fim:
     é desconhecido, não antigo.
 
+  A regra vale para **nascimento e falecimento**. A data de início da união (RN-012) continua sendo
+  data inteira: ninguém pediu, e o campo é bem menos usado — quando pedir, é o mesmo caminho.
+
 - **RN-007** — Pessoa sem foto é exibida com a inicial do nome.
 - **RN-008** — Local é opcional e vem do cadastro de Locais; a pessoa guarda a referência, não o
   texto.

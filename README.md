@@ -88,6 +88,7 @@ mora num volume do Docker — que some com um `docker compose down -v`.
 pnpm db:backup                        # copia a base para ../kindred-backups, fora do repositório
 pnpm db:restore <arquivo.json>        # devolve a base (--force apaga antes, salvando o que apagou)
 pnpm db:anonymize                     # gera o fixture anônimo com a forma da base real
+pnpm db:trim-january-first            # 1º de janeiro inventado vira só o ano (ADR-028); seco por padrão
 ```
 
 > Dados de família **não entram neste repositório**, que é público. O `db:backup` grava fora dele, e

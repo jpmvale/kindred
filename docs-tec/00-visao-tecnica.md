@@ -52,6 +52,10 @@ ADR-018) — sem sessão, qualquer outra rota devolve `401`.
 | `GET` | `/api/backup` | Baixa o backup da conta logada, em JSON (ADR-013, BL-06). |
 | `POST` | `/api/backup/restore` | Restaura o backup **na conta logada**; `?force=true` apaga o que já existe antes (RN-021). |
 
+**As datas do contrato são parciais** (RN-027, ADR-028): `birthDate` e `deathDate` viajam como texto
+no ISO encurtado — `1988-05-30`, `1988-05`, `1988`, `--05-30` ou `--05` —, e não como carimbo de
+tempo. O DTO valida o formato; o banco guarda a mesma string.
+
 A ordem das rotas importa: `/people/central` é declarada **antes** de `/people/:id`, senão "central"
 seria lido como id.
 

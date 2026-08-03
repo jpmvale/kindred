@@ -95,7 +95,7 @@ async function escolher(
 const MIGUEL = pessoa('Miguel Souza', { sex: 'MALE', birthDate: '1988-05-30' });
 const FERNANDA = pessoa('Fernanda Alves');
 const CARLOS = pessoa('Carlos Souza');
-/** Para os filtros do campo de pai/mãe (RN-016): sexo declarado e datas. */
+/** Para os filtros do campo de pai/mãe (RN-026): sexo declarado e datas. */
 const JOSÉ = pessoa('José Ramires', { sex: 'MALE', birthDate: '1955-02-10' });
 const MARIA = pessoa('Maria Ramires', { sex: 'FEMALE', birthDate: '1958-09-04' });
 const BEBÊ = pessoa('Théo Souza', { sex: 'MALE', birthDate: '2020-01-01' });
@@ -449,7 +449,7 @@ describe('PersonFormPage — edição', () => {
   });
 });
 
-describe('PersonFormPage — campos digitáveis e filtros de filiação (ADR-024, RN-016)', () => {
+describe('PersonFormPage — campos digitáveis e filtros de filiação (ADR-024, RN-026)', () => {
   beforeEach(() => {
     vi.mocked(peopleApi.getAll).mockResolvedValue([MIGUEL, FERNANDA, CARLOS, JOSÉ, MARIA, BEBÊ]);
   });

@@ -94,7 +94,7 @@ function personHint(person: Person): string | undefined {
 
 /**
  * O campo de pai ou de mãe: um combobox já filtrado pelo que faz sentido —
- * sexo e datas (RN-016) —, com a saída de emergência de listar todo mundo.
+ * sexo e datas (RN-026) —, com a saída de emergência de listar todo mundo.
  *
  * O filtro é conveniência, nunca trava: se a base tem gente sem sexo ou sem
  * data (e tem muita), essa gente continua na lista, e "mostrar todos" traz o

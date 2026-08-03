@@ -12,12 +12,17 @@ usa o kindred tem sua própria árvore, isolada das demais. A conta também já 
 e-mail e senha pela tela (BL-16), e quem tem acesso ao servidor consegue redefinir a senha de qualquer
 conta por linha de comando (BL-17, ADR-019) — **o backlog de produto está vazio**.
 
-**Marco de retomada — 29/07/2026, fim da janela.** Nada pela metade. Conferido:
-`pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` — **267 testes** (84 na API, 176 no
-web, 7 no `@kindred/db`) mais **15 e2e** (rodam à parte, com banco). A árvore é a frente de trabalho
-aberta, sem item de backlog formal: o usuário está olhando o desenho na base real e pedindo ajuste a
-cada rodada (ADR-021, ADR-022, ADR-023). Falta commitar a chave genealógica (ADR-023:
-`tree-layout.ts`, `TreePage.tsx`, o teste e estes documentos).
+**Marco de retomada — 30/07/2026, fim da janela.** Working tree limpo, tudo commitado e no
+`origin/main`. Conferido: `pnpm typecheck`, `pnpm lint` (sem um aviso sequer) e `pnpm test` —
+**313 testes** (84 na API, 219 no web, 10 no `@kindred/db`) mais **15 e2e**, que nesta janela rodaram
+contra o banco de verdade sem tocar nos dados (191 pessoas antes e depois).
+
+A frente de trabalho é a **árvore e o cadastro**, sem item de backlog formal: o usuário olha o
+resultado na base real e pede o ajuste seguinte a cada rodada. Nesta janela saíram, em ordem:
+alinhamento das gerações (ADR-021), empacotamento por família com distância por contorno (ADR-022),
+a marca de família virando fileira de irmãos (ADR-023), comboboxes digitáveis com filtro de pai/mãe
+(ADR-024, RN-026), zoom parado ao expandir (ADR-025), card de detalhe refeito (ADR-026),
+Configurações reunindo backup e conta (ADR-027) e as datas parciais (ADR-028, RN-027).
 
 **Para subir tudo e olhar a árvore:** `docker compose up -d postgres`, um `.env` na raiz (copiado do
 `.env.example`, com `PORT=3005` para casar com o `API_URL` do
@@ -44,6 +49,16 @@ começo desta janela.
 > `DATABASE_URL=...`) ou o fixture anônimo — ver a sessão de backup mais abaixo.
 
 ## Onde a última sessão parou
+
+**Auditoria de documentação, no fim da janela** — e ela achou um defeito de verdade, não só doc
+desatualizada: com o backup virando seção de `/settings` (ADR-027), a exceção do `layoutLoader` que
+dispensa pessoa central continuou apontando só para `/backup`. Quem perdesse a base seria desviado
+para o `/setup` antes de chegar na restauração — exatamente o cenário que a exceção existe para
+permitir. Corrigido, com teste. Além disso: quatro citações de RN-016 (busca sem acento) onde a regra
+é a RN-026 (filtro de pai/mãe), o modelo de domínio sem as datas parciais, o backlog ainda chamando
+`/backup` e `/account` de telas, o doc de testes sem os módulos e componentes novos, e o README sem o
+`db:trim-january-first`.
+
 
 **Datas viraram parciais** (RN-027, ADR-028): dia, mês e ano são independentes e opcionais, guardados
 como texto (`1988-05-30`, `1988-05`, `1988`, `--05-30`, `--05`). O campo são três caixas que avançam

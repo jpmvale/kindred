@@ -16,7 +16,7 @@ cadastrando o que quiser da mesma gente.
 | --- | --- |
 | **Nome** | O único campo obrigatório junto do tipo de relacionamento. |
 | **Sexo** | `MASCULINO` / `FEMININO`, opcional. Serve para flexionar o grau de parentesco ("Tia", "Neto"). |
-| **Nascimento / falecimento** | Datas opcionais. Preencher o falecimento marca a pessoa como falecida (RN-006). |
+| **Nascimento / falecimento** | Datas opcionais e **parciais**: dia, mês e ano são independentes, e sabe-se o que se sabe — só o ano, mês e ano, ou o dia e o mês sem o ano (RN-027). Preencher o falecimento marca a pessoa como falecida (RN-006). |
 | **Foto** | Arquivo de imagem enviado pelo usuário, guardado no próprio banco (RN-017). Sem foto, a interface mostra a inicial do nome (RN-007). |
 | **Tipo de relacionamento** | Como essa pessoa entra na sua vida: `FAMILY`, `FRIEND`, `ACQUAINTANCE`, `OTHER`. É um rótulo social, não um vínculo de sangue. Cônjuge **não** está aqui: é vínculo, ver União. |
 | **Notas** | Texto livre sobre a pessoa — de onde veio a amizade, histórias. Uma nota só, até 2000 caracteres, fora da busca (RN-019). |

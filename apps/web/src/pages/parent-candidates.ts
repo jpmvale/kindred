@@ -2,7 +2,7 @@ import type { Person, Sex } from '@kindred/types';
 import { parsePartialDate } from '../date';
 
 /**
- * Quem pode aparecer na lista de pai ou de mãe de alguém (RN-016). É um filtro
+ * Quem pode aparecer na lista de pai ou de mãe de alguém (RN-026). É um filtro
  * de **plausibilidade**, não de validade: serve para encurtar uma fila de 150
  * pessoas até as poucas que fazem sentido, e a tela sempre oferece ver os
  * escondidos. Quem valida de verdade é a API.
