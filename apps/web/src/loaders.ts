@@ -43,13 +43,20 @@ async function currentUser(): Promise<AuthUser | null> {
  * parentesco para calcular, então o app desvia para o cadastro dela (RN-001).
  * O `/setup` fica fora deste layout justamente para não cair no próprio desvio.
  *
- * O `/backup` é a **exceção** dentro do layout: é para lá que se vai depois de
- * perder a base (o cenário que motiva restaurar um backup, para começo de
- * conversa) — precisa de sessão como qualquer outra tela, mas não precisa de
- * pessoa central, que é justamente o que ele existe para repor.
+ * As **Configurações** são a exceção dentro do layout: é para lá que se vai
+ * depois de perder a base (o cenário que motiva restaurar um backup, para começo
+ * de conversa) — precisa de sessão como qualquer outra tela, mas não precisa de
+ * pessoa central, que é justamente o que a restauração existe para repor.
+ *
+ * `/backup` continua na lista porque ainda é endereço válido: ele redireciona
+ * para `/settings` (ADR-027), e sem a exceção nos dois o desvio para o `/setup`
+ * pegaria a pessoa no meio do caminho — o loader roda antes de o redirecionamento
+ * acontecer.
  */
+const SEM_PESSOA_CENTRAL = ['/settings', '/backup'];
+
 export async function layoutLoader({ request }: LoaderFunctionArgs) {
-  const indoParaBackup = new URL(request.url).pathname === '/backup';
+  const indoParaBackup = SEM_PESSOA_CENTRAL.includes(new URL(request.url).pathname);
 
   const user = await currentUser();
   if (!user) return redirect('/login');

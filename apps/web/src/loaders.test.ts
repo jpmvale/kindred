@@ -106,6 +106,18 @@ describe('layoutLoader', () => {
     expect(resultado).toEqual({ user: usuario(), central: null });
   });
 
+  it('as Configurações também dispensam pessoa central — é de lá que se restaura hoje', async () => {
+    // O /backup virou seção de /settings (ADR-027). Sem a exceção valer para o
+    // endereço novo, quem perdeu a base era mandado ao /setup e não chegava na
+    // restauração — justamente o que a exceção existe para permitir.
+    vi.mocked(peopleApi.getCentral).mockResolvedValue(null);
+
+    const resultado = await layoutLoader(args('http://x/settings'));
+
+    expect(resultado).toEqual({ user: usuario(), central: null });
+    expect(peopleApi.getCentral).not.toHaveBeenCalled();
+  });
+
   it('o /backup continua exigindo sessão, mesmo sendo a exceção de pessoa central', async () => {
     vi.mocked(authApi.me).mockImplementation(semSessao);
 
