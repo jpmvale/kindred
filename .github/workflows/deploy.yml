@@ -88,8 +88,19 @@ jobs:
           MAQUINA: ${{ secrets.VPS_HOST }}
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s' "$CHAVE" > ~/.ssh/deploy
+          # `%s\n` e não `%s`: chave OpenSSH SEM quebra de linha final é
+          # recusada com "error in libcrypto", e o GitHub apara o newline
+          # terminal ao guardar o secret. Um `\n` a mais é inofensivo; a menos
+          # quebra tudo, e a mensagem não sugere em nada que o problema é esse.
+          printf '%s\n' "$CHAVE" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
+
+          # Falha cedo e com mensagem clara se a chave chegou corrompida, em vez
+          # de deixar o ssh reportar um "Permission denied (publickey)" genérico
+          # que manda procurar no lugar errado (authorized_keys da VPS).
+          ssh-keygen -y -f ~/.ssh/deploy > /dev/null \
+            || { echo "::error::a chave privada em VPS_DEPLOY_KEY está malformada"; exit 1; }
+
           ssh-keyscan -H "$MAQUINA" >> ~/.ssh/known_hosts 2>/dev/null
 
           # A chave está presa a um forced command na VPS: este texto chega em
