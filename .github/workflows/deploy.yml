@@ -1,0 +1,103 @@
+name: deploy
+
+# Só em `main`, e só depois do CI passar. `workflow_run` em vez de `needs:`
+# porque o CI é um workflow separado — assim não há um segundo lugar
+# descrevendo o que precisa passar antes de publicar.
+on:
+  workflow_run:
+    # Nome EXATO do outro workflow (`name:` do ci.yml), com maiúsculas e tudo.
+    # O casamento é literal: escrever "ci" aqui faz o deploy nunca disparar, sem
+    # erro nenhum em lugar nenhum.
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # Escotilha manual: republicar o commit atual sem precisar de um push vazio.
+  workflow_dispatch:
+
+concurrency:
+  # Dois deploys simultâneos na mesma VPS disputariam o mesmo `compose up`.
+  # Sem `cancel-in-progress`: um deploy pela metade é pior que um deploy tardio.
+  group: deploy-producao
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    # A condição é o portão de qualidade inteiro: sem ela, um CI vermelho ainda
+    # dispararia este workflow (workflow_run roda em qualquer conclusão).
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Em workflow_run o checkout default é o do evento, não o do commit
+          # testado. Sem isto, a imagem publicada poderia não ser a que passou
+          # no CI — que é justamente a garantia que esta esteira existe para dar.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: sha curto
+        id: sha
+        run: echo "tag=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN basta para publicar no GHCR do próprio repositório;
+          # não é preciso PAT.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # As duas imagens saem de Dockerfiles diferentes. A `api` serve também ao
+      # serviço `migrate`, que muda só o comando.
+      - name: build e push da api
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ghcr.io/jpmvale/kindred-api:${{ steps.sha.outputs.tag }}
+            ghcr.io/jpmvale/kindred-api:latest
+          # Cache no próprio registry: sem isto cada deploy recompila do zero,
+          # que é metade do tempo do job.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: build e push do web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/jpmvale/kindred-web:${{ steps.sha.outputs.tag }}
+            ghcr.io/jpmvale/kindred-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: publicar na VPS
+        env:
+          CHAVE: ${{ secrets.VPS_DEPLOY_KEY }}
+          MAQUINA: ${{ secrets.VPS_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s' "$CHAVE" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "$MAQUINA" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # A chave está presa a um forced command na VPS: este texto chega em
+          # SSH_ORIGINAL_COMMAND e é validado lá contra uma lista fechada de
+          # apps e um regex de sha. Não é um shell.
+          #
+          # O script do outro lado sobe, confere pela URL pública e reverte
+          # sozinho se a verificação falhar — saindo com erro mesmo após
+          # reverter, para este passo ficar vermelho.
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes \
+            deploy@"$MAQUINA" "kindred ${{ steps.sha.outputs.tag }}"

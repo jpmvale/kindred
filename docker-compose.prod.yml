@@ -35,6 +35,9 @@ services:
 
   # Aplica as migrations e sai. A API só sobe depois que este termina bem.
   migrate:
+    # Mesma imagem da `api`: sai do mesmo Dockerfile e muda só o comando. Antes
+    # eram dois builds produzindo conteúdo idêntico com nomes diferentes.
+    image: ghcr.io/jpmvale/kindred-api:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -49,6 +52,11 @@ services:
         condition: service_healthy
 
   api:
+    # `image` + `build` juntos: local, `docker compose build` constrói e marca
+    # com este nome; na VPS, `docker compose pull` baixa do GHCR sem compilar
+    # nada. IMAGE_TAG é o sha do commit, injetado pela esteira — o default
+    # `latest` mantém o fluxo de desenvolvimento funcionando sem variável.
+    image: ghcr.io/jpmvale/kindred-api:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -82,6 +90,7 @@ services:
         condition: service_completed_successfully
 
   web:
+    image: ghcr.io/jpmvale/kindred-web:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: apps/web/Dockerfile
