@@ -62,11 +62,7 @@ services:
       dockerfile: Dockerfile
     container_name: kindred-api
     restart: unless-stopped
-    # QUEBRA DELIBERADA — teste do rollback automático, a ser revertida em
-    # seguida. O arquivo não existe: o container sobe, o node falha, e
-    # /api/health para de responder. O front continua servindo 200, então este
-    # é exatamente o caso que a verificação antiga (só a raiz) deixava passar.
-    command: ["node", "apps/api/dist/arquivo-que-nao-existe.js"]
+    command: ["node", "apps/api/dist/main.js"]
     environment:
       DATABASE_URL: postgresql://kindred:${POSTGRES_PASSWORD}@postgres:5432/kindred?schema=public
       PORT: "3000"
