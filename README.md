@@ -18,6 +18,7 @@ a última sessão parou, ver [`docs-tec/HANDOFF.md`](docs-tec/HANDOFF.md).
 
 | Área | O que faz |
 | --- | --- |
+| **Aterrissagem** | A raiz (`/`) apresenta o app a quem chega sem sessão — o que ele faz, e que a primeira coisa pedida é a pessoa central. Quem já está logado é mandado para dentro pelo loader. Antes, o endereço levava direto ao login, sem uma palavra sobre o que o kindred é. |
 | **Conta** | Cadastro e login por e-mail/senha; cada conta tem sua própria árvore, isolada das demais — nenhuma pessoa, local ou união é visível fora da conta que a criou (RN-022, ADR-018). |
 | **Setup** | No primeiro acesso de cada conta, a app pede a **pessoa central** — a referência de todo o cálculo de parentesco. |
 | **Pessoas** | Cadastro, edição e remoção: nome, sexo, nascimento, falecimento, foto (URL), tipo de relacionamento (família, amigo, conhecido, outro), pai, mãe e local. |

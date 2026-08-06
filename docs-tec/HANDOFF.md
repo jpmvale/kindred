@@ -1,6 +1,26 @@
 # HANDOFF — estado atual
 
-_Atualizado em 29/07/2026._
+_Atualizado em 06/08/2026._
+
+## Última mudança — aterrissagem pública na raiz (06/08/2026)
+
+`/` era um `<Navigate to="/people">` **dentro do layout**, e o layout exige sessão: na prática, quem
+abria o endereço do kindred caía numa tela de e-mail e senha sem uma palavra sobre o que o app é.
+
+Agora a raiz fica **fora** do layout, com `landingLoader`: sem sessão mostra a apresentação; com
+sessão redireciona para `/people` — e é o `layoutLoader` de sempre que decide dali se falta a pessoa
+central. Duplicar essa checagem no loader novo criaria uma segunda cópia da regra para divergir.
+
+A rota `index` do layout **saiu**: duas rotas casando com `/` deixariam a escolha para a ordem da
+lista.
+
+A ilustração da árvore é SVG desenhado com os tokens do `index.css` (ADR-015), não uma captura —
+acompanha claro e escuro sozinha. O CSS da tela é um bloco no fim do arquivo, com uma nota sobre por
+que os botões precisam de classe própria: o estilo base de botão do kindred está no **elemento**
+`button`, então um `<a class="btn-primary">` herdaria a cor e sairia sem padding.
+
+Mesma mudança já feita no expense-analyzer; falta o coda, onde `/` é a tela Explorar e vai passar a
+decidir pelo visitante sem mudar de endereço.
 
 ## Onde o projeto está
 
