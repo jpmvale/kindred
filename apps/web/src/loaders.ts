@@ -81,6 +81,25 @@ export async function guestOnlyLoader() {
   return user ? redirect('/people') : null;
 }
 
+/**
+ * A raiz decide pelo visitante: apresentação para quem chega de fora, app para
+ * quem já entrou.
+ *
+ * Antes `/` era um `<Navigate to="/people">` dentro do layout, e o layout exige
+ * sessão — então todo visitante era despejado no login sem uma palavra sobre o
+ * que o kindred é. Agora a rota fica fora do layout e é o loader que separa os
+ * dois casos.
+ *
+ * O destino de quem tem sessão é `/people`, e não `/setup`: quem sabe se falta a
+ * pessoa central é o `layoutLoader`, e mandar para lá é deixá-lo decidir como
+ * decide para qualquer outra tela. Duplicar a checagem aqui criaria uma segunda
+ * cópia da regra para divergir.
+ */
+export async function landingLoader() {
+  const user = await currentUser();
+  return user ? redirect('/people') : null;
+}
+
 export type PeopleListData = {
   query: PeopleListQuery;
   result: PaginatedPeopleResponse;

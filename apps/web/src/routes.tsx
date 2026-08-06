@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import AppLayout from './App';
+import LandingPage from './pages/LandingPage';
 import PeopleListPage from './pages/PeopleListPage';
 import PersonFormPage from './pages/PersonFormPage';
 import LocationsPage from './pages/LocationsPage';
@@ -12,6 +13,7 @@ import SettingsPage from './pages/SettingsPage';
 import {
   accountLoader,
   guestOnlyLoader,
+  landingLoader,
   layoutLoader,
   locationsLoader,
   peopleListLoader,
@@ -21,6 +23,10 @@ import {
 } from './loaders';
 
 export const router = createBrowserRouter([
+  // A raiz apresenta o app a quem chega de fora; quem já tem sessão o loader
+  // manda para dentro. Fica fora do layout porque o layout exige sessão — e era
+  // exatamente isso que despejava todo visitante no login sem explicar nada.
+  { path: '/', element: <LandingPage />, loader: landingLoader },
   // Fora do layout, e sem exigir sessão — são a porta de entrada de quem
   // ainda não tem conta ou perdeu a sessão (BL-10).
   { path: '/login', element: <LoginPage />, loader: guestOnlyLoader },
@@ -34,7 +40,9 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     loader: layoutLoader,
     children: [
-      { index: true, element: <Navigate to="/people" replace /> },
+      // Sem rota `index` aqui: a raiz agora é a aterrissagem, acima. Duas rotas
+      // casando com `/` deixariam a escolha para a ordem da lista, e a de cima
+      // ganharia sempre — melhor não ter a segunda.
       { path: 'people', element: <PeopleListPage />, loader: peopleListLoader },
       { path: 'people/new', element: <PersonFormPage />, loader: personFormLoader },
       { path: 'people/:id/edit', element: <PersonFormPage />, loader: personFormLoader },

@@ -1554,3 +1554,211 @@ button:disabled {
   font-size: 0.875rem;
   font-weight: 500;
 }
+
+/* ─── Aterrissagem ───────────────────────────────────────────────────────────
+ *
+ * A única tela sem a sidebar e sem sessão. Fica no fim do arquivo, junto: é um
+ * bloco autocontido, e nada aqui é reaproveitado pelo resto da app.
+ *
+ * Os botões precisam de classe própria porque são `<Link>`, e o estilo base de
+ * botão do kindred está no ELEMENTO `button` — um `<a class="btn-primary">`
+ * herdaria a cor e sairia sem padding nem raio.
+ */
+
+.landing {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+}
+
+.landing-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.landing-mark {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--heading);
+  letter-spacing: -0.01em;
+}
+
+.landing-top-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.landing-btn {
+  display: inline-block;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.landing-btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.landing-btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.landing-btn-ghost {
+  border: 1px solid var(--input-border);
+  color: var(--strong);
+}
+
+.landing-btn-ghost:hover {
+  background: var(--accent);
+}
+
+.landing-main {
+  flex: 1;
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+}
+
+.landing-hero {
+  display: grid;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+@media (min-width: 60rem) {
+  .landing-hero {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.landing-hero h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--heading);
+}
+
+.landing-lead {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.landing-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.landing-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--faint);
+}
+
+.landing-figure {
+  margin: 0;
+}
+
+.tree-mock {
+  width: 100%;
+  height: auto;
+}
+
+.landing-figure figcaption {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+.landing-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 4rem;
+}
+
+@media (min-width: 48rem) {
+  .landing-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.landing-start {
+  margin-top: 4rem;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.landing-start h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  color: var(--heading);
+}
+
+.landing-start ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.landing-start strong {
+  color: var(--strong);
+}
+
+.landing-foot {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.landing-foot a {
+  color: var(--muted);
+}
+
+/*
+ * O `.card` do kindred nasceu para item de lista: é `flex` com `align-items:
+ * center` e carrega `margin-bottom`, o que faz sentido empilhado e atrapalha
+ * dentro de um grid — a margem soma ao `gap` e o alinhamento central deixa
+ * cartões de alturas diferentes desencontrados. Aqui ele é cartão de conteúdo,
+ * então estes três ajustes valem só dentro da aterrissagem.
+ */
+.landing-grid .card {
+  margin-bottom: 0;
+  align-items: flex-start;
+}
+
+.landing-grid .card-body h3 {
+  margin-bottom: 0.5rem;
+  line-height: 1.35;
+}
+
+.landing-grid .card-body p {
+  line-height: 1.6;
+}
