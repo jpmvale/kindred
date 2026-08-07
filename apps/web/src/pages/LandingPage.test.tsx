@@ -35,7 +35,7 @@ describe('LandingPage', () => {
     montar();
 
     expect(
-      await screen.findByRole('heading', { name: /quem é quem na sua família/i }),
+      await screen.findByRole('heading', { name: /prima em 2º grau/i }),
     ).toBeInTheDocument();
   });
 
@@ -64,7 +64,7 @@ describe('LandingPage', () => {
     semSessao();
     const user = userEvent.setup();
     const { router } = montar();
-    await screen.findByRole('heading', { name: /quem é quem na sua família/i });
+    await screen.findByRole('heading', { name: /prima em 2º grau/i });
 
     // Há um "Criar conta" no topo e outro na chamada principal; os dois valem.
     await user.click(screen.getAllByRole('link', { name: 'Criar conta' })[0]);
