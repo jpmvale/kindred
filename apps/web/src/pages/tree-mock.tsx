@@ -1,10 +1,15 @@
 /*
  * A árvore, ilustrada — e o argumento da página, não a decoração dela.
  *
- * Cresceu e passou a mostrar **os parentescos escritos**: "Avó", "Tia", "Prima
- * em 2º", "você". Antes os nós eram caixas com traços dentro, e uma árvore
- * anônima é indistinguível de um organograma — o que o kindred faz de diferente é
- * justamente nomear o vínculo, e o desenho precisava dizer isso.
+ * Mostra **os parentescos escritos**: "Avó", "Tia", "Irmã", "você". Uma árvore
+ * anônima é indistinguível de um organograma, e o que o kindred faz de diferente
+ * é justamente nomear o vínculo.
+ *
+ * Três gerações e oito pessoas, com dois ramos abrindo em paralelo. A versão
+ * anterior tinha seis nós numa linha só de descendência, montada para provar a
+ * frase "ela é sua prima em 2º grau" que titulava a página. O título mudou, e
+ * uma ilustração que ilustra um argumento que saiu vira enfeite: esta desenha
+ * uma família qualquer, que é o que a página promete agora.
  *
  * Continua SVG com os tokens de cor do `index.css` (ADR-015), sem imagem: segue o
  * tema claro e o escuro sozinha e não pede arquivo de fora. As pessoas são
@@ -24,35 +29,37 @@ const LARGURA_NO = 62;
 const ALTURA_NO = 30;
 
 const PESSOAS: Pessoa[] = [
-  { x: 66, y: 6, parentesco: 'Avô', ano: '1938' },
-  { x: 142, y: 6, parentesco: 'Avó', ano: '1941' },
-  { x: 28, y: 76, parentesco: 'Tia', ano: '1969' },
-  { x: 180, y: 76, parentesco: 'Mãe', ano: '1972' },
-  { x: 10, y: 146, parentesco: 'Prima em 2º', ano: '1996' },
-  { x: 198, y: 146, parentesco: 'você', ano: '1994', central: true },
+  { x: 105, y: 6, parentesco: 'Avô', ano: '1938' },
+  { x: 173, y: 6, parentesco: 'Avó', ano: '1941' },
+  { x: 20, y: 76, parentesco: 'Tia', ano: '1969' },
+  { x: 139, y: 76, parentesco: 'Mãe', ano: '1972' },
+  { x: 258, y: 76, parentesco: 'Tio', ano: '1975' },
+  { x: 20, y: 146, parentesco: 'Primo', ano: '1996' },
+  { x: 104, y: 146, parentesco: 'você', ano: '1994', central: true },
+  { x: 176, y: 146, parentesco: 'Irmã', ano: '1991' },
 ];
 
 export function TreeMock() {
   return (
     <svg
-      viewBox="0 0 272 190"
+      viewBox="0 0 340 210"
       role="img"
-      aria-label="Ilustração da árvore genealógica: avós no topo, duas filhas, e na base a prima em segundo grau e você"
+      aria-label="Ilustração da árvore genealógica: avós no topo, três filhos na geração seguinte, e na base um primo, você e sua irmã"
       className="tree-mock"
     >
       {/* União dos avós: linha cheia, como a vigente na árvore de verdade */}
-      <line x1="128" y1="21" x2="142" y2="21" stroke="var(--primary)" strokeWidth="2" />
+      <line x1="167" y1="21" x2="173" y2="21" stroke="var(--primary)" strokeWidth="2" />
 
-      {/* Descida até as filhas */}
+      {/* Do casal até os três filhos */}
       <path
-        d="M135 21 V50 H59 V76 M135 50 H211 V76"
+        d="M170 21 V50 H51 V76 M170 50 H289 V76 M170 50 V76"
         fill="none"
         stroke="var(--border)"
         strokeWidth="1.8"
       />
-      {/* Das filhas até a geração de baixo */}
+      {/* Dos filhos até a geração de baixo, em dois ramos paralelos */}
       <path
-        d="M59 106 V126 H41 V146 M211 106 V126 H229 V146"
+        d="M51 106 V146 M170 106 V126 H135 V146 M170 126 H207 V146"
         fill="none"
         stroke="var(--border)"
         strokeWidth="1.8"

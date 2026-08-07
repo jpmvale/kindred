@@ -51,11 +51,11 @@ export default function LandingPage() {
       <main className="landing-main">
         <section className="landing-hero">
           <div>
-            {/* O título diz uma frase que só este app consegue dizer. "Quem é
-                quem na sua família" servia para qualquer lista de contatos; o
-                grau calculado, não — e é o motivo de o kindred existir. */}
+            {/* O título nomeia as duas coisas que o app entrega: a árvore
+                desenhada e o aniversário que ninguém precisa lembrar sozinho. */}
             <h1>
-              Ela é sua <span className="landing-destaque">prima em 2º grau</span>.
+              Visualize sua <span className="landing-destaque">árvore genealógica</span> e seja
+              sempre lembrado dos aniversários.
             </h1>
             <p className="landing-lead">
               Você diz quem é filho de quem; o kindred deduz o resto. O grau de parentesco de toda a
