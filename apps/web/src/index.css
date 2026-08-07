@@ -1762,3 +1762,24 @@ button:disabled {
 .landing-grid .card-body p {
   line-height: 1.6;
 }
+
+/* O trecho que carrega o argumento do título — o grau calculado. */
+.landing-destaque {
+  color: var(--primary);
+}
+
+/*
+ * A ilustração ganha mais espaço que o texto (1.15 contra 0.85): o que este app
+ * faz de diferente é nomear o vínculo, e isso se vê na árvore, não na frase ao
+ * lado. Abaixo de 60rem a regra não vale — lá tudo empilha em uma coluna.
+ */
+@media (min-width: 60rem) {
+  .landing-hero {
+    grid-template-columns: 0.85fr 1.15fr;
+  }
+}
+
+/* Hierarquia dos cartões: título com mais peso e corpo com mais respiro. */
+.landing-grid .card-body h3 {
+  font-size: 1.0625rem;
+}

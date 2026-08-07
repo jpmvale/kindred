@@ -51,11 +51,15 @@ export default function LandingPage() {
       <main className="landing-main">
         <section className="landing-hero">
           <div>
-            <h1>Quem é quem na sua família — e como cada um se liga a você.</h1>
+            {/* O título diz uma frase que só este app consegue dizer. "Quem é
+                quem na sua família" servia para qualquer lista de contatos; o
+                grau calculado, não — e é o motivo de o kindred existir. */}
+            <h1>
+              Ela é sua <span className="landing-destaque">prima em 2º grau</span>.
+            </h1>
             <p className="landing-lead">
-              O kindred guarda as pessoas e os vínculos entre elas. A partir de uma pessoa central,
-              ele calcula sozinho o grau de parentesco de todo mundo, desenha a árvore e reúne os
-              aniversários num calendário.
+              Você diz quem é filho de quem; o kindred deduz o resto. O grau de parentesco de toda a
+              família, a árvore desenhada e os aniversários do mês vêm daí — sem você calcular nada.
             </p>
             <div className="landing-cta">
               <Link className="landing-btn landing-btn-primary" to="/register">
