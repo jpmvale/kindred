@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- Favicon do kindred: a árvore reduzida ao mínimo que ainda é uma árvore —
-       um nó em cima, dois embaixo, ligados. No índigo da marca (#6366f1, o
-       token primary).
+  <!-- Favicon do kindred: uma árvore genealógica genérica — uma raiz em cima,
+       barramento horizontal e três filhos embaixo. No índigo da marca (#6366f1,
+       o token primary).
 
-       O arquivo anterior era uma forma abstrata roxa (#863bff, que nem é a cor
+       Três filhos e não dois: com dois ramos o desenho lia como diagrama
+       binário, uma estrutura de dados, e não como família. O terceiro nó custa
+       um círculo e é o que faz a forma dizer "genealogia" à primeira vista.
+
+       O arquivo original era uma forma abstrata roxa (#863bff, que nem é a cor
        do app) com desfoques gaussianos e máscaras: em 16px, o tamanho real de
        uma aba, aquilo virava uma mancha e não dizia nada sobre o produto. Aqui
        só há círculos e linhas sólidas, que é o que sobrevive nesse tamanho.
@@ -13,12 +17,15 @@
        token CSS pelo nome com os dois hifens à frente deixa a aba sem ícone e
        não gera erro em lugar nenhum. -->
   <circle cx="16" cy="16" r="16" fill="#6366f1"/>
-  <g stroke="#eef2ff" stroke-width="2" stroke-linecap="round" fill="none">
-    <path d="M16 12.5 V17 M10 17 H22 M10 17 V19.5 M22 17 V19.5"/>
+  <g stroke="#eef2ff" stroke-width="1.9" stroke-linecap="round" fill="none">
+    <path d="M16 11.4 V15.2"/>
+    <path d="M7.6 15.2 H24.4"/>
+    <path d="M7.6 15.2 V18.4 M16 15.2 V18.4 M24.4 15.2 V18.4"/>
   </g>
   <g fill="#eef2ff">
-    <circle cx="16" cy="10" r="3.2"/>
-    <circle cx="10" cy="22" r="3.2"/>
-    <circle cx="22" cy="22" r="3.2"/>
+    <circle cx="16" cy="8.2" r="3"/>
+    <circle cx="7.6" cy="21.4" r="3"/>
+    <circle cx="16" cy="21.4" r="3"/>
+    <circle cx="24.4" cy="21.4" r="3"/>
   </g>
 </svg>
