@@ -1,5 +1,7 @@
 # kindred
 
+**Em produção:** <https://kindred.imp-software.cloud>
+
 **kindred** é uma aplicação pessoal para registrar **pessoas** e os **vínculos** entre elas — a
 família, quem é amigo, quem é só conhecido. A partir de uma **pessoa central** (você), o kindred
 calcula sozinho o **grau de parentesco** de todo mundo ("Avó", "Tio", "Primo em 2º grau"), desenha a
